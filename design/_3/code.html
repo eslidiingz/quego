@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+
+<html class="light" lang="th"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .gold-glow {
+            box-shadow: 0 0 20px rgba(120, 90, 26, 0.15);
+        }
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .animate-pulse-subtle {
+            animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#261900",
+                        "on-background": "#191c1d",
+                        "secondary": "#775a19",
+                        "on-tertiary-fixed": "#2d0050",
+                        "inverse-surface": "#2e3132",
+                        "surface": "#f8f9fa",
+                        "on-primary-fixed": "#001f24",
+                        "on-surface-variant": "#3f484a",
+                        "surface-tint": "#156874",
+                        "on-error-container": "#93000a",
+                        "primary-fixed-dim": "#8bd2df",
+                        "on-surface": "#191c1d",
+                        "secondary-fixed-dim": "#e9c176",
+                        "surface-variant": "#e1e3e4",
+                        "on-primary-fixed-variant": "#004e59",
+                        "surface-container-high": "#e7e8e9",
+                        "secondary-fixed": "#ffdea5",
+                        "surface-bright": "#f8f9fa",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f3f4f5",
+                        "tertiary-fixed": "#f1dbff",
+                        "on-tertiary-container": "#e1bdff",
+                        "primary-container": "#005f6b",
+                        "tertiary-fixed-dim": "#deb7ff",
+                        "inverse-on-surface": "#f0f1f2",
+                        "on-primary-container": "#90d6e4",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#680eac",
+                        "error": "#ba1a1a",
+                        "primary": "#00464f",
+                        "secondary-container": "#fed488",
+                        "on-secondary-container": "#785a1a",
+                        "on-secondary-fixed-variant": "#5d4201",
+                        "primary-fixed": "#a7eefc",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#8bd2df",
+                        "tertiary": "#5e009f",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-container": "#7829bc",
+                        "background": "#f8f9fa",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#e1e3e4",
+                        "outline": "#6f797b",
+                        "surface-dim": "#d9dadb",
+                        "outline-variant": "#bec8ca",
+                        "surface-container": "#edeeef"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-md": "24px",
+                        "margin-mobile": "16px",
+                        "base": "8px",
+                        "stack-sm": "12px",
+                        "margin-desktop": "48px",
+                        "container-max": "1280px",
+                        "stack-lg": "40px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "display-lg-mobile": ["Montserrat"],
+                        "label-md": ["Inter"],
+                        "headline-lg-mobile": ["Montserrat"],
+                        "headline-lg": ["Montserrat"],
+                        "body-lg": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "display-lg": ["Montserrat"],
+                        "headline-md": ["Montserrat"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "display-lg-mobile": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col md:flex-row overflow-x-hidden">
+<!-- Sidebar Navigation (Desktop) -->
+<nav class="hidden lg:flex flex-col h-screen sticky left-0 top-0 bg-surface-container-low border-r border-outline-variant w-80 shadow-md">
+<div class="p-8 flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-4xl" data-icon="spa">spa</span>
+<span class="font-display-lg text-display-lg text-primary tracking-tight">LuxeQueue</span>
+</div>
+<div class="px-4 mb-8">
+<div class="flex items-center gap-4 p-4 rounded-xl bg-surface-container-high">
+<div class="h-12 w-12 rounded-full overflow-hidden bg-primary-container flex items-center justify-center">
+<img alt="Merchant Profile" class="h-full w-full object-cover" data-alt="A professional portrait of a high-end salon manager in an elegant, well-lit modern reception area. The lighting is soft and flattering, highlighting the luxury atmosphere of the merchant shop. The scene uses a palette of soft teals and warm gold accents, maintaining a sophisticated and welcoming boutique merchant identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCt38o-8z2iG8K5brV4hqFVn2BWva6xBRu3mySe0gbWW0Bez9b7j0eCddloUUYfc4bAhNYdyGCqwo0HSjG1HLkESkWDMX1I997Mi88BO-BDIbgDxFR9dRVh_T5zG0NSsr0KfLp0GRl4LAgfeQW2BCHlXb8ke-kDjC8ZTEEsMLXD1pTyPWUvYBlKNJ7XpG6HRt8bWhdA07j-6yKv5qMFg1twprb7NOIFWfkC_cu49LGxcX0nZF5T7FRtXXJX6hAgtatHU776YZh-L5i4"/>
+</div>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface font-bold">Elite Merchant</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Premium Tier</p>
+</div>
+<span class="ml-auto flex h-2 w-2 rounded-full bg-primary"></span>
+</div>
+</div>
+<div class="flex flex-col gap-1 px-2">
+<a class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-3 bg-secondary-container text-on-secondary-container rounded-full font-bold" href="#">
+<span class="material-symbols-outlined" data-icon="Confirmation_number">confirmation_number</span>
+<span class="font-label-md text-label-md">Queue Management</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="storefront">storefront</span>
+<span class="font-label-md text-label-md">Shop Profile</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="font-label-md text-label-md">Analytics</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+</nav>
+<!-- Top App Bar (Mobile) -->
+<header class="lg:hidden w-full top-0 sticky z-40 bg-surface shadow-sm h-16 flex items-center justify-between px-margin-mobile">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="spa">spa</span>
+<span class="font-display-lg text-display-lg-mobile text-primary tracking-tight">LuxeQueue</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="h-10 w-10 rounded-full border-2 border-secondary p-0.5">
+<img alt="Profile" class="h-full w-full rounded-full object-cover" data-alt="Close-up avatar of a premium service provider in a sleek professional environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCV2pgRZRikqs7lQpL_ofiV6ADnQn7t2XvTLg3Nq0lhMA1WDKI0XMsRRUlB_2yvardHVSemglTVJ9Uf9R5Y234Logj9QfKn-VNFdHyEnu56iuzyyfD1eno-gz4U31EMaCQNIIjhDnaub3Se6Ed-ZvS0Tb5CTGELibYcahmpHDTrfdHlc33-sky9mEiFZDn8MLnhoXPIhSSENGtdkQsyLVahUd6wmIvjjgLdjyzoL6d_FY5Be7MjOaZROUp8cR91wrSfEAzVHYMT65TX"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow p-4 md:p-8 lg:p-12 max-w-container-max mx-auto w-full mb-20 lg:mb-0">
+<!-- Welcome & Status Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-stack-lg">
+<div>
+<p class="font-label-md text-label-md text-secondary uppercase tracking-widest mb-1">ยินดีต้อนรับกลับมา</p>
+<h1 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background">การจัดการคิววันนี้</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex flex-col items-end">
+<span class="font-label-sm text-label-sm text-on-surface-variant">สถานะร้านค้า</span>
+<span class="font-label-md text-label-md text-primary font-bold flex items-center gap-1">
+<span class="h-2 w-2 rounded-full bg-primary animate-pulse"></span>
+                        เปิดให้บริการตามปกติ
+                    </span>
+</div>
+<button class="bg-primary text-on-primary px-6 py-3 rounded-full font-label-md text-label-md flex items-center gap-2 hover:shadow-lg transition-shadow active:scale-95 duration-200">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+                    เพิ่มคิวใหม่
+                </button>
+</div>
+</div>
+<!-- Bento Grid Stats Section -->
+<div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-gutter mb-stack-lg">
+<!-- Key Stat: Current Serving (Asymmetric highlight) -->
+<div class="md:col-span-2 glass-card rounded-xl border border-outline-variant p-8 relative overflow-hidden flex flex-col justify-between gold-glow min-h-[240px]">
+<div class="absolute top-0 right-0 p-6">
+<span class="material-symbols-outlined text-6xl text-secondary-container opacity-30" data-icon="record_voice_over">record_voice_over</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="campaign">campaign</span>
+                        กำลังให้บริการหมายเลข
+                    </h3>
+<div class="flex items-baseline gap-4">
+<span class="font-display-lg text-display-lg text-primary text-[80px] leading-none">A-024</span>
+<div class="bg-primary-container text-on-primary-container px-3 py-1 rounded-lg font-label-sm text-label-sm uppercase animate-pulse-subtle">
+                            กำลังดำเนินการ
+                        </div>
+</div>
+</div>
+<div class="flex gap-4 mt-6">
+<button class="flex-grow bg-primary text-on-primary py-4 rounded-xl font-headline-md text-headline-md active:scale-95 transition-transform flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="skip_next">skip_next</span>
+                        เรียกคิวถัดไป
+                    </button>
+<button class="px-6 border-2 border-secondary text-secondary rounded-xl hover:bg-secondary-fixed transition-colors active:scale-95">
+<span class="material-symbols-outlined" data-icon="notifications_active">notifications_active</span>
+</button>
+</div>
+</div>
+<!-- Total Waiting -->
+<div class="bg-surface-container rounded-xl p-8 border border-outline-variant flex flex-col justify-between">
+<div>
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-2">รอในลำดับ</h3>
+<div class="flex items-center gap-3">
+<span class="font-display-lg text-display-lg text-on-surface">12</span>
+<span class="font-body-md text-body-md text-on-surface-variant">ท่าน</span>
+</div>
+</div>
+<div class="mt-4">
+<div class="flex justify-between font-label-sm text-label-sm mb-2">
+<span>ความหนาแน่น</span>
+<span class="text-primary font-bold">ปานกลาง</span>
+</div>
+<div class="w-full bg-outline-variant h-2 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[65%] rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Health Indicator -->
+<div class="bg-surface-container-highest rounded-xl p-8 border border-outline-variant flex flex-col justify-between">
+<div>
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-2">เวลารอโดยประมาณ</h3>
+<div class="flex items-center gap-3">
+<span class="font-display-lg text-display-lg text-on-surface">18</span>
+<span class="font-body-md text-body-md text-on-surface-variant">นาที</span>
+</div>
+</div>
+<div class="bg-secondary-fixed text-on-secondary-fixed p-3 rounded-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="info">info</span>
+<span class="font-label-sm text-label-sm leading-tight">รักษาระดับเวลาได้ดีกว่าเมื่อวาน 5%</span>
+</div>
+</div>
+</div>
+<!-- Queue List Management -->
+<div class="w-full">
+<div class="flex items-center justify-between mb-6">
+<h2 class="font-headline-md text-headline-md text-on-background">รายการคิวที่รอ (12)</h2>
+<div class="flex gap-2">
+<button class="p-2 hover:bg-surface-container-high rounded-lg"><span class="material-symbols-outlined" data-icon="filter_list">filter_list</span></button>
+<button class="p-2 hover:bg-surface-container-high rounded-lg"><span class="material-symbols-outlined" data-icon="search">search</span></button>
+</div>
+</div>
+<!-- Queue Cards Container -->
+<div class="flex flex-col gap-4">
+<!-- Queue Item 1 (Urgent/Long Wait) -->
+<div class="bg-surface border-2 border-secondary rounded-xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all hover:shadow-md relative overflow-hidden">
+<div class="absolute left-0 top-0 h-full w-1.5 bg-secondary"></div>
+<div class="flex items-center gap-6">
+<div class="h-16 w-16 bg-secondary-fixed flex items-center justify-center rounded-2xl font-display-lg text-display-lg-mobile text-on-secondary-fixed">A-25</div>
+<div>
+<div class="flex items-center gap-2 mb-1">
+<h4 class="font-headline-md text-headline-md text-on-surface">คุณ วรินทร</h4>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">VIP</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">จองสำหรับ: ตัดผมชาย + ทำทรีทเมนต์</p>
+<div class="flex items-center gap-4 mt-2">
+<span class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-xs" data-icon="schedule">schedule</span> รอมาแล้ว 25 นาที
+                                </span>
+<span class="flex items-center gap-1 font-label-sm text-label-sm text-error font-bold">
+<span class="material-symbols-outlined text-xs" data-icon="priority_high">priority_high</span> รอนานกว่าปกติ
+                                </span>
+</div>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="flex-grow md:flex-none px-6 py-3 border-2 border-secondary text-secondary rounded-xl font-label-md text-label-md hover:bg-secondary-fixed transition-colors">เลื่อนคิว</button>
+<button class="flex-grow md:flex-none px-8 py-3 bg-primary text-on-primary rounded-xl font-label-md text-label-md shadow-md active:scale-95 transition-transform">เรียกคิว</button>
+</div>
+</div>
+<!-- Queue Item 2 (Standard) -->
+<div class="bg-surface border border-outline-variant rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all hover:bg-surface-container-low">
+<div class="flex items-center gap-6">
+<div class="h-16 w-16 bg-surface-container-highest flex items-center justify-center rounded-2xl font-display-lg text-display-lg-mobile text-on-surface">A-26</div>
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-1">คุณ กิตติศักดิ์</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">จองสำหรับ: ตัดผมชาย</p>
+<div class="flex items-center gap-4 mt-2">
+<span class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-xs" data-icon="schedule">schedule</span> รอมาแล้ว 12 นาที
+                                </span>
+</div>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="flex-grow md:flex-none px-6 py-3 text-on-surface-variant hover:bg-surface-container-high rounded-xl font-label-md text-label-md transition-colors">เลื่อนคิว</button>
+<button class="flex-grow md:flex-none px-8 py-3 border-2 border-primary text-primary rounded-xl font-label-md text-label-md active:scale-95 transition-transform">เรียกคิว</button>
+</div>
+</div>
+<!-- Queue Item 3 (Delayed Status) -->
+<div class="bg-surface-container-low border border-outline-variant rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 opacity-80">
+<div class="flex items-center gap-6">
+<div class="h-16 w-16 bg-secondary-fixed/50 flex items-center justify-center rounded-2xl font-display-lg text-display-lg-mobile text-on-surface-variant">A-23</div>
+<div>
+<div class="flex items-center gap-2 mb-1">
+<h4 class="font-headline-md text-headline-md text-on-surface">คุณ นภัสสร</h4>
+<div class="bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded text-[10px] font-bold">เลื่อนเวลาแล้ว</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">จองสำหรับ: สปาผม + ไดร์ผม</p>
+<div class="flex items-center gap-4 mt-2">
+<span class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-xs" data-icon="history">history</span> จะพร้อมให้บริการในอีก 10 นาที
+                                </span>
+</div>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="flex-grow md:flex-none px-8 py-3 bg-secondary text-on-secondary rounded-xl font-label-md text-label-md active:scale-95 transition-transform">พร้อมเรียก</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation (Mobile) -->
+<nav class="lg:hidden fixed bottom-0 left-0 w-full z-50 bg-surface border-t border-outline-variant flex justify-around items-center px-4 py-2 pb-safe shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+<button class="flex flex-col items-center justify-center text-on-surface-variant p-2">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+<span class="font-label-sm text-label-sm">สำรวจ</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-2xl px-4 py-1">
+<span class="material-symbols-outlined" data-icon="style">style</span>
+<span class="font-label-sm text-label-sm">คิวของฉัน</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant p-2">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="font-label-sm text-label-sm">แจ้งเตือน</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant p-2">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-sm text-label-sm">โปรไฟล์</span>
+</button>
+</nav>
+<!-- Footer (Desktop) -->
+<footer class="hidden lg:flex w-full mt-auto bg-surface-container-highest flex-col md:flex-row justify-between items-center px-margin-desktop py-8 border-t border-outline-variant">
+<div class="flex flex-col gap-2">
+<span class="font-headline-md text-primary">LuxeQueue Premium</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant">© 2024 LuxeQueue Premium Concierge</p>
+</div>
+<div class="flex gap-8">
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">นโยบายความเป็นส่วนตัว</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">ข้อตกลงการใช้งาน</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">ช่วยเหลือ</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">ติดต่อเรา</a>
+</div>
+</footer>
+<script>
+        // Micro-interaction for buttons
+        document.querySelectorAll('button').forEach(button => {
+            button.addEventListener('mousedown', () => {
+                button.classList.add('scale-95');
+            });
+            button.addEventListener('mouseup', () => {
+                button.classList.remove('scale-95');
+            });
+        });
+
+        // Simple real-time clock indicator simulation
+        function updateWaitingTimes() {
+            // Logic to update wait timer visually every minute could go here
+        }
+    </script>
+</body></html>

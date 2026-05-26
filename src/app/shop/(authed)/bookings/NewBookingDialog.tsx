@@ -1,0 +1,464 @@
+"use client";
+
+import { useActionState, useEffect, useMemo, useState } from "react";
+import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { PhoneInput } from "@/components/ui/PhoneInput";
+import { Icon } from "@/components/ui/Icon";
+import { cn } from "@/lib/cn";
+import { generateSlots, type BookingContext } from "@/lib/booking/slot-math";
+import {
+  createManualBookingAction,
+  type CreateManualBookingState,
+} from "./actions";
+
+/**
+ * Shop-side "add a booking on behalf of a customer" dialog. Same picker UX
+ * as the customer-facing form, but wrapped in a modal and submitting to
+ * `createManualBookingAction` (which uses the shop session, NOT a posted
+ * shopId, for authority).
+ *
+ * SRP: owns the picker state + modal lifecycle. Slot validity rules are
+ * defined once in `lib/booking/slot-math` and re-validated server-side.
+ */
+export function NewBookingDialog({
+  context,
+  triggerClassName,
+  triggerSize = "md",
+}: {
+  context: BookingContext;
+  triggerClassName?: string;
+  triggerSize?: "sm" | "md" | "lg" | "xl";
+}) {
+  const [open, setOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+
+  const [state, formAction, pending] = useActionState<
+    CreateManualBookingState,
+    FormData
+  >(createManualBookingAction, null);
+
+  // Reset + close on success. Wrapped state means the picker is empty next
+  // time the dialog opens — fresh sheet for the next walk-in.
+  useEffect(() => {
+    if (state?.ok) {
+      setOpen(false);
+      setSelectedDate(null);
+      setSelectedSlot(null);
+      setName("");
+      setPhone("");
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+  }, [state]);
+
+  const days = useMemo(() => buildDays(context), [context]);
+  const selectedDay = days.find((d) => d.dateYmd === selectedDate) ?? null;
+
+  const slots = useMemo(() => {
+    if (!selectedDay || selectedDay.status === "closed") return [];
+    return computeSlotsForDay(selectedDay, context);
+  }, [selectedDay, context]);
+
+  // Phone is optional on the shop-side manual flow — but if any digits were
+  // typed, they must form a valid Thai phone (9-10 digits) so we don't
+  // silently store a half-typed number.
+  const phoneValid = phone.length === 0 || /^[0-9]{9,10}$/u.test(phone);
+  const canSubmit =
+    Boolean(selectedDate) &&
+    Boolean(selectedSlot) &&
+    name.trim().length > 0 &&
+    phoneValid;
+
+  const handleSelectDate = (dateYmd: string) => {
+    setSelectedDate(dateYmd);
+    setSelectedSlot(null);
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        size={triggerSize}
+        rounded="full"
+        onClick={() => setOpen(true)}
+        iconLeft={<Icon name="person_add" />}
+        className={triggerClassName}
+      >
+        เพิ่มการจอง
+      </Button>
+
+      <Modal
+        open={open}
+        onClose={pending ? () => undefined : () => setOpen(false)}
+        title="เพิ่มการจองด้วยตนเอง"
+        size="lg"
+      >
+        <p className="text-body-md text-on-surface-variant mb-5">
+          สำหรับลูกค้าที่ติดต่อจองโดยตรงผ่านโทรศัพท์หรือหน้าร้าน
+        </p>
+
+        <form action={formAction} className="space-y-stack-md">
+          <input type="hidden" name="date" value={selectedDate ?? ""} />
+          <input type="hidden" name="slotTime" value={selectedSlot ?? ""} />
+
+          <Section step={1} title="เลือกวัน">
+            <div className="grid grid-cols-4 gap-2">
+              {days.map((d) => (
+                <DateChip
+                  key={d.dateYmd}
+                  day={d}
+                  selected={d.dateYmd === selectedDate}
+                  onClick={() => handleSelectDate(d.dateYmd)}
+                />
+              ))}
+            </div>
+          </Section>
+
+          <Section
+            step={2}
+            title="เลือกเวลา"
+            hint={
+              selectedDay?.status === "available"
+                ? `บริการครั้งละ ${context.shop.serviceDurationMinutes} นาที`
+                : undefined
+            }
+          >
+            {!selectedDate ? (
+              <EmptyHint icon="event" message="ยังไม่ได้เลือกวัน" />
+            ) : selectedDay?.status === "closed" ? (
+              <EmptyHint icon="event_busy" message="ร้านปิดในวันนี้" />
+            ) : slots.length === 0 ? (
+              <EmptyHint icon="schedule" message="ไม่มีรอบให้บริการในวันนี้" />
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {slots.map((s) => (
+                  <SlotButton
+                    key={s.time}
+                    slot={s}
+                    selected={s.time === selectedSlot}
+                    onClick={() => setSelectedSlot(s.time)}
+                  />
+                ))}
+              </div>
+            )}
+          </Section>
+
+          <Section step={3} title="ข้อมูลลูกค้า">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                name="customerName"
+                label="ชื่อ"
+                placeholder="ชื่อจริงหรือชื่อเล่น"
+                required
+                maxLength={100}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="off"
+              />
+              <PhoneInput
+                name="customerPhone"
+                label="เบอร์โทร"
+                placeholder="0812345678 (ไม่บังคับ)"
+                value={phone}
+                onChange={(digits) => setPhone(digits)}
+                helperText="ไม่บังคับกรอก"
+              />
+            </div>
+          </Section>
+
+          {state && !state.ok ? (
+            <div className="bg-error-container/30 border border-error/20 text-on-error-container rounded-xl p-4 flex items-start gap-3">
+              <Icon name="error" className="text-error mt-0.5" />
+              <p className="text-body-md">{state.message}</p>
+            </div>
+          ) : null}
+
+          <div className="flex gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={pending}
+              fullWidth
+              className="flex-1"
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="submit"
+              disabled={!canSubmit || pending}
+              fullWidth
+              className="flex-1"
+              iconLeft={
+                pending ? (
+                  <Icon name="progress_activity" className="animate-spin" />
+                ) : (
+                  <Icon name="event_available" />
+                )
+              }
+            >
+              {pending ? "กำลังบันทึก..." : "บันทึกการจอง"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    </>
+  );
+}
+
+// ----- Subcomponents ------------------------------------------------------
+
+function Section({
+  step,
+  title,
+  hint,
+  children,
+}: {
+  step: number;
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <header className="flex items-center gap-2">
+        <span className="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-label-sm shrink-0">
+          {step}
+        </span>
+        <h3 className="font-display text-headline-sm text-on-surface">
+          {title}
+        </h3>
+        {hint ? (
+          <span className="text-label-sm text-on-surface-variant ml-auto">
+            {hint}
+          </span>
+        ) : null}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function DateChip({
+  day,
+  selected,
+  onClick,
+}: {
+  day: BookableDay;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const disabled = day.status !== "available";
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      aria-pressed={selected}
+      className={cn(
+        "flex flex-col items-center gap-0.5 rounded-xl py-2 px-1 text-center transition-all border-2",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        selected
+          ? "bg-primary text-on-primary border-primary shadow-tinted"
+          : day.status === "closed"
+            ? "bg-surface-container-low/40 text-on-surface-variant/50 border-transparent cursor-not-allowed"
+            : day.status === "full"
+              ? "bg-surface-container-low text-on-surface-variant border-transparent cursor-not-allowed"
+              : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
+      )}
+    >
+      <span className="text-label-sm font-bold uppercase tracking-widest">
+        {THAI_DAY_SHORT[day.dayOfWeek]}
+      </span>
+      <span className="font-display text-headline-md leading-none">
+        {day.dayOfMonth}
+      </span>
+      <span className="text-label-sm opacity-80">
+        {THAI_MONTH_SHORT[day.month0]}
+      </span>
+      {!selected ? (
+        <span
+          className={cn(
+            "text-[10px] uppercase tracking-widest font-bold mt-1",
+            day.status === "closed" && "text-on-surface-variant/60",
+            day.status === "full" && "text-error",
+            day.status === "available" && "text-primary/70",
+          )}
+        >
+          {STATUS_LABEL[day.status]}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function SlotButton({
+  slot,
+  selected,
+  onClick,
+}: {
+  slot: SlotView;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const disabled = !slot.isAvailable;
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      aria-pressed={selected}
+      className={cn(
+        "rounded-full px-3 py-2 text-label-md font-semibold border-2 transition-all",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        selected
+          ? "bg-primary text-on-primary border-primary shadow-tinted"
+          : disabled
+            ? "bg-surface-container-low/40 text-on-surface-variant/50 border-transparent cursor-not-allowed line-through"
+            : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
+      )}
+    >
+      {slot.time}
+    </button>
+  );
+}
+
+function EmptyHint({ icon, message }: { icon: string; message: string }) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-6 text-on-surface-variant">
+      <Icon name={icon} size={28} className="opacity-60" />
+      <p className="text-label-md">{message}</p>
+    </div>
+  );
+}
+
+// ----- Pure helpers (duplicated from BookingForm to avoid a 3-way coupling
+// between this client module, the customer page's client module, and the
+// pure slot-math library — keeps each surface independently editable) ----
+
+type DayStatus = "closed" | "full" | "available";
+
+type BookableDay = {
+  dateYmd: string;
+  dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  dayOfMonth: number;
+  month0: number;
+  status: DayStatus;
+};
+
+type SlotView = {
+  time: string;
+  isAvailable: boolean;
+  isTaken: boolean;
+  isPast: boolean;
+};
+
+function buildDays(context: BookingContext): BookableDay[] {
+  const out: BookableDay[] = [];
+  let cursor = context.windowStart;
+  while (cursor <= context.windowEnd) {
+    const [y, m, d] = cursor.split("-").map(Number);
+    const dayOfWeek = new Date(Date.UTC(y, m - 1, d)).getUTCDay() as
+      | 0
+      | 1
+      | 2
+      | 3
+      | 4
+      | 5
+      | 6;
+    const hours = context.hours[dayOfWeek];
+    const isOpen = Boolean(hours?.isOpen && hours.openTime && hours.closeTime);
+
+    let status: DayStatus;
+    if (!isOpen) {
+      status = "closed";
+    } else {
+      const times = generateSlots(
+        hours!.openTime!,
+        hours!.closeTime!,
+        context.shop.serviceDurationMinutes,
+      );
+      const taken = new Set(
+        context.takenSlots
+          .filter((t) => t.date === cursor)
+          .map((t) => t.slotTime),
+      );
+      const isToday = cursor === context.nowDate;
+      const hasAvailable = times.some(
+        (t) => !taken.has(t) && !(isToday && t <= context.nowTimeHHMM),
+      );
+      status = hasAvailable ? "available" : "full";
+    }
+
+    out.push({
+      dateYmd: cursor,
+      dayOfWeek,
+      dayOfMonth: d,
+      month0: m - 1,
+      status,
+    });
+    cursor = addDays(cursor, 1);
+  }
+  return out;
+}
+
+function addDays(ymd: string, delta: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + delta));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+}
+
+function computeSlotsForDay(
+  day: BookableDay,
+  context: BookingContext,
+): SlotView[] {
+  const hours = context.hours[day.dayOfWeek];
+  if (!hours?.isOpen || !hours.openTime || !hours.closeTime) return [];
+  const times = generateSlots(
+    hours.openTime,
+    hours.closeTime,
+    context.shop.serviceDurationMinutes,
+  );
+  const taken = new Set(
+    context.takenSlots
+      .filter((t) => t.date === day.dateYmd)
+      .map((t) => t.slotTime),
+  );
+  const isToday = day.dateYmd === context.nowDate;
+  return times.map((t) => {
+    const isTaken = taken.has(t);
+    const isPast = isToday && t <= context.nowTimeHHMM;
+    return {
+      time: t,
+      isTaken,
+      isPast,
+      isAvailable: !isTaken && !isPast,
+    };
+  });
+}
+
+const STATUS_LABEL: Record<DayStatus, string> = {
+  closed: "ปิด",
+  full: "เต็ม",
+  available: "ว่าง",
+};
+
+const THAI_DAY_SHORT = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
+const THAI_MONTH_SHORT = [
+  "ม.ค.",
+  "ก.พ.",
+  "มี.ค.",
+  "เม.ย.",
+  "พ.ค.",
+  "มิ.ย.",
+  "ก.ค.",
+  "ส.ค.",
+  "ก.ย.",
+  "ต.ค.",
+  "พ.ย.",
+  "ธ.ค.",
+];

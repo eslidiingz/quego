@@ -1,0 +1,45 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Foundations/Introduction" />
+
+# Aura Queue Design System
+
+A **modern-luxury** design system for the LuxeQueue online booking experience.
+The aesthetic is composed, elite, and welcoming — a "digital velvet" feel built
+on generous whitespace, jewel-toned surfaces, metallic gold accents, and soft
+gradients.
+
+## Pillars
+
+- **Primary — Deep Teal** (`#00464F`): Stability and professional sophistication.
+  Used for core actions and primary surfaces.
+- **Secondary — Metallic Gold** (`#775A19`): Prestige accent. Reserved for VIP
+  indicators, focused inputs, and selection states.
+- **Tertiary — Deep Purple** (`#5E009F`): Vibrancy for time/motion indicators
+  and the "Now Serving" gradient.
+
+## Typography
+
+- **IBM Plex Sans Thai** — single family across display, body, and labels. Thai and
+  Latin glyphs come from the same designer, eliminating baseline drift in mixed-script
+  copy. Hierarchy is carried by weight (700 → 600 → 500 → 400 → 300).
+
+## Layout
+
+- **12-column desktop / single-column mobile.**
+- **24px** minimum gutter, **40px** section stack.
+- Booking flows centered in a 6–8 column narrow layout for focus.
+- Container max-width **1280px** on desktop.
+
+## Elevation
+
+1. **Surface** — 1px outline-variant border.
+2. **Interactive** — soft tinted shadow (teal at 15–18% opacity).
+3. **Floating / Active** — large-radius shadow with gold border (2px) for "Now Serving" tickets.
+
+## How to Use This Library
+
+Components live under `src/components/{ui,booking,layout}` and are documented
+here by category. All visual tokens are defined in `src/app/globals.css` via
+Tailwind v4 `@theme`, so utility classes like `bg-primary`, `text-secondary`,
+`p-stack-md` work everywhere.
