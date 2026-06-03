@@ -55,8 +55,11 @@ export default async function BookShopPage({
             {context.shop.name}
           </h1>
           <p className="text-body-md opacity-90 mt-2">
-            บริการครั้งละ {context.shop.serviceDurationMinutes} นาที ·
-            จองล่วงหน้าได้ {countDays(context.windowStart, context.windowEnd)} วัน
+            {context.services.length > 1
+              ? `${context.services.length} บริการให้เลือก`
+              : `บริการครั้งละ ${context.services[0]?.durationMinutes ?? context.shop.serviceDurationMinutes} นาที`}{" "}
+            · จองล่วงหน้าได้{" "}
+            {countDays(context.windowStart, context.windowEnd)} วัน
           </p>
         </section>
 

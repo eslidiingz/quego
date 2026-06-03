@@ -65,6 +65,7 @@ export async function createManualBookingAction(
   formData: FormData,
 ): Promise<CreateManualBookingState> {
   const session = await requireShopSession();
+  const serviceId = String(formData.get("serviceId") ?? "");
   const date = String(formData.get("date") ?? "");
   const slotTime = String(formData.get("slotTime") ?? "");
   const customerName = String(formData.get("customerName") ?? "");
@@ -72,6 +73,7 @@ export async function createManualBookingAction(
 
   const result = await createBooking({
     shopId: session.shopId,
+    serviceId: serviceId || null,
     date,
     slotTime,
     customerName,

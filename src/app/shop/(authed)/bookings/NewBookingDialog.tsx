@@ -7,7 +7,11 @@ import { Input } from "@/components/ui/Input";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
-import { generateSlots, type BookingContext } from "@/lib/booking/slot-math";
+import {
+  evaluateSlots,
+  type BookingContext,
+  type BookingService,
+} from "@/lib/booking/slot-math";
 import {
   createManualBookingAction,
   type CreateManualBookingState,
@@ -31,7 +35,16 @@ export function NewBookingDialog({
   triggerClassName?: string;
   triggerSize?: "sm" | "md" | "lg" | "xl";
 }) {
+  const services = context.services;
+  const showServiceStep =
+    services.length > 1 || (services.length === 1 && services[0].id !== null);
+  const autoService = showServiceStep ? null : (services[0] ?? null);
+  const autoKey = autoService ? serviceKey(autoService) : null;
+
   const [open, setOpen] = useState(false);
+  const [selectedServiceKey, setSelectedServiceKey] = useState<string | null>(
+    autoKey,
+  );
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -51,35 +64,55 @@ export function NewBookingDialog({
     // render loop, so the cascade the rule guards against doesn't apply.
     /* eslint-disable react-hooks/set-state-in-effect */
     setOpen(false);
+    setSelectedServiceKey(autoKey);
     setSelectedDate(null);
     setSelectedSlot(null);
     setName("");
     setPhone("");
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [state]);
+  }, [state, autoKey]);
 
-  const days = useMemo(() => buildDays(context), [context]);
+  const selectedService = useMemo(
+    () => services.find((s) => serviceKey(s) === selectedServiceKey) ?? null,
+    [services, selectedServiceKey],
+  );
+  const duration = selectedService?.durationMinutes ?? null;
+
+  const days = useMemo(
+    () => (duration == null ? [] : buildDays(context, duration)),
+    [context, duration],
+  );
   const selectedDay = days.find((d) => d.dateYmd === selectedDate) ?? null;
 
   const slots = useMemo(() => {
-    if (!selectedDay || selectedDay.status === "closed") return [];
-    return computeSlotsForDay(selectedDay, context);
-  }, [selectedDay, context]);
+    if (duration == null || !selectedDay || selectedDay.status === "closed")
+      return [];
+    return computeSlotsForDay(selectedDay, context, duration);
+  }, [selectedDay, context, duration]);
 
   // Phone is optional on the shop-side manual flow — but if any digits were
   // typed, they must form a valid Thai phone (9-10 digits) so we don't
   // silently store a half-typed number.
   const phoneValid = phone.length === 0 || /^[0-9]{9,10}$/u.test(phone);
   const canSubmit =
+    Boolean(selectedService) &&
     Boolean(selectedDate) &&
     Boolean(selectedSlot) &&
     name.trim().length > 0 &&
     phoneValid;
 
+  const handleSelectService = (svc: BookingService) => {
+    setSelectedServiceKey(serviceKey(svc));
+    setSelectedDate(null);
+    setSelectedSlot(null);
+  };
+
   const handleSelectDate = (dateYmd: string) => {
     setSelectedDate(dateYmd);
     setSelectedSlot(null);
   };
+
+  const stepBase = showServiceStep ? 1 : 0;
 
   return (
     <>
@@ -105,28 +138,52 @@ export function NewBookingDialog({
         </p>
 
         <form action={formAction} className="space-y-stack-md">
+          <input
+            type="hidden"
+            name="serviceId"
+            value={selectedService?.id ?? ""}
+          />
           <input type="hidden" name="date" value={selectedDate ?? ""} />
           <input type="hidden" name="slotTime" value={selectedSlot ?? ""} />
 
-          <Section step={1} title="เลือกวัน">
-            <div className="grid grid-cols-4 gap-2">
-              {days.map((d) => (
-                <DateChip
-                  key={d.dateYmd}
-                  day={d}
-                  selected={d.dateYmd === selectedDate}
-                  onClick={() => handleSelectDate(d.dateYmd)}
-                />
-              ))}
-            </div>
+          {showServiceStep ? (
+            <Section step={1} title="เลือกบริการ">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {services.map((svc) => (
+                  <ServiceCard
+                    key={serviceKey(svc)}
+                    service={svc}
+                    selected={serviceKey(svc) === selectedServiceKey}
+                    onClick={() => handleSelectService(svc)}
+                  />
+                ))}
+              </div>
+            </Section>
+          ) : null}
+
+          <Section step={stepBase + 1} title="เลือกวัน">
+            {!selectedService ? (
+              <EmptyHint icon="design_services" message="เลือกบริการก่อน" />
+            ) : (
+              <div className="grid grid-cols-4 gap-2">
+                {days.map((d) => (
+                  <DateChip
+                    key={d.dateYmd}
+                    day={d}
+                    selected={d.dateYmd === selectedDate}
+                    onClick={() => handleSelectDate(d.dateYmd)}
+                  />
+                ))}
+              </div>
+            )}
           </Section>
 
           <Section
-            step={2}
+            step={stepBase + 2}
             title="เลือกเวลา"
             hint={
-              selectedDay?.status === "available"
-                ? `บริการครั้งละ ${context.shop.serviceDurationMinutes} นาที`
+              selectedService && selectedDay?.status === "available"
+                ? `บริการครั้งละ ${selectedService.durationMinutes} นาที`
                 : undefined
             }
           >
@@ -150,7 +207,7 @@ export function NewBookingDialog({
             )}
           </Section>
 
-          <Section step={3} title="ข้อมูลลูกค้า">
+          <Section step={stepBase + 3} title="ข้อมูลลูกค้า">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 name="customerName"
@@ -243,6 +300,51 @@ function Section({
       </header>
       {children}
     </section>
+  );
+}
+
+function ServiceCard({
+  service,
+  selected,
+  onClick,
+}: {
+  service: BookingService;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const price = formatPrice(service.price);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={cn(
+        "flex flex-col items-start gap-0.5 rounded-xl p-3 text-left transition-all border-2",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        selected
+          ? "bg-primary text-on-primary border-primary shadow-tinted"
+          : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
+      )}
+    >
+      <span className="font-semibold text-body-md leading-tight">
+        {service.name}
+      </span>
+      <span
+        className={cn(
+          "flex items-center gap-1.5 text-label-sm",
+          selected ? "opacity-90" : "text-on-surface-variant",
+        )}
+      >
+        <Icon name="schedule" size={14} />
+        {service.durationMinutes} นาที
+        {price ? (
+          <>
+            <span aria-hidden>·</span>
+            <span className="font-semibold">{price}</span>
+          </>
+        ) : null}
+      </span>
+    </button>
   );
 }
 
@@ -360,7 +462,22 @@ type SlotView = {
   isPast: boolean;
 };
 
-function buildDays(context: BookingContext): BookableDay[] {
+function serviceKey(s: BookingService): string {
+  return s.id ?? "__implicit__";
+}
+
+function formatPrice(price: number | null): string | null {
+  if (price == null) return null;
+  return `${price.toLocaleString("th-TH", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })} บาท`;
+}
+
+function buildDays(
+  context: BookingContext,
+  durationMinutes: number,
+): BookableDay[] {
   const out: BookableDay[] = [];
   let cursor = context.windowStart;
   while (cursor <= context.windowEnd) {
@@ -380,21 +497,17 @@ function buildDays(context: BookingContext): BookableDay[] {
     if (!isOpen) {
       status = "closed";
     } else {
-      const times = generateSlots(
-        hours!.openTime!,
-        hours!.closeTime!,
-        context.shop.serviceDurationMinutes,
-      );
-      const taken = new Set(
-        context.takenSlots
-          .filter((t) => t.date === cursor)
-          .map((t) => t.slotTime),
-      );
-      const isToday = cursor === context.nowDate;
-      const hasAvailable = times.some(
-        (t) => !taken.has(t) && !(isToday && t <= context.nowTimeHHMM),
-      );
-      status = hasAvailable ? "available" : "full";
+      const avail = evaluateSlots({
+        openTime: hours!.openTime!,
+        closeTime: hours!.closeTime!,
+        durationMinutes,
+        date: cursor,
+        intervals: context.bookedIntervals,
+        capacity: context.capacity,
+        isToday: cursor === context.nowDate,
+        nowHHMM: context.nowTimeHHMM,
+      });
+      status = avail.some((s) => s.isAvailable) ? "available" : "full";
     }
 
     out.push({
@@ -418,30 +531,26 @@ function addDays(ymd: string, delta: number): string {
 function computeSlotsForDay(
   day: BookableDay,
   context: BookingContext,
+  durationMinutes: number,
 ): SlotView[] {
   const hours = context.hours[day.dayOfWeek];
   if (!hours?.isOpen || !hours.openTime || !hours.closeTime) return [];
-  const times = generateSlots(
-    hours.openTime,
-    hours.closeTime,
-    context.shop.serviceDurationMinutes,
-  );
-  const taken = new Set(
-    context.takenSlots
-      .filter((t) => t.date === day.dateYmd)
-      .map((t) => t.slotTime),
-  );
-  const isToday = day.dateYmd === context.nowDate;
-  return times.map((t) => {
-    const isTaken = taken.has(t);
-    const isPast = isToday && t <= context.nowTimeHHMM;
-    return {
-      time: t,
-      isTaken,
-      isPast,
-      isAvailable: !isTaken && !isPast,
-    };
+  const avail = evaluateSlots({
+    openTime: hours.openTime,
+    closeTime: hours.closeTime,
+    durationMinutes,
+    date: day.dateYmd,
+    intervals: context.bookedIntervals,
+    capacity: context.capacity,
+    isToday: day.dateYmd === context.nowDate,
+    nowHHMM: context.nowTimeHHMM,
   });
+  return avail.map((s) => ({
+    time: s.time,
+    isTaken: s.isFull,
+    isPast: s.isPast,
+    isAvailable: s.isAvailable,
+  }));
 }
 
 const STATUS_LABEL: Record<DayStatus, string> = {

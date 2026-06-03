@@ -7,6 +7,7 @@ import {
   updateStaff,
   setStaffActive,
   deleteStaff,
+  setStaffServices,
 } from "@/lib/services/staff";
 import {
   parseStaffFormData,
@@ -48,12 +49,19 @@ export async function saveStaffAction(
     return { ok: false, message: "ข้อมูลพนักงานไม่ถูกต้อง" };
   }
 
+  // Service mode (all = serves every service / some = listed services only /
+  // none = back-of-house, serves nothing). "none" ⇒ providesService=false and
+  // assignments are cleared; "all" ⇒ providesService=true with no assignments.
+  const serviceMode = String(formData.get("serviceMode") ?? "all");
+  const providesService = serviceMode !== "none";
+
   const input = {
     name: fields.name,
     nickname: fields.nickname ?? null,
     role: fields.role ?? null,
     phone: fields.phone ?? null,
     isActive: fields.isActive,
+    providesService,
   };
 
   const staffId = String(formData.get("staffId") ?? "").trim();
@@ -62,6 +70,18 @@ export async function saveStaffAction(
     : await createStaff(session.shopId, input);
 
   if (!result.ok) return { ok: false, message: result.message };
+
+  // Persist service assignments — only meaningful in "some" mode. "all" and
+  // "none" both clear assignments (empty rows). FormData.getAll returns
+  // string[] for multi-value keys; filter empties just in case.
+  const serviceIds =
+    serviceMode === "some"
+      ? formData
+          .getAll("serviceIds")
+          .map((v) => String(v).trim())
+          .filter(Boolean)
+      : [];
+  await setStaffServices(session.shopId, result.id, serviceIds);
 
   revalidateStaffSurfaces();
   return { ok: true };

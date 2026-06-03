@@ -29,6 +29,8 @@ export async function createBookingAction(
   formData: FormData,
 ): Promise<CreateBookingState> {
   const shopId = String(formData.get("shopId") ?? "");
+  const serviceId = String(formData.get("serviceId") ?? "");
+  const preferredStaffId = String(formData.get("preferredStaffId") ?? "");
   const date = String(formData.get("date") ?? "");
   const slotTime = String(formData.get("slotTime") ?? "");
   const customerName = String(formData.get("customerName") ?? "");
@@ -36,6 +38,8 @@ export async function createBookingAction(
 
   const result = await createBooking({
     shopId,
+    serviceId: serviceId || null,
+    preferredStaffId: preferredStaffId || null,
     date,
     slotTime,
     customerName,

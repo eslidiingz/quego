@@ -72,6 +72,24 @@ export default async function BookingDetailPage({
             label="เวลานัด"
             value={`${booking.slotTime} น.`}
           />
+          {booking.serviceName ? (
+            <InfoRow
+              icon="design_services"
+              label="บริการ"
+              value={
+                <span>
+                  {booking.serviceName}
+                  <span className="text-on-surface-variant">
+                    {" "}
+                    · {booking.serviceDurationMinutes} นาที
+                    {booking.servicePrice != null
+                      ? ` · ${formatBaht(booking.servicePrice)}`
+                      : ""}
+                  </span>
+                </span>
+              }
+            />
+          ) : null}
           <InfoRow icon="person" label="ชื่อผู้จอง" value={booking.customerName} />
           {booking.customerPhone ? (
             <InfoRow
@@ -196,6 +214,13 @@ function formatPhone(raw: string): string {
     return `${raw.slice(0, 3)}-${raw.slice(3, 6)}-${raw.slice(6)}`;
   }
   return raw;
+}
+
+function formatBaht(price: number): string {
+  return `${price.toLocaleString("th-TH", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })} บาท`;
 }
 
 const THAI_DAY_LONG = [

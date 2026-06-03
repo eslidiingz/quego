@@ -7,8 +7,10 @@ import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import {
-  generateSlots,
+  evaluateSlots,
   type BookingContext,
+  type BookingService,
+  type StaffOption,
 } from "@/lib/booking/slot-math";
 import { getBangkokNow, getBangkokToday } from "@/lib/time/bangkok";
 import { createBookingAction, type CreateBookingState } from "./actions";
@@ -22,14 +24,17 @@ type ClockNow = { date: string; timeHHMM: string };
  * Customer-facing booking form. Single client component because every input
  * gates the next step (no point bouncing back to the server for each):
  *
- *   1. Date picker — only open days are clickable
- *   2. Slot grid — only slots for the picked date are shown, taken/past
+ *   1. Service picker — duration & price differ per service
+ *   2. Date picker — only open days are clickable
+ *   3. Slot grid — only slots for the picked service+date are shown; taken/past
  *      slots are disabled
- *   3. Name + phone — appears once a slot is locked in
- *   4. Submit — disabled until everything's valid
+ *   4. Name + phone — appears once a slot is locked in
  *
- * SRP: render + collect local state. The actual create-booking work and
- * its re-validation live in the server action (DIP).
+ * The implicit single-service fallback (a shop with no defined services) skips
+ * step 1 and the form collapses to the classic date → time → info flow.
+ *
+ * SRP: render + collect local state. The actual create-booking work and its
+ * re-validation live in the server action (DIP).
  */
 export function BookingForm({
   context,
@@ -42,6 +47,20 @@ export function BookingForm({
   defaultName?: string;
   defaultPhone?: string;
 }) {
+  // Show the service step only when there's a real choice to make: more than
+  // one service, or a single *named* one (carries a price worth surfacing).
+  // The implicit fallback service (id === null, alone) stays hidden so legacy
+  // shops keep the original date → time → info flow.
+  const services = context.services;
+  const showServiceStep =
+    services.length > 1 || (services.length === 1 && services[0].id !== null);
+  const autoService = showServiceStep ? null : (services[0] ?? null);
+
+  const [selectedServiceKey, setSelectedServiceKey] = useState<string | null>(
+    autoService ? serviceKey(autoService) : null,
+  );
+  // Customer's chosen staff member; null = "ใครก็ได้" (any capable staff).
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [name, setName] = useState(defaultName);
@@ -63,6 +82,40 @@ export function BookingForm({
     CreateBookingState,
     FormData
   >(createBookingAction, null);
+
+  const selectedService = useMemo(
+    () => services.find((s) => serviceKey(s) === selectedServiceKey) ?? null,
+    [services, selectedServiceKey],
+  );
+  const duration = selectedService?.durationMinutes ?? null;
+
+  // Staff capable of the selected service. `staffIds === null` means a
+  // single-queue shop (no staff configured) — the staff step is hidden and
+  // the legacy capacity model applies. Otherwise only listed staff appear.
+  const serviceStaffIds = selectedService?.staffIds ?? null;
+  const capableStaff = useMemo<StaffOption[]>(() => {
+    if (serviceStaffIds === null) return [];
+    const allow = new Set(serviceStaffIds);
+    return context.staff.filter((s) => allow.has(s.id));
+  }, [context.staff, serviceStaffIds]);
+  const showStaffStep = serviceStaffIds !== null && capableStaff.length > 0;
+
+  // Slot-availability inputs depend on the staff choice:
+  //   • single-queue (no staff)   → context.capacity, no staff filter
+  //   • staffed, "ใครก็ได้"        → capacity = # capable staff, filter = them
+  //   • staffed, specific staff    → capacity 1, filter = that one staff
+  const { effectiveCapacity, staffFilter } = useMemo(() => {
+    if (serviceStaffIds === null) {
+      return { effectiveCapacity: context.capacity, staffFilter: null as ReadonlySet<string> | null };
+    }
+    if (selectedStaffId) {
+      return { effectiveCapacity: 1, staffFilter: new Set([selectedStaffId]) as ReadonlySet<string> };
+    }
+    return {
+      effectiveCapacity: Math.max(capableStaff.length, 1),
+      staffFilter: new Set(capableStaff.map((s) => s.id)) as ReadonlySet<string>,
+    };
+  }, [serviceStaffIds, selectedStaffId, capableStaff, context.capacity]);
 
   // Fold a server `slot_taken` rejection into the local taken-set so the grid
   // disables that exact slot. Reacting to the settled action result — a one-off
@@ -101,15 +154,27 @@ export function BookingForm({
   }, []);
 
   const days = useMemo(
-    () => buildDays(context, now, locallyTaken),
-    [context, now, locallyTaken],
+    () =>
+      duration == null
+        ? []
+        : buildDays(context, duration, now, locallyTaken, effectiveCapacity, staffFilter),
+    [context, duration, now, locallyTaken, effectiveCapacity, staffFilter],
   );
   const selectedDay = days.find((d) => d.dateYmd === selectedDate) ?? null;
 
   const slots = useMemo(() => {
-    if (!selectedDay || selectedDay.status === "closed") return [];
-    return computeSlotsForDay(selectedDay, context, now, locallyTaken);
-  }, [selectedDay, context, now, locallyTaken]);
+    if (duration == null || !selectedDay || selectedDay.status === "closed")
+      return [];
+    return computeSlotsForDay(
+      selectedDay,
+      context,
+      duration,
+      now,
+      locallyTaken,
+      effectiveCapacity,
+      staffFilter,
+    );
+  }, [selectedDay, context, duration, now, locallyTaken, effectiveCapacity, staffFilter]);
 
   // A slot the customer picked that has since slipped into the past is treated
   // as no selection — derived during render, not stored, so the step-3 form
@@ -129,11 +194,14 @@ export function BookingForm({
     selectedSlotExpired || selectedSlotTaken ? null : selectedSlot;
 
   const canSubmit =
+    Boolean(selectedService) &&
     Boolean(selectedDate) &&
     Boolean(activeSlot) &&
     name.trim().length > 0 &&
     /^[0-9]{9,10}$/u.test(phone);
 
+  const staffSectionRef = useRef<HTMLDivElement>(null);
+  const dateSectionRef = useRef<HTMLDivElement>(null);
   const timeSectionRef = useRef<HTMLDivElement>(null);
   const infoSectionRef = useRef<HTMLDivElement>(null);
 
@@ -143,6 +211,25 @@ export function BookingForm({
     requestAnimationFrame(() => {
       ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+  };
+
+  const handleSelectService = (svc: BookingService) => {
+    setSelectedServiceKey(serviceKey(svc));
+    setSelectedStaffId(null);
+    setSelectedDate(null);
+    setSelectedSlot(null);
+    // Scroll to the staff step when this service has assignable staff,
+    // otherwise straight to the date step.
+    const willShowStaff = svc.staffIds !== null && svc.staffIds.length > 0;
+    scrollToSection(willShowStaff ? staffSectionRef : dateSectionRef);
+  };
+
+  const handleSelectStaff = (staffId: string | null) => {
+    setSelectedStaffId(staffId);
+    // Staff choice changes which slots are free — reset the downstream picks.
+    setSelectedDate(null);
+    setSelectedSlot(null);
+    scrollToSection(dateSectionRef);
   };
 
   const handleSelectDate = (dateYmd: string) => {
@@ -156,92 +243,159 @@ export function BookingForm({
     scrollToSection(infoSectionRef);
   };
 
+  // Step numbers shift as optional steps (service, staff) appear before the
+  // date → time → info core.
+  const staffStepNum = showServiceStep ? 2 : 1;
+  const stepBase =
+    (showServiceStep ? 1 : 0) + (showStaffStep ? 1 : 0); // steps before "date"
+
   return (
     <form action={formAction} className="space-y-stack-md">
       <input type="hidden" name="shopId" value={context.shop.id} />
+      <input type="hidden" name="serviceId" value={selectedService?.id ?? ""} />
+      <input
+        type="hidden"
+        name="preferredStaffId"
+        value={showStaffStep ? (selectedStaffId ?? "") : ""}
+      />
       <input type="hidden" name="date" value={selectedDate ?? ""} />
       <input type="hidden" name="slotTime" value={activeSlot ?? ""} />
 
-      <Section
-        step={1}
-        title="เลือกวัน"
-        description="เลือกวันที่คุณต้องการเข้ารับบริการ"
-      >
-        <div className="grid grid-cols-4 gap-2 sm:gap-3">
-          {days.map((d) => (
-            <DateChip
-              key={d.dateYmd}
-              day={d}
-              selected={d.dateYmd === selectedDate}
-              onClick={() => handleSelectDate(d.dateYmd)}
-            />
-          ))}
-        </div>
-      </Section>
-
-      <div ref={timeSectionRef} className="scroll-mt-4">
-      <Section
-        step={2}
-        title="เลือกเวลา"
-        description={
-          selectedDay?.status === "available"
-            ? `บริการครั้งละ ${context.shop.serviceDurationMinutes} นาที`
-            : "กรุณาเลือกวันที่เปิดบริการก่อน"
-        }
-      >
-        {!selectedDate ? (
-          <EmptyHint icon="event" message="ยังไม่ได้เลือกวัน" />
-        ) : selectedDay?.status === "closed" ? (
-          <EmptyHint icon="event_busy" message="ร้านปิดในวันนี้" />
-        ) : slots.length === 0 ? (
-          <EmptyHint icon="schedule" message="ไม่มีรอบให้บริการในวันนี้" />
-        ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-            {slots.map((s) => (
-              <SlotButton
-                key={s.time}
-                slot={s}
-                selected={s.time === activeSlot}
-                onClick={() => handleSelectSlot(s.time)}
+      {showServiceStep ? (
+        <Section
+          step={1}
+          title="เลือกบริการ"
+          description="เลือกบริการที่คุณต้องการเข้ารับ"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+            {services.map((svc) => (
+              <ServiceCard
+                key={serviceKey(svc)}
+                service={svc}
+                selected={serviceKey(svc) === selectedServiceKey}
+                onClick={() => handleSelectService(svc)}
               />
             ))}
           </div>
-        )}
-      </Section>
+        </Section>
+      ) : null}
+
+      {showStaffStep ? (
+        <div ref={staffSectionRef} className="scroll-mt-4">
+          <Section
+            step={staffStepNum}
+            title="เลือกผู้ให้บริการ"
+            description="เลือกช่างที่ต้องการ หรือให้ร้านจัดให้"
+          >
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+              <StaffCard
+                name="ใครก็ได้"
+                subtitle="ร้านจัดช่างที่ว่างให้"
+                icon="groups"
+                selected={selectedStaffId === null}
+                onClick={() => handleSelectStaff(null)}
+              />
+              {capableStaff.map((member) => (
+                <StaffCard
+                  key={member.id}
+                  name={member.nickname || member.name}
+                  subtitle={member.nickname ? member.name : undefined}
+                  icon="person"
+                  selected={selectedStaffId === member.id}
+                  onClick={() => handleSelectStaff(member.id)}
+                />
+              ))}
+            </div>
+          </Section>
+        </div>
+      ) : null}
+
+      <div ref={dateSectionRef} className="scroll-mt-4">
+        <Section
+          step={stepBase + 1}
+          title="เลือกวัน"
+          description="เลือกวันที่คุณต้องการเข้ารับบริการ"
+        >
+          {!selectedService ? (
+            <EmptyHint icon="design_services" message="เลือกบริการก่อน" />
+          ) : (
+            <div className="grid grid-cols-4 gap-2 sm:gap-3">
+              {days.map((d) => (
+                <DateChip
+                  key={d.dateYmd}
+                  day={d}
+                  selected={d.dateYmd === selectedDate}
+                  onClick={() => handleSelectDate(d.dateYmd)}
+                />
+              ))}
+            </div>
+          )}
+        </Section>
+      </div>
+
+      <div ref={timeSectionRef} className="scroll-mt-4">
+        <Section
+          step={stepBase + 2}
+          title="เลือกเวลา"
+          description={
+            selectedService && selectedDay?.status === "available"
+              ? `บริการครั้งละ ${selectedService.durationMinutes} นาที`
+              : "กรุณาเลือกวันที่เปิดบริการก่อน"
+          }
+        >
+          {!selectedDate ? (
+            <EmptyHint icon="event" message="ยังไม่ได้เลือกวัน" />
+          ) : selectedDay?.status === "closed" ? (
+            <EmptyHint icon="event_busy" message="ร้านปิดในวันนี้" />
+          ) : slots.length === 0 ? (
+            <EmptyHint icon="schedule" message="ไม่มีรอบให้บริการในวันนี้" />
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+              {slots.map((s) => (
+                <SlotButton
+                  key={s.time}
+                  slot={s}
+                  selected={s.time === activeSlot}
+                  onClick={() => handleSelectSlot(s.time)}
+                />
+              ))}
+            </div>
+          )}
+        </Section>
       </div>
 
       <div ref={infoSectionRef} className="scroll-mt-4">
-      <Section
-        step={3}
-        title="ข้อมูลผู้จอง"
-        description="ใช้สำหรับยืนยันการจองที่ร้าน"
-      >
-        {!activeSlot ? (
-          <EmptyHint icon="person" message="เลือกเวลาแล้วจึงกรอกข้อมูล" />
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              name="customerName"
-              label="ชื่อ"
-              placeholder="ชื่อจริงหรือชื่อเล่น"
-              required
-              maxLength={100}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="name"
-            />
-            <PhoneInput
-              name="customerPhone"
-              label="เบอร์โทร"
-              placeholder="0812345678"
-              required
-              value={phone}
-              onChange={(digits) => setPhone(digits)}
-              helperText="ใช้สำหรับยืนยันการจองที่หน้าร้าน"
-            />
-          </div>
-        )}
-      </Section>
+        <Section
+          step={stepBase + 3}
+          title="ข้อมูลผู้จอง"
+          description="ใช้สำหรับยืนยันการจองที่ร้าน"
+        >
+          {!activeSlot ? (
+            <EmptyHint icon="person" message="เลือกเวลาแล้วจึงกรอกข้อมูล" />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                name="customerName"
+                label="ชื่อ"
+                placeholder="ชื่อจริงหรือชื่อเล่น"
+                required
+                maxLength={100}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+              />
+              <PhoneInput
+                name="customerPhone"
+                label="เบอร์โทร"
+                placeholder="0812345678"
+                required
+                value={phone}
+                onChange={(digits) => setPhone(digits)}
+                helperText="ใช้สำหรับยืนยันการจองที่หน้าร้าน"
+              />
+            </div>
+          )}
+        </Section>
       </div>
 
       {selectedSlotExpired ? (
@@ -318,6 +472,102 @@ function Section({
       </header>
       {children}
     </section>
+  );
+}
+
+function ServiceCard({
+  service,
+  selected,
+  onClick,
+}: {
+  service: BookingService;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const price = formatPrice(service.price);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={cn(
+        "flex flex-col items-start gap-1 rounded-xl p-4 text-left transition-all border-2",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        selected
+          ? "bg-primary text-on-primary border-primary shadow-tinted"
+          : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
+      )}
+    >
+      <span className="font-display text-headline-sm leading-tight">
+        {service.name}
+      </span>
+      <span
+        className={cn(
+          "flex items-center gap-2 text-label-md",
+          selected ? "opacity-90" : "text-on-surface-variant",
+        )}
+      >
+        <Icon name="schedule" size={16} />
+        {service.durationMinutes} นาที
+        {price ? (
+          <>
+            <span aria-hidden>·</span>
+            <span className="font-semibold">{price}</span>
+          </>
+        ) : null}
+      </span>
+    </button>
+  );
+}
+
+function StaffCard({
+  name,
+  subtitle,
+  icon,
+  selected,
+  onClick,
+}: {
+  name: string;
+  subtitle?: string;
+  icon: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={cn(
+        "flex flex-col items-center gap-1.5 rounded-xl p-4 text-center transition-all border-2",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        selected
+          ? "bg-primary text-on-primary border-primary shadow-tinted"
+          : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
+      )}
+    >
+      <span
+        className={cn(
+          "flex items-center justify-center size-10 rounded-full",
+          selected ? "bg-on-primary/15" : "bg-secondary-container text-on-secondary-container",
+        )}
+      >
+        <Icon name={icon} />
+      </span>
+      <span className="font-display font-semibold text-label-md leading-tight truncate max-w-full">
+        {name}
+      </span>
+      {subtitle ? (
+        <span
+          className={cn(
+            "text-label-sm truncate max-w-full",
+            selected ? "opacity-80" : "text-on-surface-variant",
+          )}
+        >
+          {subtitle}
+        </span>
+      ) : null}
+    </button>
   );
 }
 
@@ -447,27 +697,32 @@ type SlotView = {
   isPast: boolean;
 };
 
+/** Stable identity for a service in local state (the implicit one has no id). */
+function serviceKey(s: BookingService): string {
+  return s.id ?? "__implicit__";
+}
+
+/** Format an optional price as Thai baht, or null when unpriced. */
+function formatPrice(price: number | null): string | null {
+  if (price == null) return null;
+  return `${price.toLocaleString("th-TH", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })} บาท`;
+}
+
 /** Stable key for a (date, slotTime) pair used in the locally-taken set. */
 function takenKey(date: string, slotTime: string): string {
   return `${date} ${slotTime}`;
 }
 
-/** Fold any locally-known taken slots for `date` into the `taken` set. */
-function addLocalTaken(
-  taken: Set<string>,
-  locallyTaken: ReadonlySet<string>,
-  date: string,
-): void {
-  const prefix = `${date} `;
-  for (const key of locallyTaken) {
-    if (key.startsWith(prefix)) taken.add(key.slice(prefix.length));
-  }
-}
-
 function buildDays(
   context: BookingContext,
+  durationMinutes: number,
   now: ClockNow,
   locallyTaken: ReadonlySet<string>,
+  capacity: number,
+  staffFilter: ReadonlySet<string> | null,
 ): BookableDay[] {
   const out: BookableDay[] = [];
   let cursor = context.windowStart;
@@ -488,20 +743,19 @@ function buildDays(
     if (!isOpen) {
       status = "closed";
     } else {
-      const times = generateSlots(
-        hours!.openTime!,
-        hours!.closeTime!,
-        context.shop.serviceDurationMinutes,
-      );
-      const taken = new Set(
-        context.takenSlots
-          .filter((t) => t.date === cursor)
-          .map((t) => t.slotTime),
-      );
-      addLocalTaken(taken, locallyTaken, cursor);
-      const isToday = cursor === now.date;
-      const hasAvailable = times.some(
-        (t) => !taken.has(t) && !(isToday && t <= now.timeHHMM),
+      const avail = evaluateSlots({
+        openTime: hours!.openTime!,
+        closeTime: hours!.closeTime!,
+        durationMinutes,
+        date: cursor,
+        intervals: context.bookedIntervals,
+        capacity,
+        isToday: cursor === now.date,
+        nowHHMM: now.timeHHMM,
+        staffIdFilter: staffFilter,
+      });
+      const hasAvailable = avail.some(
+        (s) => s.isAvailable && !locallyTaken.has(takenKey(cursor, s.time)),
       );
       status = hasAvailable ? "available" : "full";
     }
@@ -527,31 +781,32 @@ function addDays(ymd: string, delta: number): string {
 function computeSlotsForDay(
   day: BookableDay,
   context: BookingContext,
+  durationMinutes: number,
   now: ClockNow,
   locallyTaken: ReadonlySet<string>,
+  capacity: number,
+  staffFilter: ReadonlySet<string> | null,
 ): SlotView[] {
   const hours = context.hours[day.dayOfWeek];
   if (!hours?.isOpen || !hours.openTime || !hours.closeTime) return [];
-  const times = generateSlots(
-    hours.openTime,
-    hours.closeTime,
-    context.shop.serviceDurationMinutes,
-  );
-  const taken = new Set(
-    context.takenSlots
-      .filter((t) => t.date === day.dateYmd)
-      .map((t) => t.slotTime),
-  );
-  addLocalTaken(taken, locallyTaken, day.dateYmd);
-  const isToday = day.dateYmd === now.date;
-  return times.map((t) => {
-    const isTaken = taken.has(t);
-    const isPast = isToday && t <= now.timeHHMM;
+  const avail = evaluateSlots({
+    openTime: hours.openTime,
+    closeTime: hours.closeTime,
+    durationMinutes,
+    date: day.dateYmd,
+    intervals: context.bookedIntervals,
+    capacity,
+    isToday: day.dateYmd === now.date,
+    nowHHMM: now.timeHHMM,
+    staffIdFilter: staffFilter,
+  });
+  return avail.map((s) => {
+    const locTaken = locallyTaken.has(takenKey(day.dateYmd, s.time));
     return {
-      time: t,
-      isTaken,
-      isPast,
-      isAvailable: !isTaken && !isPast,
+      time: s.time,
+      isTaken: s.isFull || locTaken,
+      isPast: s.isPast,
+      isAvailable: s.isAvailable && !locTaken,
     };
   });
 }
