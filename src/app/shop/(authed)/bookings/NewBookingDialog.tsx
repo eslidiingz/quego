@@ -45,14 +45,17 @@ export function NewBookingDialog({
   // Reset + close on success. Wrapped state means the picker is empty next
   // time the dialog opens — fresh sheet for the next walk-in.
   useEffect(() => {
-    if (state?.ok) {
-      setOpen(false);
-      setSelectedDate(null);
-      setSelectedSlot(null);
-      setName("");
-      setPhone("");
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!state?.ok) return;
+    // Resetting the picker after an async submit success is exactly what this
+    // effect is for — it settles once after a server round-trip, not in a
+    // render loop, so the cascade the rule guards against doesn't apply.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setOpen(false);
+    setSelectedDate(null);
+    setSelectedSlot(null);
+    setName("");
+    setPhone("");
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [state]);
 
   const days = useMemo(() => buildDays(context), [context]);

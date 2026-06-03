@@ -69,3 +69,55 @@ export function validateShopForm(input: ShopFormFields): ShopFormErrors {
 export function hasErrors(errors: ShopFormErrors): boolean {
   return Object.keys(errors).length > 0;
 }
+
+// ----- Staff (พนักงาน) form -------------------------------------------------
+
+export type StaffFormFields = {
+  name: string;
+  nickname?: string;
+  role?: string;
+  phone?: string;
+  isActive: boolean;
+};
+
+export type StaffFormErrors = Partial<
+  Record<"name" | "nickname" | "role" | "phone", string>
+>;
+
+export function parseStaffFormData(formData: FormData): StaffFormFields {
+  const get = (key: string) => String(formData.get(key) ?? "").trim();
+  return {
+    name: get("name"),
+    nickname: get("nickname") || undefined,
+    role: get("role") || undefined,
+    phone: get("phone") || undefined,
+    // The staff form always renders the active toggle, so an unchecked box
+    // (which submits no value) means "inactive". Treat only an explicit
+    // on/true/1 as active.
+    isActive: ["on", "true", "1"].includes(get("isActive").toLowerCase()),
+  };
+}
+
+export function validateStaffForm(input: StaffFormFields): StaffFormErrors {
+  const errors: StaffFormErrors = {};
+
+  if (!input.name) errors.name = "กรุณากรอกชื่อพนักงาน";
+  else if (input.name.length > 120)
+    errors.name = "ชื่อพนักงานต้องไม่เกิน 120 ตัวอักษร";
+
+  if (input.nickname && input.nickname.length > 60)
+    errors.nickname = "ชื่อเล่นต้องไม่เกิน 60 ตัวอักษร";
+
+  if (input.role && input.role.length > 60)
+    errors.role = "ตำแหน่งต้องไม่เกิน 60 ตัวอักษร";
+
+  if (input.phone && !PHONE_RE.test(input.phone)) {
+    errors.phone = "เบอร์โทรไม่ถูกต้อง (10 หลัก ขึ้นต้นด้วย 0)";
+  }
+
+  return errors;
+}
+
+export function hasStaffErrors(errors: StaffFormErrors): boolean {
+  return Object.keys(errors).length > 0;
+}
