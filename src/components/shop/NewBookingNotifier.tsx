@@ -165,7 +165,7 @@ export function NewBookingNotifier({
           setOpen((v) => !v);
           setUnread(0);
         }}
-        className="relative inline-flex items-center justify-center p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
+        className="relative inline-flex items-center justify-center size-10 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
       >
         <Icon name="notifications" />
         {unread > 0 ? (

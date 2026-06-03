@@ -19,7 +19,7 @@ export async function signOutShop() {
   redirect(
     wasImpersonating
       ? "/admin/shops?notice=impersonation-ended"
-      : "/login?tab=shop&notice=signed-out",
+      : "/?notice=signed-out",
   );
 }
 

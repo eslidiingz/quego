@@ -27,7 +27,7 @@ export function TopAppBar({
         {onBack ? (
           <button
             onClick={onBack}
-            className="p-2 rounded-full hover:bg-surface-container-low transition-colors text-primary"
+            className="inline-flex items-center justify-center size-10 rounded-full hover:bg-surface-container-low transition-colors text-primary"
             aria-label="ย้อนกลับ"
           >
             <Icon name="arrow_back" />

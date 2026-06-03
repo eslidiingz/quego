@@ -116,7 +116,7 @@ export function AdminShell({
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
-            className="lg:hidden p-2 rounded-full hover:bg-surface-container-low text-primary"
+            className="lg:hidden inline-flex items-center justify-center size-10 rounded-full hover:bg-surface-container-low text-primary"
             aria-label="เปิด/ปิดเมนู"
           >
             <Icon name={menuOpen ? "close" : "menu"} />

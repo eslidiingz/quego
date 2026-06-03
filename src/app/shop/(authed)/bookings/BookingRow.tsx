@@ -8,7 +8,7 @@ const STATUS_MAP: Record<
   BookingStatus,
   { label: string; variant: "confirmed" | "success" | "danger" }
 > = {
-  confirmed: { label: "ยืนยันแล้ว", variant: "confirmed" },
+  confirmed: { label: "รอรับบริการ", variant: "confirmed" },
   completed: { label: "เสร็จสิ้น", variant: "success" },
   cancelled: { label: "ยกเลิก", variant: "danger" },
   no_show: { label: "ไม่มาตามนัด", variant: "danger" },

@@ -137,7 +137,7 @@ export function CategoriesTable({ rows }: { rows: CategoryRow[] }) {
                           type="button"
                           onClick={() => setDeleteTarget({ id: row.id, name: row.name })}
                           aria-label="ลบ"
-                          className="p-2 rounded-full text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors"
+                          className="inline-flex items-center justify-center size-10 rounded-full text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors"
                         >
                           <Icon name="delete" />
                         </button>
