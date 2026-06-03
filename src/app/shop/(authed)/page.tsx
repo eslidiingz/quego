@@ -52,7 +52,7 @@ function matchesFilter(b: BookingListItem, filter: FilterKey): boolean {
   }
 }
 
-type SearchParams = Promise<{ filter?: string }>;
+type SearchParams = Promise<{ filter?: string; show?: string }>;
 
 export default async function ShopHomePage({
   searchParams,
@@ -60,8 +60,12 @@ export default async function ShopHomePage({
   searchParams: SearchParams;
 }) {
   const session = await requireShopSession();
-  const { filter: rawFilter } = await searchParams;
+  const { filter: rawFilter, show: rawShow } = await searchParams;
   const filter = parseFilter(rawFilter);
+  const showCount = Math.max(
+    PREVIEW_LIMIT,
+    Number.isFinite(Number(rawShow)) ? Number(rawShow) : PREVIEW_LIMIT,
+  );
 
   const [bookings, context] = await Promise.all([
     listBookingsByShop(session.shopId, "today"),
@@ -83,21 +87,19 @@ export default async function ShopHomePage({
       return order !== 0 ? order : a.slotTime.localeCompare(b.slotTime);
     });
 
-  const preview = visible.slice(0, PREVIEW_LIMIT);
-  const overflow = Math.max(0, visible.length - PREVIEW_LIMIT);
+  const preview = visible.slice(0, showCount);
+  const overflow = Math.max(0, visible.length - showCount);
 
   return (
     <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-lg">
       <div>
         <p className="text-label-md text-secondary uppercase tracking-widest mb-1">
-          ยินดีต้อนรับกลับมา
+          ยินดีต้อนรับสู่ร้าน
         </p>
         <h1 className="font-display text-headline-lg text-on-background">
           {session.shopName}
         </h1>
-        <div className="mt-3">
-          <Chip variant="premium">เข้าสู่ระบบสำเร็จ</Chip>
-        </div>
+
       </div>
 
       <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 space-y-stack-md">
@@ -128,7 +130,7 @@ export default async function ShopHomePage({
           aria-label="กรองตามสถานะ"
         >
           <FilterTile
-            label="ยืนยันแล้ว"
+            label="รอรับบริการ"
             value={counts.confirmed}
             tone="secondary"
             target="confirmed"
@@ -162,7 +164,8 @@ export default async function ShopHomePage({
             {overflow > 0 ? (
               <li>
                 <Link
-                  href="/shop/bookings?view=today"
+                  href={`/shop?${new URLSearchParams({ ...(filter !== "all" && { filter }), show: String(showCount + PREVIEW_LIMIT) })}`}
+                  scroll={false}
                   className="block text-center text-label-md text-primary hover:underline pt-2"
                 >
                   +{overflow} รายการ
@@ -172,11 +175,6 @@ export default async function ShopHomePage({
           </ul>
         )}
 
-        {counts.confirmed > 0 ? (
-          <p className="text-label-sm text-on-surface-variant text-center pt-1">
-            แตะที่แถว &ldquo;ยืนยันแล้ว&rdquo; เพื่อทำเครื่องหมายเสร็จสิ้น
-          </p>
-        ) : null}
       </section>
     </div>
   );

@@ -10,7 +10,7 @@ import { cancelOwnBooking } from "@/lib/services/bookings";
 
 export async function signOutCustomer() {
   await destroyCustomerSession();
-  redirect("/login?notice=signed-out");
+  redirect("/?notice=signed-out");
 }
 
 export async function cancelMyBooking(bookingId: string): Promise<void> {

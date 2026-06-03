@@ -130,7 +130,7 @@ export function ShopShell({
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
-            className="lg:hidden inline-flex items-center justify-center p-2 rounded-full text-primary hover:bg-surface-container-high transition-colors"
+            className="lg:hidden inline-flex items-center justify-center size-10 rounded-full text-primary hover:bg-surface-container-high transition-colors"
             aria-label="เปิด/ปิดเมนู"
           >
             <Icon name={menuOpen ? "close" : "menu"} />

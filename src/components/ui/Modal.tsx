@@ -85,7 +85,7 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label="ปิด"
-            className="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-low transition-colors"
+            className="inline-flex items-center justify-center size-10 rounded-full text-on-surface-variant hover:bg-surface-container-low transition-colors"
           >
             <Icon name="close" />
           </button>

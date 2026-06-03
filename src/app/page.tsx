@@ -21,10 +21,7 @@ export default async function HomePage() {
 
       <section className="max-w-[1280px] mx-auto w-full px-4 md:px-12 pt-stack-lg">
         <div className="text-center max-w-2xl mx-auto">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-secondary-container/30 text-on-secondary-container text-label-sm uppercase tracking-widest mb-3">
-            <Icon name="workspace_premium" size={16} />
-            สำหรับลูกค้า
-          </span>
+
           <h1 className="font-display text-headline-lg text-on-background mb-2">
             ค้นพบร้านที่ใช่ จองคิวสะดวก
           </h1>

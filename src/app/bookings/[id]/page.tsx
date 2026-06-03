@@ -17,7 +17,7 @@ const STATUS_LABEL: Record<
   string,
   { label: string; variant: "confirmed" | "success" | "danger" }
 > = {
-  confirmed: { label: "ยืนยันแล้ว", variant: "confirmed" },
+  confirmed: { label: "รอรับบริการ", variant: "confirmed" },
   completed: { label: "เสร็จสิ้น", variant: "success" },
   cancelled: { label: "ยกเลิก", variant: "danger" },
   no_show: { label: "ไม่มาตามนัด", variant: "danger" },
@@ -70,7 +70,7 @@ export default async function BookingDetailPage({
           <InfoRow
             icon="schedule"
             label="เวลานัด"
-            value={`${booking.slotTime} น. (ครั้งละ ${booking.serviceDurationMinutes} นาที)`}
+            value={`${booking.slotTime} น.`}
           />
           <InfoRow icon="person" label="ชื่อผู้จอง" value={booking.customerName} />
           {booking.customerPhone ? (
