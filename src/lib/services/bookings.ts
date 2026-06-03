@@ -3,10 +3,13 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
   DAYS_OF_WEEK,
   generateSlots,
+  hhmmToMinutes,
+  intervalsOverlap,
+  type BookedInterval,
   type BookingContext,
+  type BookingService,
   type BusinessHour,
   type DayOfWeek,
-  type TakenSlot,
 } from "@/lib/booking/slot-math";
 import {
   dayOfWeekFor,
@@ -15,10 +18,15 @@ import {
   getBangkokToday,
 } from "@/lib/time/bangkok";
 import { countActiveStaff } from "@/lib/services/staff";
+import type { StaffOption } from "@/lib/booking/slot-math";
+import {
+  getBookableService,
+  listActiveServicesByShop,
+} from "@/lib/services/services";
 
 // Re-export so server callers can import {BookingContext} from this module
 // in addition to the pure slot-math file (single source of truth).
-export type { BookingContext, TakenSlot } from "@/lib/booking/slot-math";
+export type { BookingContext, BookedInterval } from "@/lib/booking/slot-math";
 export { generateSlots } from "@/lib/booking/slot-math";
 
 /**
@@ -52,6 +60,18 @@ export type CreateBookingInput = {
    * caller's number from the phone call itself).
    */
   customerPhone?: string;
+  /**
+   * Chosen service id. Omit / null for shops on the implicit single-service
+   * fallback (duration taken from the shop's default `service_duration_minutes`).
+   */
+  serviceId?: string | null;
+  /**
+   * Customer's preferred staff member. When provided and that staff is free,
+   * they are assigned exclusively. If they are busy the booking fails with
+   * `slot_taken` — no fallback to another staff member, so the customer must
+   * choose a different slot or staff.
+   */
+  preferredStaffId?: string | null;
 };
 
 export type CreateBookingResult =
@@ -60,6 +80,7 @@ export type CreateBookingResult =
       ok: false;
       code:
         | "shop_unavailable"
+        | "service_unavailable"
         | "date_closed"
         | "slot_invalid"
         | "slot_past"
@@ -80,6 +101,8 @@ export type BookingDetails = {
   bookingDate: string;
   slotTime: string; // HH:MM
   serviceDurationMinutes: number;
+  serviceName: string | null;
+  servicePrice: number | null;
   status: BookingStatus;
   createdAt: string;
 };
@@ -91,6 +114,8 @@ export type BookingListItem = {
   bookingDate: string;
   slotTime: string; // HH:MM
   serviceDurationMinutes: number;
+  serviceName: string | null;
+  servicePrice: number | null;
   status: BookingStatus;
   createdAt: string;
 };
@@ -107,6 +132,8 @@ export type CustomerBookingItem = {
   bookingDate: string;
   slotTime: string; // HH:MM
   serviceDurationMinutes: number;
+  serviceName: string | null;
+  servicePrice: number | null;
   status: BookingStatus;
 };
 
@@ -144,7 +171,7 @@ export async function getBookingContext(
   const windowStart = window[0].dateYmd;
   const windowEnd = window[window.length - 1].dateYmd;
 
-  const [{ data: hoursData }, { data: bookingsData }, activeStaff] =
+  const [{ data: hoursData }, { data: bookingsData }, activeStaff, activeServices, { data: activeStaffRows }] =
     await Promise.all([
       supabase
         .from("shop_business_hours")
@@ -152,18 +179,82 @@ export async function getBookingContext(
         .eq("shop_id", shopId),
       supabase
         .from("bookings")
-        .select("booking_date, slot_time")
+        .select("booking_date, slot_time, service_duration_minutes, staff_id")
         .eq("shop_id", shopId)
         .gte("booking_date", windowStart)
         .lte("booking_date", windowEnd)
         .in("status", ["confirmed", "completed"]),
       countActiveStaff(shopId),
+      listActiveServicesByShop(shopId),
+      supabase
+        .from("shop_staff")
+        .select("id, name, nickname")
+        .eq("shop_id", shopId)
+        .eq("is_active", true)
+        .eq("provides_service", true)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true }),
     ]);
 
   // Per-slot capacity = number of active staff (parallel service lines), with
   // a floor of 1 so shops that haven't added staff keep the legacy
   // single-queue behaviour.
   const capacity = Math.max(activeStaff, 1);
+
+  const staffList = (activeStaffRows ?? []) as { id: string; name: string; nickname: string | null }[];
+  const staffOptions: StaffOption[] = staffList.map((s) => ({
+    id: s.id,
+    name: s.name,
+    nickname: s.nickname,
+  }));
+
+  // Build per-service staff assignment: staff with no rows in shop_staff_services
+  // can perform all services (all-capable); staff with rows can only do those.
+  let serviceStaffMap: Map<string, string[]> | null = null;
+  if (staffList.length > 0 && activeServices.length > 0) {
+    const allStaffIds = staffList.map((s) => s.id);
+    const { data: assignRows } = await supabase
+      .from("shop_staff_services")
+      .select("staff_id, service_id")
+      .in("staff_id", allStaffIds);
+
+    const staffServiceAssignments = new Map<string, Set<string>>();
+    for (const r of assignRows ?? []) {
+      const set = staffServiceAssignments.get(r.staff_id as string) ?? new Set<string>();
+      set.add(r.service_id as string);
+      staffServiceAssignments.set(r.staff_id as string, set);
+    }
+
+    serviceStaffMap = new Map<string, string[]>();
+    for (const svc of activeServices) {
+      const capableIds = allStaffIds.filter((id) => {
+        const assigned = staffServiceAssignments.get(id);
+        return !assigned || assigned.has(svc.id);
+      });
+      serviceStaffMap.set(svc.id, capableIds);
+    }
+  }
+
+  // Shops that haven't defined any services fall back to a single implicit one
+  // using the shop's default duration, so the booking flow stays uniform.
+  const services: BookingService[] =
+    activeServices.length > 0
+      ? activeServices.map((s) => ({
+          id: s.id,
+          name: s.name,
+          durationMinutes: s.durationMinutes,
+          price: s.price,
+          staffIds: serviceStaffMap ? (serviceStaffMap.get(s.id) ?? []) : null,
+        }))
+      : [
+          {
+            id: null,
+            name: "บริการ",
+            durationMinutes: shop.service_duration_minutes,
+            price: null,
+            staffIds: null,
+          },
+        ];
 
   const byDay = new Map<DayOfWeek, BusinessHour>();
   for (const h of hoursData ?? []) {
@@ -185,23 +276,15 @@ export async function getBookingContext(
       },
   );
 
-  // A slot is unavailable to the picker only when it is FULL — i.e. the number
-  // of active bookings in it has reached capacity. We count per (date, slot)
-  // and emit just the full ones, so the existing picker logic ("slot present
-  // in takenSlots ⇒ disabled") keeps working unchanged while respecting the
-  // multi-staff capacity.
-  const slotCounts = new Map<string, number>();
-  for (const b of bookingsData ?? []) {
-    const key = `${b.booking_date}T${(b.slot_time as string).slice(0, 5)}`;
-    slotCounts.set(key, (slotCounts.get(key) ?? 0) + 1);
-  }
-  const takenSlots: TakenSlot[] = [];
-  for (const [key, count] of slotCounts) {
-    if (count >= capacity) {
-      const [date, slotTime] = key.split("T");
-      takenSlots.push({ date, slotTime });
-    }
-  }
+  // Project each active booking onto an overlap interval. The picker decides
+  // availability per *selected service* (durations differ) by counting how
+  // many parallel lines a candidate interval overlaps — see `evaluateSlots`.
+  const bookedIntervals: BookedInterval[] = (bookingsData ?? []).map((b) => ({
+    date: b.booking_date as string,
+    startMin: hhmmToMinutes((b.slot_time as string).slice(0, 5)),
+    durationMin: b.service_duration_minutes as number,
+    staffId: (b.staff_id as string | null) ?? null,
+  }));
 
   const now = getBangkokNow();
   return {
@@ -210,12 +293,15 @@ export async function getBookingContext(
       name: shop.name,
       serviceDurationMinutes: shop.service_duration_minutes,
     },
+    services,
+    capacity,
+    bookedIntervals,
     hours,
-    takenSlots,
     windowStart,
     windowEnd,
     nowDate: getBangkokToday(),
     nowTimeHHMM: now.timeHHMM,
+    staff: staffOptions,
   };
 }
 
@@ -273,7 +359,32 @@ export async function createBooking(
       message: "ร้านนี้ยังไม่พร้อมรับการจอง",
     };
   }
-  const duration = shopData.service_duration_minutes as number;
+
+  // Resolve the chosen service. A provided serviceId must be an active service
+  // of THIS shop (ownership + active checked in getBookableService). Its
+  // absence means the implicit single-service fallback (shop default duration).
+  // Duration drives slot generation; name + price are snapshotted onto the row.
+  const serviceId = input.serviceId?.trim() || null;
+  let duration: number;
+  let serviceName: string | null;
+  let servicePrice: number | null;
+  if (serviceId) {
+    const service = await getBookableService(input.shopId, serviceId);
+    if (!service) {
+      return {
+        ok: false,
+        code: "service_unavailable",
+        message: "บริการที่เลือกไม่พร้อมให้บริการแล้ว กรุณาเลือกใหม่",
+      };
+    }
+    duration = service.durationMinutes;
+    serviceName = service.name;
+    servicePrice = service.price;
+  } else {
+    duration = shopData.service_duration_minutes as number;
+    serviceName = null;
+    servicePrice = null;
+  }
 
   // Window check — booking_date must be today..today+13.
   const window = getBangkokDateWindow(BOOKING_WINDOW_DAYS);
@@ -338,6 +449,9 @@ export async function createBooking(
     booking_date: input.date,
     slot_time: input.slotTime,
     service_duration_minutes: duration,
+    service_id: serviceId,
+    service_name: serviceName,
+    service_price: servicePrice,
   };
 
   const slotTaken: CreateBookingResult = {
@@ -346,10 +460,19 @@ export async function createBooking(
     message: "ช่วงเวลานี้ถูกจองโดยลูกค้าอีกคนแล้ว กรุณาเลือกใหม่",
   };
 
+  // The booking occupies [start, start+duration). With variable per-service
+  // durations a clash is an interval OVERLAP (not an exact slot_time match),
+  // so the DB backstop is a GiST exclusion constraint — a conflicting insert
+  // raises SQLSTATE 23P01 (exclusion_violation). We treat that (and 23505,
+  // just in case) as "slot taken".
+  const isConflict = (code: string | undefined) =>
+    code === "23P01" || code === "23505";
+  const startMin = hhmmToMinutes(input.slotTime);
+
   // Capacity model: each active staff member is a parallel service line, so a
   // slot can hold one active booking PER active staff. Shops with no staff
   // fall back to the legacy single-queue path (staff_id = null), guarded by
-  // the `bookings_unique_active_slot_noassign` partial unique index.
+  // the `bookings_no_overlap_noassign` exclusion constraint.
   const activeStaff = await countActiveStaff(input.shopId);
 
   if (activeStaff === 0) {
@@ -360,40 +483,77 @@ export async function createBooking(
       .single();
 
     if (insertError) {
-      // 23505 = unique_violation: another booking already holds this slot.
-      if (insertError.code === "23505") return slotTaken;
+      if (isConflict(insertError.code)) return slotTaken;
       return { ok: false, code: "unknown", message: insertError.message };
     }
     return { ok: true, bookingId: inserted!.id as string };
   }
 
-  // Staffed path: find an active staff member with no active booking in this
-  // exact slot, then assign them. The per-staff unique index
-  // (`bookings_unique_active_slot_staff`) is the race backstop — if two
-  // requests pick the same free staff, one gets 23505 and we try the next.
+  // Staffed path: find an active staff member whose existing bookings don't
+  // OVERLAP this interval, then assign them. The per-staff exclusion
+  // constraint (`bookings_no_overlap_staff`) is the race backstop — if two
+  // requests pick the same free staff, one gets 23P01 and we try the next.
   const { data: staffRows } = await supabase
     .from("shop_staff")
     .select("id")
     .eq("shop_id", input.shopId)
     .eq("is_active", true)
+    .eq("provides_service", true)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
+  const allActiveIds = (staffRows ?? []).map((r) => r.id as string);
+
+  // Filter by service capability: staff with no assignments can do all
+  // services; staff with assignments can only do their assigned services.
+  let candidateIds = allActiveIds;
+  if (serviceId && allActiveIds.length > 0) {
+    const { data: assignRows } = await supabase
+      .from("shop_staff_services")
+      .select("staff_id, service_id")
+      .in("staff_id", allActiveIds);
+
+    const staffServiceMap = new Map<string, Set<string>>();
+    for (const r of assignRows ?? []) {
+      const set = staffServiceMap.get(r.staff_id as string) ?? new Set<string>();
+      set.add(r.service_id as string);
+      staffServiceMap.set(r.staff_id as string, set);
+    }
+    candidateIds = allActiveIds.filter((id) => {
+      const assigned = staffServiceMap.get(id);
+      return !assigned || assigned.has(serviceId);
+    });
+  }
+
+  // Respect customer's preferred staff: only use them (if capable).
+  const preferredId = input.preferredStaffId?.trim() || null;
+  if (preferredId) {
+    candidateIds = candidateIds.includes(preferredId) ? [preferredId] : candidateIds;
+  }
+
   const { data: bookedRows } = await supabase
     .from("bookings")
-    .select("staff_id")
+    .select("staff_id, slot_time, service_duration_minutes")
     .eq("shop_id", input.shopId)
     .eq("booking_date", input.date)
-    .eq("slot_time", input.slotTime)
     .in("status", ["confirmed", "completed"])
     .not("staff_id", "is", null);
 
-  const bookedIds = new Set(
-    (bookedRows ?? []).map((r) => r.staff_id as string),
-  );
-  const freeStaffIds = (staffRows ?? [])
-    .map((r) => r.id as string)
-    .filter((id) => !bookedIds.has(id));
+  const busyStaff = new Set<string>();
+  for (const r of bookedRows ?? []) {
+    const ivStart = hhmmToMinutes((r.slot_time as string).slice(0, 5));
+    if (
+      intervalsOverlap(
+        startMin,
+        duration,
+        ivStart,
+        r.service_duration_minutes as number,
+      )
+    ) {
+      busyStaff.add(r.staff_id as string);
+    }
+  }
+  const freeStaffIds = candidateIds.filter((id) => !busyStaff.has(id));
 
   if (freeStaffIds.length === 0) return slotTaken;
 
@@ -405,9 +565,9 @@ export async function createBooking(
       .single();
 
     if (!insertError) return { ok: true, bookingId: inserted!.id as string };
-    // 23505 = this staff was just taken by a concurrent booking; try the next
+    // 23P01 = this staff was just taken by a concurrent booking; try the next
     // free one. Any other error is fatal.
-    if (insertError.code !== "23505") {
+    if (!isConflict(insertError.code)) {
       return { ok: false, code: "unknown", message: insertError.message };
     }
   }
@@ -418,6 +578,13 @@ export async function createBooking(
 
 // ----- Read: confirmation view --------------------------------------------
 
+/** Postgres `numeric` arrives over the wire as a string — coerce to number. */
+function priceFromDb(value: number | string | null): number | null {
+  if (value == null) return null;
+  const n = typeof value === "string" ? Number(value) : value;
+  return Number.isFinite(n) ? n : null;
+}
+
 type BookingJoinRow = {
   id: string;
   shop_id: string;
@@ -426,6 +593,8 @@ type BookingJoinRow = {
   booking_date: string;
   slot_time: string;
   service_duration_minutes: number;
+  service_name: string | null;
+  service_price: number | string | null;
   status: BookingStatus;
   created_at: string;
   shops: {
@@ -451,6 +620,7 @@ export async function getBookingById(
       `
         id, shop_id, customer_name, customer_phone,
         booking_date, slot_time, service_duration_minutes,
+        service_name, service_price,
         status, created_at,
         shops ( name, address, contact_phone )
       `,
@@ -471,6 +641,8 @@ export async function getBookingById(
     bookingDate: row.booking_date,
     slotTime: row.slot_time.slice(0, 5),
     serviceDurationMinutes: row.service_duration_minutes,
+    serviceName: row.service_name,
+    servicePrice: priceFromDb(row.service_price),
     status: row.status,
     createdAt: row.created_at,
   };
@@ -485,6 +657,8 @@ type BookingRowDb = {
   booking_date: string;
   slot_time: string;
   service_duration_minutes: number;
+  service_name: string | null;
+  service_price: number | string | null;
   status: BookingStatus;
   created_at: string;
 };
@@ -509,6 +683,8 @@ function mapRow(r: BookingRowDb): BookingListItem {
     bookingDate: r.booking_date,
     slotTime: r.slot_time.slice(0, 5),
     serviceDurationMinutes: r.service_duration_minutes,
+    serviceName: r.service_name,
+    servicePrice: priceFromDb(r.service_price),
     status: r.status,
     createdAt: r.created_at,
   };
@@ -543,7 +719,8 @@ export async function listBookingsByShop(
     .from("bookings")
     .select(
       `id, customer_name, customer_phone, booking_date,
-       slot_time, service_duration_minutes, status, created_at`,
+       slot_time, service_duration_minutes, service_name, service_price,
+       status, created_at`,
     )
     .eq("shop_id", shopId);
 
@@ -799,6 +976,8 @@ type CustomerBookingRow = {
   booking_date: string;
   slot_time: string;
   service_duration_minutes: number;
+  service_name: string | null;
+  service_price: number | string | null;
   status: BookingStatus;
   shops: { name: string; address: string | null } | null;
 };
@@ -821,7 +1000,8 @@ export async function listBookingsByCustomerPhone(
   const { data, error } = await supabase
     .from("bookings")
     .select(
-      `id, shop_id, booking_date, slot_time, service_duration_minutes, status,
+      `id, shop_id, booking_date, slot_time, service_duration_minutes,
+       service_name, service_price, status,
        shops ( name, address )`,
     )
     .eq("customer_phone", phone)
@@ -839,6 +1019,8 @@ export async function listBookingsByCustomerPhone(
       bookingDate: r.booking_date,
       slotTime: r.slot_time.slice(0, 5),
       serviceDurationMinutes: r.service_duration_minutes,
+      serviceName: r.service_name,
+      servicePrice: priceFromDb(r.service_price),
       status: r.status,
     }),
   );

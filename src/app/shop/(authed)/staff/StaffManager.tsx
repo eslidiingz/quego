@@ -16,6 +16,7 @@ import {
   type StaffFormErrors,
 } from "@/lib/validation/shop";
 import type { StaffListItem } from "@/lib/services/staff";
+import type { ShopServiceListItem } from "@/lib/services/services";
 import {
   saveStaffAction,
   setStaffActiveAction,
@@ -32,7 +33,13 @@ import {
  * SRP: list layout + dialog orchestration. The form lives in `StaffFormModal`
  * and a single row in `StaffRow`.
  */
-export function StaffManager({ staff }: { staff: StaffListItem[] }) {
+export function StaffManager({
+  staff,
+  services,
+}: {
+  staff: StaffListItem[];
+  services: ShopServiceListItem[];
+}) {
   const [editing, setEditing] = useState<StaffListItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -44,6 +51,9 @@ export function StaffManager({ staff }: { staff: StaffListItem[] }) {
     setEditing(member);
     setDialogOpen(true);
   }
+
+  // Resolve a staff member's assigned service IDs to names for the row chips.
+  const serviceNameById = new Map(services.map((s) => [s.id, s.name]));
 
   return (
     <section className="space-y-stack-md">
@@ -61,13 +71,23 @@ export function StaffManager({ staff }: { staff: StaffListItem[] }) {
       ) : (
         <ul className="space-y-3">
           {staff.map((member) => (
-            <StaffRow key={member.id} member={member} onEdit={() => openEdit(member)} />
+            <StaffRow
+              key={member.id}
+              member={member}
+              serviceNameById={serviceNameById}
+              hasServices={services.length > 0}
+              onEdit={() => openEdit(member)}
+            />
           ))}
         </ul>
       )}
 
       {dialogOpen ? (
-        <StaffFormModal editing={editing} onClose={() => setDialogOpen(false)} />
+        <StaffFormModal
+          editing={editing}
+          services={services}
+          onClose={() => setDialogOpen(false)}
+        />
       ) : null}
     </section>
   );
@@ -75,12 +95,21 @@ export function StaffManager({ staff }: { staff: StaffListItem[] }) {
 
 function StaffRow({
   member,
+  serviceNameById,
+  hasServices,
   onEdit,
 }: {
   member: StaffListItem;
+  serviceNameById: Map<string, string>;
+  hasServices: boolean;
   onEdit: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+
+  // Map the assigned service IDs to names (skip any that no longer exist).
+  const assignedNames = member.serviceIds
+    .map((id) => serviceNameById.get(id))
+    .filter((n): n is string => Boolean(n));
 
   return (
     <li
@@ -94,7 +123,7 @@ function StaffRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="font-display text-headline-sm text-on-surface truncate">
+          <h3 className="font-display font-bold text-headline-sm text-on-surface truncate">
             {member.name}
             {member.nickname ? (
               <span className="text-on-surface-variant font-normal"> ({member.nickname})</span>
@@ -106,9 +135,32 @@ function StaffRow({
             </Chip>
           ) : null}
         </div>
-        <p className="text-label-md text-on-surface-variant mt-0.5">
+        <p className="text-label-md text-on-surface-variant/60 mt-0.5">
           {member.phone ? formatPhone(member.phone) : "ไม่ระบุเบอร์โทร"}
         </p>
+        {!member.providesService ? (
+          <div className="flex items-center gap-1.5 flex-wrap mt-2">
+            <span className="inline-flex items-center gap-1 text-label-sm text-on-surface-variant/60">
+              <Icon name="block" size={14} />
+              ไม่ให้บริการ
+            </span>
+          </div>
+        ) : hasServices ? (
+          <div className="flex items-center gap-1.5 flex-wrap mt-2">
+            {assignedNames.length === 0 ? (
+              <span className="inline-flex items-center gap-1 text-label-sm text-on-surface-variant">
+                <Icon name="stacks" size={14} />
+                ทุกบริการ
+              </span>
+            ) : (
+              assignedNames.map((n) => (
+                <Chip key={n} variant="confirmed" size="sm">
+                  {n}
+                </Chip>
+              ))
+            )}
+          </div>
+        ) : null}
       </div>
 
       <Switch
@@ -121,41 +173,45 @@ function StaffRow({
         }}
       />
 
-      <button
-        type="button"
-        onClick={onEdit}
-        aria-label="แก้ไขพนักงาน"
-        className="inline-flex items-center justify-center size-10 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
-      >
-        <Icon name="edit" size={20} />
-      </button>
+      <div className="flex items-center">
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label="แก้ไขพนักงาน"
+          className="inline-flex items-center justify-center size-10 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
+        >
+          <Icon name="edit" size={20} />
+        </button>
 
-      <ConfirmDialog
-        trigger={
-          <button
-            type="button"
-            aria-label="ลบพนักงาน"
-            className="inline-flex items-center justify-center size-10 rounded-full text-error hover:bg-error-container/40 transition-colors"
-          >
-            <Icon name="delete" size={20} />
-          </button>
-        }
-        title="ลบพนักงานคนนี้?"
-        description={`"${member.name}" จะถูกลบออกจากรายชื่อ ประวัติการจองเดิมยังอยู่แต่จะไม่ผูกกับพนักงานคนนี้`}
-        confirmLabel="ลบ"
-        cancelLabel="ยกเลิก"
-        destructive
-        onConfirm={() => deleteStaffAction(member.id)}
-      />
+        <ConfirmDialog
+          trigger={
+            <button
+              type="button"
+              aria-label="ลบพนักงาน"
+              className="inline-flex items-center justify-center size-10 rounded-full text-error hover:bg-error-container/40 transition-colors"
+            >
+              <Icon name="delete" size={20} />
+            </button>
+          }
+          title="ลบพนักงานคนนี้?"
+          description={`"${member.name}" จะถูกลบออกจากรายชื่อ ประวัติการจองเดิมยังอยู่แต่จะไม่ผูกกับพนักงานคนนี้`}
+          confirmLabel="ลบ"
+          cancelLabel="ยกเลิก"
+          destructive
+          onConfirm={() => deleteStaffAction(member.id)}
+        />
+      </div>
     </li>
   );
 }
 
 function StaffFormModal({
   editing,
+  services,
   onClose,
 }: {
   editing: StaffListItem | null;
+  services: ShopServiceListItem[];
   onClose: () => void;
 }) {
   const [state, formAction, pending] = useActionState<StaffFormState, FormData>(
@@ -164,15 +220,41 @@ function StaffFormModal({
   );
   const [errors, setErrors] = useState<StaffFormErrors>({});
 
+  // Three service modes: "all" = serves every service (no specific rows),
+  // "some" = only the checked services, "none" = back-of-house (manager,
+  // housekeeper) who serves nothing. Derive the initial mode when editing.
+  const [serviceMode, setServiceMode] = useState<"all" | "some" | "none">(
+    () => {
+      if (!editing) return "all";
+      if (!editing.providesService) return "none";
+      return editing.serviceIds.length === 0 ? "all" : "some";
+    },
+  );
+  const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(
+    () => new Set(editing?.serviceIds ?? []),
+  );
+
+  const toggleService = (id: string) =>
+    setSelectedServiceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   // Close on a successful save. State only flips to ok after a real submit
   // (the component mounts fresh per open, so there's no stale success).
   useEffect(() => {
     if (state?.ok) onClose();
   }, [state, onClose]);
 
+  // "เลือกบางบริการ" with nothing checked is incoherent — block it client-side.
+  const serviceSelectionInvalid =
+    services.length > 0 && serviceMode === "some" && selectedServiceIds.size === 0;
+
   function clientAction(formData: FormData) {
     const fieldErrors = validateStaffForm(parseStaffFormData(formData));
-    if (hasStaffErrors(fieldErrors)) {
+    if (hasStaffErrors(fieldErrors) || serviceSelectionInvalid) {
       setErrors(fieldErrors);
       return; // do not call the server on invalid input
     }
@@ -228,16 +310,120 @@ function StaffFormModal({
           onChange={clearErr("phone")}
         />
 
+        {services.length > 0 ? (
+          <fieldset className="space-y-3 border-t border-outline-variant pt-4">
+            <legend className="text-label-md text-on-surface font-semibold">
+              บริการที่ให้บริการได้
+            </legend>
+
+            {/* "some" emits the checked ids; "all" and "none" emit none. The
+                action reads `serviceMode` (the checked radio's value) to tell
+                "all" and "none" apart. */}
+            {serviceMode === "some"
+              ? [...selectedServiceIds].map((id) => (
+                  <input key={id} type="hidden" name="serviceIds" value={id} />
+                ))
+              : null}
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="serviceMode"
+                value="all"
+                checked={serviceMode === "all"}
+                onChange={() => setServiceMode("all")}
+                className="size-4 accent-primary"
+              />
+              <span className="text-body-md text-on-surface">
+                ทุกบริการ
+                <span className="text-on-surface-variant"> (ค่าเริ่มต้น)</span>
+              </span>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="serviceMode"
+                value="some"
+                checked={serviceMode === "some"}
+                onChange={() => setServiceMode("some")}
+                className="size-4 accent-primary"
+              />
+              <span className="text-body-md text-on-surface">เลือกบางบริการ</span>
+            </label>
+
+            {serviceMode === "some" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-7">
+                {services.map((svc) => (
+                  <label
+                    key={svc.id}
+                    className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors ${
+                      selectedServiceIds.has(svc.id)
+                        ? "border-primary bg-primary/5"
+                        : "border-outline-variant hover:bg-surface-container-high"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedServiceIds.has(svc.id)}
+                      onChange={() => toggleService(svc.id)}
+                      className="size-4 accent-primary"
+                    />
+                    <span className="text-label-md text-on-surface truncate">
+                      {svc.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+
+            {serviceSelectionInvalid ? (
+              <p className="text-label-sm text-on-surface-variant pl-7">
+                ยังไม่ได้เลือกบริการ — เลือกอย่างน้อย 1 อย่าง หรือกลับไปเลือก "ทุกบริการ"
+              </p>
+            ) : null}
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="serviceMode"
+                value="none"
+                checked={serviceMode === "none"}
+                onChange={() => setServiceMode("none")}
+                className="size-4 accent-primary"
+              />
+              <span className="text-body-md text-on-surface">
+                ไม่มีบริการ
+                <span className="text-on-surface-variant"> (เช่น ผู้จัดการ, แม่บ้าน)</span>
+              </span>
+            </label>
+          </fieldset>
+        ) : null}
+
         <label className="flex items-center justify-between gap-4 pt-1">
-          <span className="text-label-md text-on-surface">เปิดใช้งาน (รับคิวได้)</span>
+          <span className="text-label-md text-on-surface">
+            {serviceMode === "none" ? "เปิดใช้งาน (แสดงในทีม)" : "เปิดใช้งาน (รับคิวได้)"}
+          </span>
           <Switch name="isActive" defaultChecked={editing ? editing.isActive : true} />
         </label>
 
-        <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
+        <div className="flex gap-3 pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={pending}
+            fullWidth
+            className="flex-1"
+          >
             ยกเลิก
           </Button>
-          <Button type="submit" disabled={pending}>
+          <Button
+            type="submit"
+            disabled={pending || serviceSelectionInvalid}
+            fullWidth
+            className="flex-1"
+          >
             {pending ? "กำลังบันทึก…" : "บันทึก"}
           </Button>
         </div>

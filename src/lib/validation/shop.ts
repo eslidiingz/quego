@@ -121,3 +121,78 @@ export function validateStaffForm(input: StaffFormFields): StaffFormErrors {
 export function hasStaffErrors(errors: StaffFormErrors): boolean {
   return Object.keys(errors).length > 0;
 }
+
+// ----- Service (บริการ) form ------------------------------------------------
+
+export type ServiceFormFields = {
+  name: string;
+  /** Raw string from the form input; validated/parsed to a number below. */
+  durationMinutes: string;
+  /** Raw string; empty means "no price". */
+  price: string;
+  description?: string;
+  isActive: boolean;
+};
+
+export type ServiceFormErrors = Partial<
+  Record<"name" | "durationMinutes" | "price" | "description", string>
+>;
+
+export function parseServiceFormData(formData: FormData): ServiceFormFields {
+  const get = (key: string) => String(formData.get(key) ?? "").trim();
+  return {
+    name: get("name"),
+    durationMinutes: get("durationMinutes"),
+    price: get("price"),
+    description: get("description") || undefined,
+    // The service form always renders the active toggle, so an unchecked box
+    // (which submits no value) means "inactive". Treat only an explicit
+    // on/true/1 as active.
+    isActive: ["on", "true", "1"].includes(get("isActive").toLowerCase()),
+  };
+}
+
+export function validateServiceForm(input: ServiceFormFields): ServiceFormErrors {
+  const errors: ServiceFormErrors = {};
+
+  if (!input.name) errors.name = "กรุณากรอกชื่อบริการ";
+  else if (input.name.length > 120)
+    errors.name = "ชื่อบริการต้องไม่เกิน 120 ตัวอักษร";
+
+  // Duration must be a 10-minute multiple in [10, 480] — the same grid the
+  // booking slot-math and the DB CHECK enforce.
+  if (!input.durationMinutes) {
+    errors.durationMinutes = "กรุณากรอกระยะเวลา";
+  } else {
+    const duration = Number(input.durationMinutes);
+    if (!Number.isInteger(duration)) {
+      errors.durationMinutes = "ระยะเวลาต้องเป็นจำนวนเต็ม (นาที)";
+    } else if (duration < 10 || duration > 480) {
+      errors.durationMinutes = "ระยะเวลาต้องอยู่ระหว่าง 10–480 นาที";
+    } else if (duration % 10 !== 0) {
+      errors.durationMinutes = "ระยะเวลาต้องเป็นจำนวนเท่าของ 10 นาที";
+    }
+  }
+
+  // Price is optional. When provided it must be a non-negative number with at
+  // most two decimal places.
+  if (input.price) {
+    const price = Number(input.price);
+    if (!Number.isFinite(price) || price < 0) {
+      errors.price = "ราคาต้องเป็นตัวเลขไม่ติดลบ";
+    } else if (Math.round(price * 100) !== price * 100) {
+      errors.price = "ราคามีทศนิยมได้ไม่เกิน 2 ตำแหน่ง";
+    } else if (price > 1_000_000) {
+      errors.price = "ราคาสูงเกินไป";
+    }
+  }
+
+  if (input.description && input.description.length > 500)
+    errors.description = "รายละเอียดต้องไม่เกิน 500 ตัวอักษร";
+
+  return errors;
+}
+
+export function hasServiceErrors(errors: ServiceFormErrors): boolean {
+  return Object.keys(errors).length > 0;
+}

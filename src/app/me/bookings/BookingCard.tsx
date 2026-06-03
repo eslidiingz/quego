@@ -40,6 +40,17 @@ export function BookingCard({ booking }: { booking: CustomerBookingItem }) {
               {status.label}
             </Chip>
           </div>
+          {booking.serviceName ? (
+            <p className="flex items-center gap-1.5 text-label-md text-on-surface-variant">
+              <Icon name="design_services" size={16} className="shrink-0" />
+              <span className="break-words">
+                {booking.serviceName} · {booking.serviceDurationMinutes} นาที
+                {booking.servicePrice != null
+                  ? ` · ${formatBaht(booking.servicePrice)}`
+                  : ""}
+              </span>
+            </p>
+          ) : null}
         </div>
         <DateBadge dateYmd={booking.bookingDate} />
       </div>
@@ -115,6 +126,13 @@ function formatThaiDate(ymd: string): string {
   const dayLabel = THAI_DAY_LONG[dt.getUTCDay()];
   const monthLabel = THAI_MONTH_SHORT[m - 1];
   return `วัน${dayLabel}ที่ ${d} ${monthLabel} ${y + 543}`;
+}
+
+function formatBaht(price: number): string {
+  return `${price.toLocaleString("th-TH", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })} บาท`;
 }
 
 const THAI_DAY_LONG = [
