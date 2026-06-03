@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
+import { Chip } from "@/components/ui/Chip";
+
+export type ShopOpenState = "open" | "closed" | "unknown";
 
 export type PublicShopCardProps = {
   id: string;
@@ -9,6 +12,8 @@ export type PublicShopCardProps = {
   address?: string | null;
   serviceDurationMinutes: number;
   categoryIcon?: string | null;
+  /** Live open/closed state from today's business hours. */
+  openState?: ShopOpenState;
   className?: string;
 };
 
@@ -29,6 +34,7 @@ export function PublicShopCard({
   address,
   serviceDurationMinutes,
   categoryIcon,
+  openState = "unknown",
   className,
 }: PublicShopCardProps) {
   return (
@@ -44,6 +50,9 @@ export function PublicShopCard({
           name={categoryIcon ?? "storefront"}
           className="text-on-primary opacity-90 text-[36px] sm:text-[48px]"
         />
+        {openState !== "unknown" ? (
+          <OpenStateBadge state={openState} />
+        ) : null}
         <span className="absolute top-2 right-2 sm:top-3 sm:right-3 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-white/90 backdrop-blur-sm text-[10px] sm:text-label-sm font-bold text-primary inline-flex items-center gap-1 shadow-sm whitespace-nowrap">
           <Icon name="schedule" size={12} />
           {formatDuration(serviceDurationMinutes)}
@@ -54,7 +63,7 @@ export function PublicShopCard({
           {name}
         </h3>
         {description ? (
-          <p className="text-label-md sm:text-body-md text-on-surface-variant line-clamp-2 hidden sm:block">
+          <p className="text-label-md sm:text-body-md text-on-surface-variant line-clamp-2">
             {description}
           </p>
         ) : null}
@@ -66,6 +75,31 @@ export function PublicShopCard({
         ) : null}
       </div>
     </Link>
+  );
+}
+
+/**
+ * Live availability pill, top-left of the card hero. Open uses a pulsing
+ * success chip; closed is a muted neutral chip. `"unknown"` shops render no
+ * badge (handled by the caller) so we never mislabel a shop with no hours.
+ */
+function OpenStateBadge({ state }: { state: "open" | "closed" }) {
+  return (
+    <span className="absolute top-2 left-2 sm:top-3 sm:left-3">
+      {state === "open" ? (
+        <Chip variant="success" size="sm" pulse className="shadow-sm">
+          เปิดอยู่
+        </Chip>
+      ) : (
+        <Chip
+          variant="neutral"
+          size="sm"
+          className="bg-white/90 backdrop-blur-sm text-on-surface-variant shadow-sm"
+        >
+          ปิดแล้ว
+        </Chip>
+      )}
+    </span>
   );
 }
 

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
-import { Chip } from "@/components/ui/Chip";
 import { requireShopSession } from "@/lib/auth/shop-session-server";
 import {
   getBookingContext,

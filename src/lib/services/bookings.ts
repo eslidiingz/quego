@@ -14,6 +14,7 @@ import {
   getBangkokNow,
   getBangkokToday,
 } from "@/lib/time/bangkok";
+import { countActiveStaff } from "@/lib/services/staff";
 
 // Re-export so server callers can import {BookingContext} from this module
 // in addition to the pure slot-math file (single source of truth).
@@ -143,19 +144,26 @@ export async function getBookingContext(
   const windowStart = window[0].dateYmd;
   const windowEnd = window[window.length - 1].dateYmd;
 
-  const [{ data: hoursData }, { data: bookingsData }] = await Promise.all([
-    supabase
-      .from("shop_business_hours")
-      .select("day_of_week, is_open, open_time, close_time")
-      .eq("shop_id", shopId),
-    supabase
-      .from("bookings")
-      .select("booking_date, slot_time")
-      .eq("shop_id", shopId)
-      .gte("booking_date", windowStart)
-      .lte("booking_date", windowEnd)
-      .in("status", ["confirmed", "completed"]),
-  ]);
+  const [{ data: hoursData }, { data: bookingsData }, activeStaff] =
+    await Promise.all([
+      supabase
+        .from("shop_business_hours")
+        .select("day_of_week, is_open, open_time, close_time")
+        .eq("shop_id", shopId),
+      supabase
+        .from("bookings")
+        .select("booking_date, slot_time")
+        .eq("shop_id", shopId)
+        .gte("booking_date", windowStart)
+        .lte("booking_date", windowEnd)
+        .in("status", ["confirmed", "completed"]),
+      countActiveStaff(shopId),
+    ]);
+
+  // Per-slot capacity = number of active staff (parallel service lines), with
+  // a floor of 1 so shops that haven't added staff keep the legacy
+  // single-queue behaviour.
+  const capacity = Math.max(activeStaff, 1);
 
   const byDay = new Map<DayOfWeek, BusinessHour>();
   for (const h of hoursData ?? []) {
@@ -177,10 +185,23 @@ export async function getBookingContext(
       },
   );
 
-  const takenSlots: TakenSlot[] = (bookingsData ?? []).map((b) => ({
-    date: b.booking_date,
-    slotTime: (b.slot_time as string).slice(0, 5),
-  }));
+  // A slot is unavailable to the picker only when it is FULL — i.e. the number
+  // of active bookings in it has reached capacity. We count per (date, slot)
+  // and emit just the full ones, so the existing picker logic ("slot present
+  // in takenSlots ⇒ disabled") keeps working unchanged while respecting the
+  // multi-staff capacity.
+  const slotCounts = new Map<string, number>();
+  for (const b of bookingsData ?? []) {
+    const key = `${b.booking_date}T${(b.slot_time as string).slice(0, 5)}`;
+    slotCounts.set(key, (slotCounts.get(key) ?? 0) + 1);
+  }
+  const takenSlots: TakenSlot[] = [];
+  for (const [key, count] of slotCounts) {
+    if (count >= capacity) {
+      const [date, slotTime] = key.split("T");
+      takenSlots.push({ date, slotTime });
+    }
+  }
 
   const now = getBangkokNow();
   return {
@@ -310,37 +331,89 @@ export async function createBooking(
     }
   }
 
-  const { data: inserted, error: insertError } = await supabase
-    .from("bookings")
-    .insert({
-      shop_id: input.shopId,
-      customer_name: name,
-      customer_phone: phoneProvided ? phone : null,
-      booking_date: input.date,
-      slot_time: input.slotTime,
-      service_duration_minutes: duration,
-    })
-    .select("id")
-    .single();
+  const baseRow = {
+    shop_id: input.shopId,
+    customer_name: name,
+    customer_phone: phoneProvided ? phone : null,
+    booking_date: input.date,
+    slot_time: input.slotTime,
+    service_duration_minutes: duration,
+  };
 
-  if (insertError) {
-    // 23505 = unique_violation. Our partial unique index fires here when a
-    // second booking races against an active one in the same slot.
-    if (insertError.code === "23505") {
-      return {
-        ok: false,
-        code: "slot_taken",
-        message: "ช่วงเวลานี้ถูกจองโดยลูกค้าอีกคนแล้ว กรุณาเลือกใหม่",
-      };
+  const slotTaken: CreateBookingResult = {
+    ok: false,
+    code: "slot_taken",
+    message: "ช่วงเวลานี้ถูกจองโดยลูกค้าอีกคนแล้ว กรุณาเลือกใหม่",
+  };
+
+  // Capacity model: each active staff member is a parallel service line, so a
+  // slot can hold one active booking PER active staff. Shops with no staff
+  // fall back to the legacy single-queue path (staff_id = null), guarded by
+  // the `bookings_unique_active_slot_noassign` partial unique index.
+  const activeStaff = await countActiveStaff(input.shopId);
+
+  if (activeStaff === 0) {
+    const { data: inserted, error: insertError } = await supabase
+      .from("bookings")
+      .insert({ ...baseRow, staff_id: null })
+      .select("id")
+      .single();
+
+    if (insertError) {
+      // 23505 = unique_violation: another booking already holds this slot.
+      if (insertError.code === "23505") return slotTaken;
+      return { ok: false, code: "unknown", message: insertError.message };
     }
-    return {
-      ok: false,
-      code: "unknown",
-      message: insertError.message,
-    };
+    return { ok: true, bookingId: inserted!.id as string };
   }
 
-  return { ok: true, bookingId: inserted!.id as string };
+  // Staffed path: find an active staff member with no active booking in this
+  // exact slot, then assign them. The per-staff unique index
+  // (`bookings_unique_active_slot_staff`) is the race backstop — if two
+  // requests pick the same free staff, one gets 23505 and we try the next.
+  const { data: staffRows } = await supabase
+    .from("shop_staff")
+    .select("id")
+    .eq("shop_id", input.shopId)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  const { data: bookedRows } = await supabase
+    .from("bookings")
+    .select("staff_id")
+    .eq("shop_id", input.shopId)
+    .eq("booking_date", input.date)
+    .eq("slot_time", input.slotTime)
+    .in("status", ["confirmed", "completed"])
+    .not("staff_id", "is", null);
+
+  const bookedIds = new Set(
+    (bookedRows ?? []).map((r) => r.staff_id as string),
+  );
+  const freeStaffIds = (staffRows ?? [])
+    .map((r) => r.id as string)
+    .filter((id) => !bookedIds.has(id));
+
+  if (freeStaffIds.length === 0) return slotTaken;
+
+  for (const staffId of freeStaffIds) {
+    const { data: inserted, error: insertError } = await supabase
+      .from("bookings")
+      .insert({ ...baseRow, staff_id: staffId })
+      .select("id")
+      .single();
+
+    if (!insertError) return { ok: true, bookingId: inserted!.id as string };
+    // 23505 = this staff was just taken by a concurrent booking; try the next
+    // free one. Any other error is fatal.
+    if (insertError.code !== "23505") {
+      return { ok: false, code: "unknown", message: insertError.message };
+    }
+  }
+
+  // Every free candidate lost a race — the slot filled up under us.
+  return slotTaken;
 }
 
 // ----- Read: confirmation view --------------------------------------------
@@ -416,6 +489,18 @@ type BookingRowDb = {
   created_at: string;
 };
 
+// Status priority for the live "today" queue: still-actionable bookings
+// (รอรับบริการ / confirmed) rise to the top, then no-shows, with เสร็จสิ้น
+// (completed) sunk to the very bottom. cancelled shares no-show's rank — it
+// only reaches this sort via the dashboard (includeCancelled), which re-sorts
+// in-page anyway, and is excluded from the /shop/bookings list entirely.
+const TODAY_STATUS_RANK: Record<BookingStatus, number> = {
+  confirmed: 0,
+  no_show: 1,
+  cancelled: 1,
+  completed: 2,
+};
+
 function mapRow(r: BookingRowDb): BookingListItem {
   return {
     id: r.id,
@@ -433,7 +518,10 @@ function mapRow(r: BookingRowDb): BookingListItem {
  * List bookings for one shop, filtered relative to today (Bangkok).
  *
  * Sort direction follows the natural reading order for each filter:
- *   - today / upcoming → chronological (next service first)
+ *   - today            → by status first (รอรับบริการ at the top ordered by
+ *                        nearest slot time, เสร็จสิ้น sunk to the bottom),
+ *                        chronological within each status group
+ *   - upcoming         → chronological (next service first)
  *   - past / all       → reverse chronological (most recent first)
  *
  * `includeCancelled` controls whether cancelled bookings appear:
@@ -490,7 +578,19 @@ export async function listBookingsByShop(
 
   const { data, error } = await query;
   if (error || !data) return [];
-  return (data as BookingRowDb[]).map(mapRow);
+  const rows = (data as BookingRowDb[]).map(mapRow);
+
+  // Today's view is the live working queue: lift รอรับบริการ to the top and
+  // sink เสร็จสิ้น to the bottom. The query already ordered by slot_time asc,
+  // and Array.prototype.sort is stable, so "nearest time first" is preserved
+  // within each status group. Other filters keep their query ordering.
+  if (filter === "today") {
+    rows.sort(
+      (a, b) => TODAY_STATUS_RANK[a.status] - TODAY_STATUS_RANK[b.status],
+    );
+  }
+
+  return rows;
 }
 
 // ----- Write: status transitions ----------------------------------------

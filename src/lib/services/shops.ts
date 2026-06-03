@@ -1,6 +1,7 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { getBangkokNow } from "@/lib/time/bangkok";
 import {
   DAYS_OF_WEEK,
   type BusinessHour,
@@ -157,18 +158,48 @@ export async function getPublicShopById(
   };
 }
 
+/**
+ * Whether a shop is currently taking walk-ins, derived from today's business
+ * hours vs. Bangkok-local "now". `"unknown"` means the shop hasn't configured
+ * hours for today — we render no badge rather than guess.
+ */
+export type ShopOpenState = "open" | "closed" | "unknown";
+
 export type PublicShop = {
   id: string;
   name: string;
   description: string | null;
   address: string | null;
   service_duration_minutes: number;
+  openState: ShopOpenState;
 };
 
 export type CategoryWithShops = {
   category: { id: string; name: string; icon: string | null };
   shops: PublicShop[];
 };
+
+type TodayHoursRow = {
+  is_open: boolean;
+  open_time: string | null;
+  close_time: string | null;
+};
+
+/**
+ * Pure open/closed decision for a single shop, given its row for *today* and
+ * the current "HH:MM". Keeping it pure makes the rule trivially testable and
+ * impossible to disagree with itself across call sites.
+ */
+function computeOpenState(
+  row: TodayHoursRow | undefined,
+  nowHHMM: string,
+): ShopOpenState {
+  if (!row) return "unknown";
+  if (!row.is_open || !row.open_time || !row.close_time) return "closed";
+  const open = row.open_time.slice(0, 5);
+  const close = row.close_time.slice(0, 5);
+  return nowHHMM >= open && nowHHMM < close ? "open" : "closed";
+}
 
 /**
  * Returns active categories together with their approved shops, sorted
@@ -200,8 +231,33 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
 
   if (categoriesResult.error || shopsResult.error) return [];
 
+  const shopRows = shopsResult.data ?? [];
+
+  // Batch-load only *today's* business-hours row for the shops we're about to
+  // render, then derive open/closed once. One extra query for the whole page
+  // instead of N detail fetches.
+  const now = getBangkokNow();
+  const openByShop = new Map<string, ShopOpenState>();
+  const shopIds = shopRows.map((s) => s.id);
+  if (shopIds.length > 0) {
+    const { data: hoursRows } = await supabase
+      .from("shop_business_hours")
+      .select("shop_id, is_open, open_time, close_time")
+      .in("shop_id", shopIds)
+      .eq("day_of_week", now.dayOfWeek);
+    for (const h of hoursRows ?? []) {
+      openByShop.set(
+        h.shop_id,
+        computeOpenState(
+          { is_open: h.is_open, open_time: h.open_time, close_time: h.close_time },
+          now.timeHHMM,
+        ),
+      );
+    }
+  }
+
   const shopsByCategory = new Map<string, PublicShop[]>();
-  for (const s of shopsResult.data ?? []) {
+  for (const s of shopRows) {
     const list = shopsByCategory.get(s.category_id) ?? [];
     list.push({
       id: s.id,
@@ -209,6 +265,7 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
       description: s.description,
       address: s.address,
       service_duration_minutes: s.service_duration_minutes,
+      openState: openByShop.get(s.id) ?? "unknown",
     });
     shopsByCategory.set(s.category_id, list);
   }

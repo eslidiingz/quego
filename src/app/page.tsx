@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
-import { PublicShopCard } from "@/components/booking/PublicShopCard";
+import { ShopDiscovery } from "@/components/booking/ShopDiscovery";
 import { SiteAuthLink } from "@/components/layout/SiteAuthLink";
 import { listPublicShopsByCategory } from "@/lib/services/shops";
 
@@ -19,25 +19,24 @@ export default async function HomePage() {
     <main className="min-h-screen bg-background flex flex-col">
       <SiteHeader />
 
-      <section className="max-w-[1280px] mx-auto w-full px-4 md:px-12 pt-stack-lg">
+      <section className="max-w-[1280px] mx-auto w-full px-4 md:px-12 pt-stack-lg pb-stack-md">
         <div className="text-center max-w-2xl mx-auto">
-
-          <h1 className="font-display text-headline-lg text-on-background mb-2">
+          <h1 className="font-display text-headline-lg text-on-background mb-2 text-balance">
             ค้นพบร้านที่ใช่ จองคิวสะดวก
           </h1>
-          <p className="text-body-md text-on-surface-variant">
-            เลือกร้านจากหมวดหมู่ที่คุณสนใจ และดูระยะเวลาที่จะใช้บริการได้ทันที
+          <p className="text-body-md text-on-surface-variant text-balance">
+            ค้นหาร้าน เลือกจากหมวดหมู่ และดูว่าร้านไหนเปิดอยู่ตอนนี้ได้ทันที
           </p>
         </div>
       </section>
 
-      <div className="flex-1 max-w-[1280px] mx-auto w-full px-4 md:px-12 py-stack-lg space-y-stack-lg">
+      <div className="flex-1">
         {groups.length === 0 ? (
-          <EmptyState />
+          <div className="max-w-[1280px] mx-auto w-full px-4 md:px-12 py-stack-lg">
+            <EmptyState />
+          </div>
         ) : (
-          groups.map(({ category, shops }) => (
-            <CategorySection key={category.id} category={category} shops={shops} />
-          ))
+          <ShopDiscovery groups={groups} />
         )}
       </div>
 
@@ -86,46 +85,6 @@ function SiteFooter() {
         </nav>
       </div>
     </footer>
-  );
-}
-
-function CategorySection({
-  category,
-  shops,
-}: {
-  category: { id: string; name: string; icon: string | null };
-  shops: { id: string; name: string; description: string | null; address: string | null; service_duration_minutes: number }[];
-}) {
-  return (
-    <section aria-labelledby={`cat-${category.id}`}>
-      <header className="flex items-center gap-3 mb-4">
-        <span className="w-10 h-10 rounded-xl bg-primary-container/15 text-primary flex items-center justify-center shrink-0">
-          <Icon name={category.icon ?? "category"} />
-        </span>
-        <h2
-          id={`cat-${category.id}`}
-          className="font-display text-headline-md text-on-background"
-        >
-          {category.name}
-        </h2>
-        <span className="text-label-md text-on-surface-variant">
-          ({shops.length} ร้าน)
-        </span>
-      </header>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
-        {shops.map((shop) => (
-          <PublicShopCard
-            key={shop.id}
-            id={shop.id}
-            name={shop.name}
-            description={shop.description}
-            address={shop.address}
-            serviceDurationMinutes={shop.service_duration_minutes}
-            categoryIcon={category.icon}
-          />
-        ))}
-      </div>
-    </section>
   );
 }
 
