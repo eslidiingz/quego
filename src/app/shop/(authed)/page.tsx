@@ -156,8 +156,8 @@ export default async function ShopHomePage({
           <EmptyState kind="filter-empty" />
         ) : (
           <ul className="space-y-1">
-            {preview.map((b) => (
-              <TodayBookingRow key={b.id} booking={b} />
+            {preview.map((b, i) => (
+              <TodayBookingRow key={b.id} booking={b} index={i} />
             ))}
             {overflow > 0 ? (
               <li>

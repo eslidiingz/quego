@@ -2,6 +2,7 @@ import { SignJWT, jwtVerify } from "jose";
 
 export const ADMIN_SESSION_COOKIE = "lq_admin_session";
 export const SHOP_SESSION_COOKIE = "lq_shop_session";
+export const CUSTOMER_SESSION_COOKIE = "lq_customer_session";
 export const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8 hours
 
 export type AdminSession = {
@@ -20,6 +21,11 @@ export type ShopSession = {
    * to render the impersonation banner and route sign-out back to /admin.
    */
   impersonatedBy?: string;
+};
+
+export type CustomerSession = {
+  customerId: string;
+  phone: string;
 };
 
 function getSecret(): Uint8Array {
@@ -93,6 +99,37 @@ export async function verifyShopSessionToken(
             ? payload.impersonatedBy
             : undefined,
       };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// ----- Customer session ---------------------------------------------------
+
+export async function signCustomerSessionToken(
+  session: CustomerSession,
+): Promise<string> {
+  return new SignJWT({ ...session, aud: "customer" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
+    .sign(getSecret());
+}
+
+export async function verifyCustomerSessionToken(
+  token: string,
+): Promise<CustomerSession | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecret(), {
+      audience: "customer",
+    });
+    if (
+      typeof payload.customerId === "string" &&
+      typeof payload.phone === "string"
+    ) {
+      return { customerId: payload.customerId, phone: payload.phone };
     }
     return null;
   } catch {

@@ -18,7 +18,7 @@ export type ToastProps = {
 
 const styles: Record<ToastKind, { container: string; icon: string }> = {
   success: {
-    container: "bg-primary text-on-primary border-primary-container",
+    container: "bg-success text-on-success border-success",
     icon: "check_circle",
   },
   error: {
@@ -67,7 +67,7 @@ export function Toast({ kind = "info", message, duration = 4000, onDismiss }: To
       role="status"
       aria-live="polite"
       className={cn(
-        "fixed top-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-3 rounded-full border shadow-luxury text-label-md transition-all duration-200",
+        "fixed top-6 inset-x-0 mx-auto w-max max-w-[calc(100%-2rem)] z-[60] flex items-center gap-2 px-4 py-3 rounded-full border shadow-luxury text-label-md transition-all duration-200",
         style.container,
         visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none",
       )}

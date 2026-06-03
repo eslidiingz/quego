@@ -33,6 +33,10 @@ colors:
   on-error: '#ffffff'
   error-container: '#ffdad6'
   on-error-container: '#93000a'
+  success: '#2ecc71'
+  on-success: '#ffffff'
+  success-container: '#b8f3c2'
+  on-success-container: '#00210d'
   primary-fixed: '#a7eefc'
   primary-fixed-dim: '#8bd2df'
   on-primary-fixed: '#001f24'
@@ -184,6 +188,7 @@ Larger components like cards and booking containers use `rounded-lg` (1rem / 16p
 - **Waiting:** Teal outline.
 - **Now Serving:** Gradient background (Teal to Purple) with White text.
 - **Delayed:** Soft Gold background with Dark Brown text for high-contrast warning.
+- **Completed / Success:** Green background (`success`, #2ecc71) with White text.
 
 ### Progress Indicators
 - Linear progress bars should use a **Teal-to-Gold gradient** to visualize the journey toward the "Golden" service moment.

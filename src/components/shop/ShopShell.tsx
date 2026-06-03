@@ -26,11 +26,15 @@ export function ShopShell({
   shopName,
   shopPhone,
   isImpersonating = false,
+  headerSlot,
   children,
 }: {
   shopName: string;
   shopPhone: string;
   isImpersonating?: boolean;
+  /** Optional widget rendered at the right of the sticky header (e.g. the
+   *  new-booking notifier). Kept as a slot so the shell stays layout-only. */
+  headerSlot?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -126,7 +130,7 @@ export function ShopShell({
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
-            className="lg:hidden p-2 rounded-full hover:bg-surface-container-low text-primary"
+            className="lg:hidden inline-flex items-center justify-center p-2 rounded-full text-primary hover:bg-surface-container-high transition-colors"
             aria-label="เปิด/ปิดเมนู"
           >
             <Icon name={menuOpen ? "close" : "menu"} />
@@ -134,7 +138,7 @@ export function ShopShell({
           <h1 className="font-display text-headline-md text-on-surface lg:hidden">
             {shopName}
           </h1>
-          <div />
+          {headerSlot ? <div className="ml-auto">{headerSlot}</div> : <div />}
         </header>
         <div className="flex-1">{children}</div>
       </main>

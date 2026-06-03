@@ -3,9 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { requireShopSession } from "@/lib/auth/shop-session-server";
 import {
+  changeShopPin,
   updateOwnShopProfile,
   updateServiceDuration as updateServiceDurationSvc,
 } from "@/lib/services/shops";
+import type {
+  ChangePinFieldErrors,
+  ChangePinState,
+} from "@/components/ui/ChangePinForm";
 import {
   DAYS_OF_WEEK,
   upsertBusinessHours,
@@ -161,6 +166,56 @@ export async function updateBusinessHours(
 
   revalidatePath("/shop/profile");
   revalidatePath("/shop");
+  return { ok: true };
+}
+
+// ----- Change PIN --------------------------------------------------------
+
+const PIN_RE = /^\d{6}$/u;
+
+/**
+ * Change the shop's login PIN. shopId comes from the verified session; the
+ * service re-verifies the current PIN before writing. Mirrors the customer
+ * change-PIN action so both share the `ChangePinForm`.
+ */
+export async function changeShopPinAction(
+  _prev: ChangePinState,
+  formData: FormData,
+): Promise<ChangePinState> {
+  const session = await requireShopSession();
+  const currentPin = String(formData.get("currentPin") ?? "").trim();
+  const newPin = String(formData.get("newPin") ?? "").trim();
+  const confirmPin = String(formData.get("confirmPin") ?? "").trim();
+
+  const fieldErrors: ChangePinFieldErrors = {};
+  if (!PIN_RE.test(currentPin)) {
+    fieldErrors.currentPin = "รหัส PIN ต้องเป็นตัวเลข 6 หลัก";
+  }
+  if (!PIN_RE.test(newPin)) {
+    fieldErrors.newPin = "รหัส PIN ต้องเป็นตัวเลข 6 หลัก";
+  } else if (newPin === currentPin) {
+    fieldErrors.newPin = "รหัส PIN ใหม่ต้องไม่ซ้ำกับรหัสเดิม";
+  }
+  if (newPin !== confirmPin) {
+    fieldErrors.confirmPin = "รหัส PIN ที่ยืนยันไม่ตรงกัน";
+  }
+  if (Object.keys(fieldErrors).length > 0) {
+    return { ok: false, message: "กรอกข้อมูลไม่ถูกต้อง", fieldErrors };
+  }
+
+  const result = await changeShopPin(session.shopId, currentPin, newPin);
+  if (!result.ok) {
+    if (result.code === "bad_pin") {
+      return {
+        ok: false,
+        message: result.message,
+        fieldErrors: { currentPin: result.message },
+      };
+    }
+    return { ok: false, message: result.message };
+  }
+
+  revalidatePath("/shop/profile");
   return { ok: true };
 }
 

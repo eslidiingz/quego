@@ -73,7 +73,7 @@ export async function getShopSession(): Promise<ShopSession | null> {
 export async function requireShopSession(): Promise<ShopSession> {
   const session = await getShopSession();
   if (!session) {
-    redirect("/shop/login");
+    redirect("/login?tab=shop");
   }
   return session;
 }

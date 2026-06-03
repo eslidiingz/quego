@@ -61,6 +61,8 @@ const tonalGroups: { title: string; tokens: { name: string; bg: string; text: st
   {
     title: "Status",
     tokens: [
+      { name: "success", bg: "bg-success", text: "text-on-success" },
+      { name: "success-container", bg: "bg-success-container", text: "text-on-success-container" },
       { name: "error", bg: "bg-error", text: "text-on-error" },
       { name: "error-container", bg: "bg-error-container", text: "text-on-error-container" },
     ],

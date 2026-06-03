@@ -2,6 +2,7 @@ import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import type { BookingListItem, BookingStatus } from "@/lib/services/bookings";
+import { CancelBookingByShopButton } from "./CancelBookingByShopButton";
 
 const STATUS_MAP: Record<
   BookingStatus,
@@ -25,9 +26,10 @@ export function BookingRow({ booking }: { booking: BookingListItem }) {
         muted && "opacity-70",
       )}
     >
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="min-w-0">
-          <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1 space-y-2">
+          <TimeBadge time={booking.slotTime} />
+          <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-display text-headline-md text-on-surface">
               {booking.customerName}
             </h3>
@@ -35,60 +37,120 @@ export function BookingRow({ booking }: { booking: BookingListItem }) {
               {status.label}
             </Chip>
           </div>
-          <p className="text-label-sm text-on-surface-variant uppercase tracking-widest mt-1">
+          <p className="text-label-sm text-on-surface-variant uppercase tracking-widest">
             รหัสการจอง <span className="font-mono normal-case tracking-normal">{code}</span>
           </p>
         </div>
+        <DateBadge dateYmd={booking.bookingDate} />
       </div>
 
-      <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-label-md">
-        <DetailRow
-          icon="event"
-          label="วันที่นัด"
-          value={formatThaiDate(booking.bookingDate)}
-        />
-        <DetailRow
-          icon="schedule"
-          label="เวลานัด"
-          value={`${booking.slotTime} น. (ครั้งละ ${booking.serviceDurationMinutes} นาที)`}
-        />
-        <DetailRow
-          icon="phone"
-          label="เบอร์โทร"
-          value={
-            booking.customerPhone ? (
-              <a
-                href={`tel:${booking.customerPhone}`}
-                className="text-primary hover:underline"
-              >
-                {formatPhone(booking.customerPhone)}
-              </a>
-            ) : (
-              <span className="text-on-surface-variant">ไม่ระบุ</span>
-            )
-          }
-        />
-      </dl>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <PhoneRow phone={booking.customerPhone} />
+        </div>
+        {booking.status === "confirmed" ? (
+          <CancelBookingByShopButton
+            bookingId={booking.id}
+            customerName={booking.customerName}
+            slotTime={booking.slotTime}
+          />
+        ) : null}
+      </div>
+
+      <p className="sr-only">
+        {formatThaiDate(booking.bookingDate)} เวลา {booking.slotTime} น.
+      </p>
     </article>
   );
 }
 
-function DetailRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: string;
-  label: string;
-  value: React.ReactNode;
-}) {
+/**
+ * Calendar-style date badge — mirrors the visual of the date chip in the
+ * customer / manual booking picker so the shop owner reads the date the
+ * same way across the app. Non-interactive (no click target needed —
+ * the date is already locked in).
+ */
+function DateBadge({ dateYmd }: { dateYmd: string }) {
+  const [y, m, d] = dateYmd.split("-").map(Number);
+  const dayOfWeek = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
   return (
-    <div className="flex items-start gap-2 text-on-surface-variant">
-      <Icon name={icon} size={18} className="text-primary mt-0.5 shrink-0" />
-      <div className="min-w-0">
-        <dt className="text-label-sm uppercase tracking-widest">{label}</dt>
-        <dd className="text-body-md text-on-surface break-words">{value}</dd>
+    <div
+      aria-hidden="true"
+      className="flex flex-col items-center gap-0.5 rounded-xl bg-surface-container-low py-2.5 px-3 text-center w-20"
+    >
+      <span className="text-label-sm font-bold uppercase tracking-widest text-on-surface-variant">
+        {THAI_DAY_SHORT[dayOfWeek]}
+      </span>
+      <span className="font-display text-headline-md leading-none text-on-surface">
+        {d}
+      </span>
+      <span className="text-label-sm text-on-surface-variant">
+        {THAI_MONTH_SHORT[m - 1]}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Inline time pill — placed below the booking code on the left column.
+ * Bigger and more saturated than the surrounding metadata so the slot
+ * time is the second thing the shop owner sees after the customer name.
+ */
+function TimeBadge({ time }: { time: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary-container/15 text-primary"
+    >
+      <Icon name="schedule" size={16} />
+      <span className="font-display text-headline-sm leading-none">
+        {time}
+      </span>
+      <span className="text-label-md">น.</span>
+    </span>
+  );
+}
+
+/**
+ * Specialised phone row: the icon doubles as a tap-to-call button so the
+ * shop owner can dial the customer with one tap on mobile. Icon sized to
+ * span both the "เบอร์โทร" label and the number for visual balance.
+ */
+function PhoneRow({ phone }: { phone: string | null }) {
+  const Label = (
+    <>
+      <dt className="text-label-sm uppercase tracking-widest text-on-surface-variant">
+        เบอร์โทร
+      </dt>
+      <dd className="text-body-md text-on-surface break-words">
+        {phone ? formatPhone(phone) : (
+          <span className="text-on-surface-variant">ไม่ระบุ</span>
+        )}
+      </dd>
+    </>
+  );
+
+  if (phone) {
+    return (
+      <div className="flex items-center gap-3">
+        <a
+          href={`tel:${phone}`}
+          aria-label={`โทรหาลูกค้า ${formatPhone(phone)}`}
+          className="flex items-center justify-center w-11 h-11 rounded-full bg-primary-container/15 text-primary hover:bg-primary-container/25 active:bg-primary-container/35 transition-colors shrink-0"
+        >
+          <Icon name="phone" size={22} />
+        </a>
+        <div className="min-w-0">{Label}</div>
       </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex items-center justify-center w-11 h-11 rounded-full bg-surface-container-low text-on-surface-variant shrink-0">
+        <Icon name="phone" size={22} />
+      </span>
+      <div className="min-w-0">{Label}</div>
     </div>
   );
 }
@@ -117,6 +179,8 @@ const THAI_DAY_LONG = [
   "ศุกร์",
   "เสาร์",
 ];
+
+const THAI_DAY_SHORT = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
 
 const THAI_MONTH_SHORT = [
   "ม.ค.",

@@ -5,7 +5,14 @@ import { redirect } from "next/navigation";
 import { createBooking } from "@/lib/services/bookings";
 
 export type CreateBookingState =
-  | { ok: false; message: string; code: string }
+  | {
+      ok: false;
+      message: string;
+      code: string;
+      /** Present only for `slot_taken`: the exact slot another customer won, so
+       *  the form can disable it client-side. */
+      takenSlot?: { date: string; slotTime: string };
+    }
   | null;
 
 /**
@@ -36,7 +43,14 @@ export async function createBookingAction(
   });
 
   if (!result.ok) {
-    return { ok: false, code: result.code, message: result.message };
+    return result.code === "slot_taken"
+      ? {
+          ok: false,
+          code: result.code,
+          message: result.message,
+          takenSlot: { date, slotTime },
+        }
+      : { ok: false, code: result.code, message: result.message };
   }
 
   revalidatePath(`/shops/${shopId}/book`);

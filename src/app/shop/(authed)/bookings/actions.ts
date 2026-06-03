@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireShopSession } from "@/lib/auth/shop-session-server";
 import {
+  cancelBookingByShop,
   createBooking,
   updateBookingStatus,
 } from "@/lib/services/bookings";
@@ -19,6 +20,24 @@ export async function markBookingCompleted(bookingId: string): Promise<void> {
     session.shopId,
     "completed",
   );
+  if (!result.ok) {
+    throw new Error(result.message);
+  }
+  revalidatePath("/shop");
+  revalidatePath("/shop/bookings");
+}
+
+/**
+ * Cancel one confirmed booking. Like `markBookingCompleted`, the shopId comes
+ * from the verified session — never a hidden form field — so a guessed booking
+ * UUID can't be used to cancel another shop's row. Only confirmed bookings can
+ * be cancelled (the service enforces it); anything else throws not_found.
+ */
+export async function cancelBookingByShopAction(
+  bookingId: string,
+): Promise<void> {
+  const session = await requireShopSession();
+  const result = await cancelBookingByShop(bookingId, session.shopId);
   if (!result.ok) {
     throw new Error(result.message);
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { cloneElement, useState, useTransition } from "react";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
 import { Icon } from "./Icon";
@@ -36,13 +36,10 @@ export function ConfirmDialog({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const wrappedTrigger = (
-    <trigger.type
-      {...trigger.props}
-      onClick={() => setOpen(true)}
-      disabled={trigger.props.disabled || pending}
-    />
-  );
+  const wrappedTrigger = cloneElement(trigger, {
+    onClick: () => setOpen(true),
+    disabled: trigger.props?.disabled || pending,
+  });
 
   const handleConfirm = () => {
     startTransition(async () => {

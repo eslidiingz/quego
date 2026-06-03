@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
+import { SiteAuthLink } from "@/components/layout/SiteAuthLink";
 import { getBookingContext } from "@/lib/services/bookings";
+import { getCustomerSession } from "@/lib/auth/customer-session-server";
+import { getCustomerProfile } from "@/lib/services/customers";
 import { BookingForm } from "./BookingForm";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +28,11 @@ export default async function BookShopPage({
   const { id } = await params;
   const context = await getBookingContext(id);
   if (!context) notFound();
+
+  // Pre-fill the booker fields when a customer is signed in. Public page, so
+  // this is best-effort: no session simply means an empty form.
+  const session = await getCustomerSession();
+  const profile = session ? await getCustomerProfile(session.customerId) : null;
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
@@ -52,7 +60,11 @@ export default async function BookShopPage({
           </p>
         </section>
 
-        <BookingForm context={context} />
+        <BookingForm
+          context={context}
+          defaultName={profile?.name ?? ""}
+          defaultPhone={profile?.phone ?? session?.phone ?? ""}
+        />
       </div>
 
       <SiteFooter />
@@ -78,13 +90,7 @@ function SiteHeader() {
             LuxeQueue
           </span>
         </Link>
-        <Link
-          href="/shop/login"
-          className="text-label-md text-primary font-semibold hover:underline inline-flex items-center gap-1"
-        >
-          เข้าสู่ระบบร้าน
-          <Icon name="chevron_right" size={16} />
-        </Link>
+        <SiteAuthLink />
       </div>
     </header>
   );

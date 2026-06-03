@@ -770,6 +770,53 @@ export async function verifyShopPin(
   return { ok: true };
 }
 
+/**
+ * Change an approved shop's PIN: verify the current PIN, then store a hash of
+ * the new one. `shopId` MUST come from the verified session so a shop can only
+ * change its own PIN. Wrong current PIN surfaces as `bad_pin`.
+ */
+export async function changeShopPin(
+  shopId: string,
+  currentPin: string,
+  newPin: string,
+): Promise<PinResult> {
+  if (!PIN_RE.test(newPin)) {
+    return {
+      ok: false,
+      code: "bad_pin",
+      message: `รหัส PIN ต้องเป็นตัวเลข ${PIN_LENGTH} หลัก`,
+    };
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("shops")
+    .select("pin_hash, status")
+    .eq("id", shopId)
+    .maybeSingle();
+
+  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (!data || data.status !== "approved" || !data.pin_hash) {
+    return { ok: false, code: "not_found", message: "ไม่พบร้านในระบบ" };
+  }
+
+  const ok = await verifyPassword(currentPin, data.pin_hash);
+  if (!ok) {
+    return { ok: false, code: "bad_pin", message: "รหัส PIN เดิมไม่ถูกต้อง" };
+  }
+
+  const hash = await hashPassword(newPin);
+  const { error: updateError } = await supabase
+    .from("shops")
+    .update({ pin_hash: hash })
+    .eq("id", shopId);
+
+  if (updateError) {
+    return { ok: false, code: "unknown", message: updateError.message };
+  }
+  return { ok: true };
+}
+
 // ----- Service duration (operational config) -----------------------------
 
 export type UpdateServiceDurationResult =

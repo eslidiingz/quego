@@ -28,7 +28,7 @@ export async function setupShopPin(
 ): Promise<PinFormState> {
   const intent = await getShopLoginIntent();
   if (!intent) {
-    redirect("/shop/login?notice=session-expired");
+    redirect("/login?tab=shop&notice=session-expired");
   }
 
   const pin = String(formData.get("pin") ?? "").trim();
@@ -81,7 +81,7 @@ export async function verifyShopPinAction(
 ): Promise<PinFormState> {
   const intent = await getShopLoginIntent();
   if (!intent) {
-    redirect("/shop/login?notice=session-expired");
+    redirect("/login?tab=shop&notice=session-expired");
   }
 
   const pin = String(formData.get("pin") ?? "").trim();

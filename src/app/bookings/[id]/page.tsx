@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Chip } from "@/components/ui/Chip";
+import { SiteAuthLink } from "@/components/layout/SiteAuthLink";
 import { getBookingById } from "@/lib/services/bookings";
 
 export const dynamic = "force-dynamic";
@@ -232,13 +233,7 @@ function SiteHeader() {
             LuxeQueue
           </span>
         </Link>
-        <Link
-          href="/shop/login"
-          className="text-label-md text-primary font-semibold hover:underline inline-flex items-center gap-1"
-        >
-          เข้าสู่ระบบร้าน
-          <Icon name="chevron_right" size={16} />
-        </Link>
+        <SiteAuthLink />
       </div>
     </header>
   );

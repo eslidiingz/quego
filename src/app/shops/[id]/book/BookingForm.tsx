@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PhoneInput } from "@/components/ui/PhoneInput";
@@ -10,7 +10,13 @@ import {
   generateSlots,
   type BookingContext,
 } from "@/lib/booking/slot-math";
+import { getBangkokNow, getBangkokToday } from "@/lib/time/bangkok";
 import { createBookingAction, type CreateBookingState } from "./actions";
+
+/** Live "now" in Bangkok, re-checked on the client so the picker keeps up with
+ *  the wall clock while the page sits open. */
+const CLOCK_TICK_MS = 30_000;
+type ClockNow = { date: string; timeHHMM: string };
 
 /**
  * Customer-facing booking form. Single client component because every input
@@ -25,41 +31,136 @@ import { createBookingAction, type CreateBookingState } from "./actions";
  * SRP: render + collect local state. The actual create-booking work and
  * its re-validation live in the server action (DIP).
  */
-export function BookingForm({ context }: { context: BookingContext }) {
+export function BookingForm({
+  context,
+  defaultName = "",
+  defaultPhone = "",
+}: {
+  context: BookingContext;
+  /** Pre-fills the booker fields for a signed-in customer (still editable, so
+   *  they can book on someone else's behalf). */
+  defaultName?: string;
+  defaultPhone?: string;
+}) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [name, setName] = useState(defaultName);
+  const [phone, setPhone] = useState(defaultPhone);
+  // Seed from the server snapshot so SSR and first client render agree (no
+  // hydration mismatch); the effect below then keeps it live on the client.
+  const [now, setNow] = useState<ClockNow>(() => ({
+    date: context.nowDate,
+    timeHHMM: context.nowTimeHHMM,
+  }));
+  // Slots this client learned were taken *after* page load — specifically a
+  // slot the server rejected with `slot_taken` because another customer won
+  // the race by a hair. Disabling it locally stops it being re-picked.
+  const [locallyTaken, setLocallyTaken] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
 
   const [state, formAction, pending] = useActionState<
     CreateBookingState,
     FormData
   >(createBookingAction, null);
 
-  const days = useMemo(() => buildDays(context), [context]);
+  // Fold a server `slot_taken` rejection into the local taken-set so the grid
+  // disables that exact slot. Reacting to the settled action result — a one-off
+  // server signal with no derived-state equivalent.
+  useEffect(() => {
+    if (!state || state.code !== "slot_taken" || !state.takenSlot) return;
+    const key = takenKey(state.takenSlot.date, state.takenSlot.slotTime);
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setLocallyTaken((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [state]);
+
+  // Live clock: advance "now" on an interval and on tab refocus so past slots
+  // disable themselves in real time. Only updates state when the minute (or
+  // day) actually changes, so memos don't churn every tick.
+  useEffect(() => {
+    const update = () => {
+      const date = getBangkokToday();
+      const { timeHHMM } = getBangkokNow();
+      setNow((prev) =>
+        prev.date === date && prev.timeHHMM === timeHHMM
+          ? prev
+          : { date, timeHHMM },
+      );
+    };
+    update(); // sync to the real client clock immediately
+    const id = window.setInterval(update, CLOCK_TICK_MS);
+    const onVisibility = () => {
+      if (!document.hidden) update();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  const days = useMemo(
+    () => buildDays(context, now, locallyTaken),
+    [context, now, locallyTaken],
+  );
   const selectedDay = days.find((d) => d.dateYmd === selectedDate) ?? null;
 
   const slots = useMemo(() => {
     if (!selectedDay || selectedDay.status === "closed") return [];
-    return computeSlotsForDay(selectedDay, context);
-  }, [selectedDay, context]);
+    return computeSlotsForDay(selectedDay, context, now, locallyTaken);
+  }, [selectedDay, context, now, locallyTaken]);
+
+  // A slot the customer picked that has since slipped into the past is treated
+  // as no selection — derived during render, not stored, so the step-3 form
+  // collapses, submit disables, and a notice shows WITHOUT a state-syncing
+  // effect. The server would reject it anyway; this just fails early.
+  const selectedSlotExpired =
+    selectedSlot !== null &&
+    selectedDate === now.date &&
+    selectedSlot <= now.timeHHMM;
+  // A slot just lost to another customer (server `slot_taken`) is treated as no
+  // selection — step 3 collapses and submit disables until a fresh pick.
+  const selectedSlotTaken =
+    selectedSlot !== null &&
+    selectedDate !== null &&
+    locallyTaken.has(takenKey(selectedDate, selectedSlot));
+  const activeSlot =
+    selectedSlotExpired || selectedSlotTaken ? null : selectedSlot;
 
   const canSubmit =
     Boolean(selectedDate) &&
-    Boolean(selectedSlot) &&
+    Boolean(activeSlot) &&
     name.trim().length > 0 &&
     /^[0-9]{9,10}$/u.test(phone);
+
+  const timeSectionRef = useRef<HTMLDivElement>(null);
+  const infoSectionRef = useRef<HTMLDivElement>(null);
+
+  // Smooth-scroll a step's section to the top once React has committed the
+  // DOM (rAF), so each pick leads the eye to the next step.
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
+    requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   const handleSelectDate = (dateYmd: string) => {
     setSelectedDate(dateYmd);
     setSelectedSlot(null);
+    scrollToSection(timeSectionRef);
+  };
+
+  const handleSelectSlot = (time: string) => {
+    setSelectedSlot(time);
+    scrollToSection(infoSectionRef);
   };
 
   return (
     <form action={formAction} className="space-y-stack-md">
       <input type="hidden" name="shopId" value={context.shop.id} />
       <input type="hidden" name="date" value={selectedDate ?? ""} />
-      <input type="hidden" name="slotTime" value={selectedSlot ?? ""} />
+      <input type="hidden" name="slotTime" value={activeSlot ?? ""} />
 
       <Section
         step={1}
@@ -78,6 +179,7 @@ export function BookingForm({ context }: { context: BookingContext }) {
         </div>
       </Section>
 
+      <div ref={timeSectionRef} className="scroll-mt-4">
       <Section
         step={2}
         title="เลือกเวลา"
@@ -99,20 +201,22 @@ export function BookingForm({ context }: { context: BookingContext }) {
               <SlotButton
                 key={s.time}
                 slot={s}
-                selected={s.time === selectedSlot}
-                onClick={() => setSelectedSlot(s.time)}
+                selected={s.time === activeSlot}
+                onClick={() => handleSelectSlot(s.time)}
               />
             ))}
           </div>
         )}
       </Section>
+      </div>
 
+      <div ref={infoSectionRef} className="scroll-mt-4">
       <Section
         step={3}
         title="ข้อมูลผู้จอง"
         description="ใช้สำหรับยืนยันการจองที่ร้าน"
       >
-        {!selectedSlot ? (
+        {!activeSlot ? (
           <EmptyHint icon="person" message="เลือกเวลาแล้วจึงกรอกข้อมูล" />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -138,11 +242,25 @@ export function BookingForm({ context }: { context: BookingContext }) {
           </div>
         )}
       </Section>
+      </div>
+
+      {selectedSlotExpired ? (
+        <div className="bg-secondary-container/30 border border-secondary/20 text-on-secondary-container rounded-xl p-4 flex items-start gap-3">
+          <Icon name="schedule" className="text-secondary mt-0.5" />
+          <p className="text-body-md">
+            ช่วงเวลา {selectedSlot} น. ผ่านไปแล้ว กรุณาเลือกเวลาใหม่
+          </p>
+        </div>
+      ) : null}
 
       {state && !state.ok ? (
         <div className="bg-error-container/30 border border-error/20 text-on-error-container rounded-xl p-4 flex items-start gap-3">
           <Icon name="error" className="text-error mt-0.5" />
-          <p className="text-body-md">{state.message}</p>
+          <p className="text-body-md">
+            {state.code === "slot_taken" && state.takenSlot
+              ? `ช่วงเวลา ${state.takenSlot.slotTime} น. ถูกจองโดยลูกค้าอีกคนแล้ว กรุณาเลือกใหม่`
+              : state.message}
+          </p>
         </div>
       ) : null}
 
@@ -329,7 +447,28 @@ type SlotView = {
   isPast: boolean;
 };
 
-function buildDays(context: BookingContext): BookableDay[] {
+/** Stable key for a (date, slotTime) pair used in the locally-taken set. */
+function takenKey(date: string, slotTime: string): string {
+  return `${date} ${slotTime}`;
+}
+
+/** Fold any locally-known taken slots for `date` into the `taken` set. */
+function addLocalTaken(
+  taken: Set<string>,
+  locallyTaken: ReadonlySet<string>,
+  date: string,
+): void {
+  const prefix = `${date} `;
+  for (const key of locallyTaken) {
+    if (key.startsWith(prefix)) taken.add(key.slice(prefix.length));
+  }
+}
+
+function buildDays(
+  context: BookingContext,
+  now: ClockNow,
+  locallyTaken: ReadonlySet<string>,
+): BookableDay[] {
   const out: BookableDay[] = [];
   let cursor = context.windowStart;
   while (cursor <= context.windowEnd) {
@@ -359,9 +498,10 @@ function buildDays(context: BookingContext): BookableDay[] {
           .filter((t) => t.date === cursor)
           .map((t) => t.slotTime),
       );
-      const isToday = cursor === context.nowDate;
+      addLocalTaken(taken, locallyTaken, cursor);
+      const isToday = cursor === now.date;
       const hasAvailable = times.some(
-        (t) => !taken.has(t) && !(isToday && t <= context.nowTimeHHMM),
+        (t) => !taken.has(t) && !(isToday && t <= now.timeHHMM),
       );
       status = hasAvailable ? "available" : "full";
     }
@@ -387,6 +527,8 @@ function addDays(ymd: string, delta: number): string {
 function computeSlotsForDay(
   day: BookableDay,
   context: BookingContext,
+  now: ClockNow,
+  locallyTaken: ReadonlySet<string>,
 ): SlotView[] {
   const hours = context.hours[day.dayOfWeek];
   if (!hours?.isOpen || !hours.openTime || !hours.closeTime) return [];
@@ -400,10 +542,11 @@ function computeSlotsForDay(
       .filter((t) => t.date === day.dateYmd)
       .map((t) => t.slotTime),
   );
-  const isToday = day.dateYmd === context.nowDate;
+  addLocalTaken(taken, locallyTaken, day.dateYmd);
+  const isToday = day.dateYmd === now.date;
   return times.map((t) => {
     const isTaken = taken.has(t);
-    const isPast = isToday && t <= context.nowTimeHHMM;
+    const isPast = isToday && t <= now.timeHHMM;
     return {
       time: t,
       isTaken,

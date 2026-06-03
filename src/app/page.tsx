@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { PublicShopCard } from "@/components/booking/PublicShopCard";
+import { SiteAuthLink } from "@/components/layout/SiteAuthLink";
 import { listPublicShopsByCategory } from "@/lib/services/shops";
 
 export const dynamic = "force-dynamic";
@@ -66,13 +67,7 @@ function SiteHeader() {
             <Icon name="store" size={16} />
             สมัครเป็นร้าน
           </Link>
-          <Link
-            href="/shop/login"
-            className="text-label-md text-primary font-semibold hover:underline inline-flex items-center gap-1"
-          >
-            เข้าสู่ระบบร้าน
-            <Icon name="chevron_right" size={16} />
-          </Link>
+          <SiteAuthLink />
         </nav>
       </div>
     </header>
@@ -90,9 +85,7 @@ function SiteFooter() {
           <Link href="/shops/register" className="hover:text-primary transition-colors">
             สมัครเป็นร้าน
           </Link>
-          <Link href="/shop/login" className="hover:text-primary transition-colors">
-            เข้าสู่ระบบร้าน
-          </Link>
+          <SiteAuthLink variant="footer" />
         </nav>
       </div>
     </footer>

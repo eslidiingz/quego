@@ -98,6 +98,17 @@ export type BookingsFilter = "today" | "upcoming" | "past" | "all";
 
 export type BookingsCounts = Record<BookingsFilter, number>;
 
+export type CustomerBookingItem = {
+  id: string;
+  shopId: string;
+  shopName: string;
+  shopAddress: string | null;
+  bookingDate: string;
+  slotTime: string; // HH:MM
+  serviceDurationMinutes: number;
+  status: BookingStatus;
+};
+
 // ----- Public read: context for the booking form --------------------------
 
 type ShopRow = {
@@ -425,12 +436,17 @@ function mapRow(r: BookingRowDb): BookingListItem {
  *   - today / upcoming → chronological (next service first)
  *   - past / all       → reverse chronological (most recent first)
  *
- * Cancelled bookings are intentionally included — the shop owner sees the
- * full history with a status chip rather than a silent drop.
+ * `includeCancelled` controls whether cancelled bookings appear:
+ *   - the shop dashboard's today-overview keeps them (default true) so the
+ *     "ยกเลิก" status tile has something to count;
+ *   - the /shop/bookings management list passes false so a retracted booking
+ *     drops out of the list entirely, staying consistent with the tab badges
+ *     (`countBookingsByShop` also excludes cancelled).
  */
 export async function listBookingsByShop(
   shopId: string,
   filter: BookingsFilter,
+  { includeCancelled = true }: { includeCancelled?: boolean } = {},
 ): Promise<BookingListItem[]> {
   const supabase = getSupabaseAdmin();
   const today = getBangkokToday();
@@ -442,6 +458,10 @@ export async function listBookingsByShop(
        slot_time, service_duration_minutes, status, created_at`,
     )
     .eq("shop_id", shopId);
+
+  if (!includeCancelled) {
+    query = query.neq("status", "cancelled");
+  }
 
   switch (filter) {
     case "today":
@@ -517,10 +537,83 @@ export async function updateBookingStatus(
 }
 
 /**
+ * Customer-initiated cancel. Uses `customer_phone` as the ownership key
+ * (compound `eq(id) + eq(customer_phone)`) so a logged-in customer can
+ * only cancel bookings tied to their own phone — including ones made
+ * anonymously or by a shop on their behalf. Only confirmed bookings can
+ * be cancelled; completed / no_show / already-cancelled return not_found.
+ */
+export async function cancelOwnBooking(
+  bookingId: string,
+  customerPhone: string,
+): Promise<UpdateBookingStatusResult> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("bookings")
+    .update({ status: "cancelled" })
+    .eq("id", bookingId)
+    .eq("customer_phone", customerPhone)
+    .eq("status", "confirmed")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, code: "unknown", message: error.message };
+  }
+  if (!data) {
+    return {
+      ok: false,
+      code: "not_found",
+      message: "ไม่พบการจองนี้ หรือสถานะไม่อนุญาตให้ยกเลิก",
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * Shop-initiated cancel. Mirrors `cancelOwnBooking` but keyed by `shopId`
+ * (which MUST come from the caller's verified session) instead of
+ * `customer_phone`, so a shop can only cancel its own bookings. Only
+ * confirmed bookings can be cancelled; completed / no_show / already-cancelled
+ * return not_found.
+ */
+export async function cancelBookingByShop(
+  bookingId: string,
+  shopId: string,
+): Promise<UpdateBookingStatusResult> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("bookings")
+    .update({ status: "cancelled" })
+    .eq("id", bookingId)
+    .eq("shop_id", shopId)
+    .eq("status", "confirmed")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, code: "unknown", message: error.message };
+  }
+  if (!data) {
+    return {
+      ok: false,
+      code: "not_found",
+      message: "ไม่พบการจองนี้ หรือสถานะไม่อนุญาตให้ยกเลิก",
+    };
+  }
+  return { ok: true };
+}
+
+/**
  * Returns the count for each filter in a single round-trip. The query
  * fetches just `booking_date` for every booking and buckets client-side —
  * cheap because there's no realistic universe in which a single shop has
  * enough bookings to make this scan painful.
+ *
+ * Cancelled bookings are excluded: the tab badges report how many *active*
+ * bookings each bucket holds, so a retracted booking must not inflate the
+ * number shown to the shop. (Cancelled rows still appear in the list itself
+ * via `listBookingsByShop` — they're history, just not counted.)
  */
 export async function countBookingsByShop(
   shopId: string,
@@ -529,7 +622,8 @@ export async function countBookingsByShop(
   const { data, error } = await supabase
     .from("bookings")
     .select("booking_date")
-    .eq("shop_id", shopId);
+    .eq("shop_id", shopId)
+    .neq("status", "cancelled");
 
   const counts: BookingsCounts = { today: 0, upcoming: 0, past: 0, all: 0 };
   if (error || !data) return counts;
@@ -542,4 +636,122 @@ export async function countBookingsByShop(
     else counts.past += 1;
   }
   return counts;
+}
+
+// ----- Read: shop new-booking notifications ------------------------------
+
+export type NewBookingAlert = {
+  id: string;
+  customerName: string;
+  slotTime: string; // HH:MM
+  bookingDate: string; // YYYY-MM-DD
+  createdAt: string; // UTC ISO
+};
+
+/**
+ * List confirmed bookings for one shop created strictly after `sinceIso`.
+ * Backs the shop's live "new booking" notifier, which polls this on a short
+ * interval with a server-supplied cursor.
+ *
+ * SRP: a thin "what arrived since T?" read — no UI shaping, no side effects.
+ * `.gt` (strict) pairs with the caller advancing its cursor to the server's
+ * current time each tick, so a row is never emitted twice on the boundary.
+ * Capped at 20 to bound a pathological burst; only `confirmed` bookings
+ * count (a same-tick cancel shouldn't ping the shop).
+ */
+export async function listNewBookingsForShop(
+  shopId: string,
+  sinceIso: string,
+): Promise<NewBookingAlert[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("id, customer_name, booking_date, slot_time, created_at")
+    .eq("shop_id", shopId)
+    .eq("status", "confirmed")
+    .gt("created_at", sinceIso)
+    .order("created_at", { ascending: true })
+    .limit(20);
+
+  if (error || !data) return [];
+  return (
+    data as {
+      id: string;
+      customer_name: string;
+      booking_date: string;
+      slot_time: string;
+      created_at: string;
+    }[]
+  ).map((r) => ({
+    id: r.id,
+    customerName: r.customer_name,
+    slotTime: r.slot_time.slice(0, 5),
+    bookingDate: r.booking_date,
+    createdAt: r.created_at,
+  }));
+}
+
+// ----- Read: customer "my queue" view ------------------------------------
+
+type CustomerBookingRow = {
+  id: string;
+  shop_id: string;
+  booking_date: string;
+  slot_time: string;
+  service_duration_minutes: number;
+  status: BookingStatus;
+  shops: { name: string; address: string | null } | null;
+};
+
+/**
+ * List all bookings tied to a customer's phone number, ordered with
+ * upcoming-first then past. Includes shop name + address for context so
+ * the customer's "คิวของฉัน" page can render without a second round-trip.
+ *
+ * Phone is treated as the customer identity key here — bookings made
+ * anonymously (or by a shop on the customer's behalf) under the same
+ * phone surface in the same list.
+ */
+export async function listBookingsByCustomerPhone(
+  phone: string,
+): Promise<CustomerBookingItem[]> {
+  const supabase = getSupabaseAdmin();
+  const today = getBangkokToday();
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(
+      `id, shop_id, booking_date, slot_time, service_duration_minutes, status,
+       shops ( name, address )`,
+    )
+    .eq("customer_phone", phone)
+    .order("booking_date", { ascending: false })
+    .order("slot_time", { ascending: false });
+
+  if (error || !data) return [];
+
+  const mapped: CustomerBookingItem[] = (data as unknown as CustomerBookingRow[]).map(
+    (r) => ({
+      id: r.id,
+      shopId: r.shop_id,
+      shopName: r.shops?.name ?? "—",
+      shopAddress: r.shops?.address ?? null,
+      bookingDate: r.booking_date,
+      slotTime: r.slot_time.slice(0, 5),
+      serviceDurationMinutes: r.service_duration_minutes,
+      status: r.status,
+    }),
+  );
+
+  // Upcoming bookings (today or later) first in chronological order, then
+  // past bookings reverse-chronological. The DB query above ordered the
+  // whole list reverse-chrono — we split + reverse the upcoming half.
+  const upcoming: CustomerBookingItem[] = [];
+  const past: CustomerBookingItem[] = [];
+  for (const b of mapped) {
+    if (b.bookingDate >= today) upcoming.push(b);
+    else past.push(b);
+  }
+  upcoming.reverse();
+  return [...upcoming, ...past];
 }

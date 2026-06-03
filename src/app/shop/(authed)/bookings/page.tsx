@@ -40,7 +40,7 @@ export default async function ShopBookingsPage({
   const view = parseView(rawView);
 
   const [rows, counts, context] = await Promise.all([
-    listBookingsByShop(session.shopId, view),
+    listBookingsByShop(session.shopId, view, { includeCancelled: false }),
     countBookingsByShop(session.shopId),
     getBookingContext(session.shopId),
   ]);

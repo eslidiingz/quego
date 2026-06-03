@@ -2,6 +2,7 @@
 
 import { Chip } from "@/components/ui/Chip";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { cn } from "@/lib/cn";
 import type {
   BookingListItem,
   BookingStatus,
@@ -17,22 +18,36 @@ import { markBookingCompleted } from "./bookings/actions";
  * SRP: presentation + click-to-complete plumbing only. The actual status
  * transition + ownership check live in the server action.
  */
-export function TodayBookingRow({ booking }: { booking: BookingListItem }) {
+export function TodayBookingRow({
+  booking,
+  index,
+}: {
+  booking: BookingListItem;
+  index: number;
+}) {
+  // Zebra striping for readability: every other row gets a faint fill.
+  const striped = index % 2 === 1;
+
   if (booking.status !== "confirmed") {
     return (
-      <li className="flex items-center gap-3 p-3 rounded-lg">
+      <li
+        className={cn(
+          "flex items-center gap-3 p-3 rounded-lg",
+          striped && "bg-surface-container-low/50",
+        )}
+      >
         <RowInner booking={booking} />
       </li>
     );
   }
 
   return (
-    <li>
+    <li className={cn("rounded-lg", striped && "bg-surface-container-low/50")}>
       <ConfirmDialog
         trigger={
           <button
             type="button"
-            className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container-low focus:bg-surface-container-low focus:outline-none transition-colors text-left"
+            className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container focus:bg-surface-container focus:outline-none transition-colors text-left"
           >
             <RowInner booking={booking} />
           </button>

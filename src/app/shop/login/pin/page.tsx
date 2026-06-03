@@ -21,12 +21,12 @@ export const dynamic = "force-dynamic";
 export default async function ShopPinPage() {
   const intent = await getShopLoginIntent();
   if (!intent) {
-    redirect("/shop/login?notice=session-expired");
+    redirect("/login?tab=shop&notice=session-expired");
   }
 
   const shop = await findApprovedShopByPhone(intent.phone);
   if (!shop) {
-    redirect("/shop/login?notice=session-expired");
+    redirect("/login?tab=shop&notice=session-expired");
   }
 
   const mode: "setup" | "verify" = shop.hasPin ? "verify" : "setup";
@@ -67,7 +67,7 @@ export default async function ShopPinPage() {
         </div>
         <p className="text-label-sm text-on-surface-variant text-center mt-6">
           ไม่ใช่ร้านนี้?{" "}
-          <Link href="/shop/login" className="text-primary font-semibold hover:underline">
+          <Link href="/login?tab=shop" className="text-primary font-semibold hover:underline">
             กลับไปกรอกเบอร์ใหม่
           </Link>
         </p>

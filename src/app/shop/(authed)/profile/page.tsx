@@ -3,9 +3,11 @@ import { requireShopSession } from "@/lib/auth/shop-session-server";
 import { getShopById, listActiveCategories } from "@/lib/services/shops";
 import { listBusinessHours } from "@/lib/services/business-hours";
 import { Chip } from "@/components/ui/Chip";
+import { ChangePinForm } from "@/components/ui/ChangePinForm";
 import { EditProfileForm } from "./EditProfileForm";
 import { BusinessHoursForm } from "./BusinessHoursForm";
 import { ServiceDurationForm } from "./ServiceDurationForm";
+import { changeShopPinAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +25,7 @@ export default async function ShopProfilePage() {
 
   if (!shop) {
     // Shouldn't happen if session is valid, but keep a graceful path.
-    redirect("/shop/login?notice=session-expired");
+    redirect("/login?tab=shop&notice=session-expired");
   }
 
   return (
@@ -66,6 +68,8 @@ export default async function ShopProfilePage() {
         </p>
         <BusinessHoursForm hours={hours} shopId={session.shopId} />
       </div>
+
+      <ChangePinForm action={changeShopPinAction} />
     </div>
   );
 }

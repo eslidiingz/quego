@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
+import { SiteAuthLink } from "@/components/layout/SiteAuthLink";
 import { Chip } from "@/components/ui/Chip";
 import { BusinessHoursDisplay } from "@/components/booking/BusinessHoursDisplay";
 import { getPublicShopById } from "@/lib/services/shops";
@@ -74,7 +75,7 @@ export default async function ShopDetailPage({
               </h1>
               <div className="flex items-center gap-2 flex-wrap pt-1">
                 {isOpenNow ? (
-                  <Chip variant="now-serving" size="sm" pulse>
+                  <Chip variant="success" size="sm" pulse>
                     เปิดอยู่ตอนนี้
                   </Chip>
                 ) : (
@@ -83,7 +84,7 @@ export default async function ShopDetailPage({
                   </Chip>
                 )}
                 <Chip variant="premium" size="sm">
-                  ครั้งละ {formatDuration(shop.service_duration_minutes)}
+                  ให้บริการ {formatDuration(shop.service_duration_minutes)}/ครั้ง
                 </Chip>
               </div>
             </div>
@@ -176,13 +177,7 @@ function SiteHeader() {
             LuxeQueue
           </span>
         </Link>
-        <Link
-          href="/shop/login"
-          className="text-label-md text-primary font-semibold hover:underline inline-flex items-center gap-1"
-        >
-          เข้าสู่ระบบร้าน
-          <Icon name="chevron_right" size={16} />
-        </Link>
+        <SiteAuthLink />
       </div>
     </header>
   );
