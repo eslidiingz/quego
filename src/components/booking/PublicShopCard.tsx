@@ -10,7 +10,6 @@ export type PublicShopCardProps = {
   name: string;
   description?: string | null;
   address?: string | null;
-  serviceDurationMinutes: number;
   categoryIcon?: string | null;
   /** Live open/closed state from today's business hours. */
   openState?: ShopOpenState;
@@ -19,7 +18,7 @@ export type PublicShopCardProps = {
 
 /**
  * Customer-facing shop card built around the real data we have today
- * (name / description / address / service duration / category icon).
+ * (name / description / address / category icon + live open state).
  * The hero image / rating / distance slots from the storybook `ShopCard`
  * are deliberately left out — they'll be added when the underlying data
  * is captured by future features.
@@ -32,7 +31,6 @@ export function PublicShopCard({
   name,
   description,
   address,
-  serviceDurationMinutes,
   categoryIcon,
   openState = "unknown",
   className,
@@ -53,10 +51,6 @@ export function PublicShopCard({
         {openState !== "unknown" ? (
           <OpenStateBadge state={openState} />
         ) : null}
-        <span className="absolute top-2 right-2 sm:top-3 sm:right-3 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-white/90 backdrop-blur-sm text-[10px] sm:text-label-sm font-bold text-primary inline-flex items-center gap-1 shadow-sm whitespace-nowrap">
-          <Icon name="schedule" size={12} />
-          {formatDuration(serviceDurationMinutes)}
-        </span>
       </div>
       <div className="p-3 sm:p-5 flex flex-col gap-1 sm:gap-2 flex-1">
         <h3 className="font-display text-base sm:text-headline-md text-on-surface leading-tight line-clamp-2">
@@ -101,12 +95,4 @@ function OpenStateBadge({ state }: { state: "open" | "closed" }) {
       )}
     </span>
   );
-}
-
-function formatDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes} นาที`;
-  const hours = Math.floor(minutes / 60);
-  const rem = minutes % 60;
-  if (rem === 0) return `${hours} ชม.`;
-  return `${hours} ชม. ${rem} นาที`;
 }

@@ -6,6 +6,7 @@ import {
   listBookingsByShop,
   type BookingsFilter,
 } from "@/lib/services/bookings";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { BookingRow } from "./BookingRow";
 import { BookingsTabs } from "./BookingsTabs";
 import { NewBookingDialog } from "./NewBookingDialog";
@@ -40,27 +41,19 @@ export default async function ShopBookingsPage({
   const view = parseView(rawView);
 
   const [rows, counts, context] = await Promise.all([
-    listBookingsByShop(session.shopId, view, { includeCancelled: false }),
+    listBookingsByShop(session.shopId, view),
     countBookingsByShop(session.shopId),
     getBookingContext(session.shopId),
   ]);
 
   return (
     <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-lg">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-label-md text-secondary uppercase tracking-widest mb-1">
-            การจองของลูกค้า
-          </p>
-          <h1 className="font-display text-headline-lg text-on-background">
-            รายการจอง
-          </h1>
-          <p className="text-on-surface-variant mt-2">
-            ติดตามคิวที่ลูกค้าจองเข้ามาที่ร้านของคุณ ทั้งคิววันนี้ คิวล่วงหน้า และประวัติย้อนหลัง
-          </p>
-        </div>
-        {context ? <NewBookingDialog context={context} /> : null}
-      </header>
+      <PageHeader
+        eyebrow="การจองของลูกค้า"
+        title="รายการจอง"
+        description="ติดตามคิวที่ลูกค้าจองเข้ามาที่ร้านของคุณ ทั้งคิววันนี้ คิวล่วงหน้า และประวัติย้อนหลัง"
+        action={context ? <NewBookingDialog context={context} triggerSize="sm" /> : undefined}
+      />
 
       <BookingsTabs active={view} counts={counts} />
 

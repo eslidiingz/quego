@@ -26,10 +26,10 @@ export function CancelBookingByShopButton({
       trigger={
         <button
           type="button"
-          className="shrink-0 border-2 border-outline-variant rounded-full px-4 py-2 text-on-surface-variant hover:bg-error/5 hover:border-error/40 hover:text-error transition-colors text-label-md font-semibold flex items-center justify-center gap-2"
+          className="flex-1 sm:flex-none whitespace-nowrap border-2 border-outline-variant rounded-full px-4 py-2 text-on-surface-variant hover:bg-error/5 hover:border-error/40 hover:text-error transition-colors text-label-md font-semibold flex items-center justify-center gap-2"
         >
           <Icon name="cancel" size={18} />
-          ยกเลิกการจอง
+          ยกเลิก
         </button>
       }
       title="ยกเลิกการจองหรือไม่?"

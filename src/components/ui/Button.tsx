@@ -38,7 +38,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     {
       variant = "primary",
       size = "md",
-      rounded = "lg",
+      rounded = "full",
       iconLeft,
       iconRight,
       fullWidth,

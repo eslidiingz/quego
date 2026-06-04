@@ -83,9 +83,11 @@ export default async function ShopDetailPage({
                     ปิดอยู่ตอนนี้
                   </Chip>
                 )}
-                <Chip variant="premium" size="sm">
-                  ให้บริการ {formatDuration(shop.service_duration_minutes)}/ครั้ง
-                </Chip>
+                {shop.services.length > 0 ? (
+                  <Chip variant="premium" size="sm">
+                    {shop.services.length} บริการ
+                  </Chip>
+                ) : null}
               </div>
             </div>
           </div>
@@ -100,6 +102,40 @@ export default async function ShopDetailPage({
             <p className="text-body-md text-on-surface-variant whitespace-pre-line">
               {shop.description}
             </p>
+          </section>
+        ) : null}
+
+        {/* Services catalogue — each service shows its own duration & price */}
+        {shop.services.length > 0 ? (
+          <section className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+            <header className="px-5 md:px-6 py-4 border-b border-outline-variant/40">
+              <h2 className="font-display text-headline-md text-on-surface">
+                บริการ
+              </h2>
+            </header>
+            <ul className="divide-y divide-outline-variant/40">
+              {shop.services.map((service) => (
+                <li
+                  key={service.id}
+                  className="px-5 md:px-6 py-4 flex items-center justify-between gap-4"
+                >
+                  <div className="min-w-0">
+                    <p className="text-body-md font-medium text-on-surface">
+                      {service.name}
+                    </p>
+                    <p className="text-label-sm text-on-surface-variant flex items-center gap-1 mt-0.5">
+                      <Icon name="schedule" size={14} />
+                      {formatDuration(service.durationMinutes)}
+                    </p>
+                  </div>
+                  {service.price != null ? (
+                    <span className="text-body-md font-semibold text-primary shrink-0">
+                      {formatBaht(service.price)}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
           </section>
         ) : null}
 
@@ -125,11 +161,6 @@ export default async function ShopDetailPage({
               }
             />
           ) : null}
-          <InfoRow
-            icon="schedule"
-            label="ระยะเวลาให้บริการ"
-            value={`${formatDuration(shop.service_duration_minutes)} ต่อครั้ง`}
-          />
         </section>
 
         {/* Hours */}
@@ -145,19 +176,36 @@ export default async function ShopDetailPage({
           />
         </section>
 
-        {/* CTA — booking flow */}
+        {/* CTA — booking flow (only when the shop has bookable services) */}
         <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 md:p-6">
           <div className="flex flex-col gap-2 text-center">
-            <Link
-              href={`/shops/${shop.id}/book`}
-              className="inline-flex items-center justify-center gap-2 w-full h-14 px-6 rounded-full bg-primary text-on-primary font-bold text-label-lg shadow-tinted hover:opacity-90 transition-opacity"
-            >
-              <Icon name="event_available" />
-              จองคิวร้านนี้
-            </Link>
-            <p className="text-label-sm text-on-surface-variant">
-              จองล่วงหน้าได้ทันที โดยไม่ต้องสมัครสมาชิก
-            </p>
+            {shop.services.length > 0 ? (
+              <>
+                <Link
+                  href={`/shops/${shop.id}/book`}
+                  className="inline-flex items-center justify-center gap-2 w-full h-14 px-6 rounded-full bg-primary text-on-primary font-bold text-label-lg shadow-tinted hover:opacity-90 transition-opacity"
+                >
+                  <Icon name="event_available" />
+                  จองคิวร้านนี้
+                </Link>
+                <p className="text-label-sm text-on-surface-variant">
+                  จองล่วงหน้าได้ทันที โดยไม่ต้องสมัครสมาชิก
+                </p>
+              </>
+            ) : (
+              <>
+                <div
+                  aria-disabled="true"
+                  className="inline-flex items-center justify-center gap-2 w-full h-14 px-6 rounded-full bg-surface-container text-on-surface-variant font-bold text-label-lg cursor-not-allowed select-none"
+                >
+                  <Icon name="event_busy" />
+                  ยังไม่เปิดให้จอง
+                </div>
+                <p className="text-label-sm text-on-surface-variant">
+                  ร้านนี้ยังไม่ได้เพิ่มบริการที่เปิดให้จอง
+                </p>
+              </>
+            )}
           </div>
         </section>
       </div>
@@ -223,6 +271,13 @@ function formatDuration(minutes: number): string {
   const rem = minutes % 60;
   if (rem === 0) return `${hours} ชั่วโมง`;
   return `${hours} ชม. ${rem} นาที`;
+}
+
+function formatBaht(price: number): string {
+  return `${price.toLocaleString("th-TH", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })} บาท`;
 }
 
 function formatPhone(raw: string): string {

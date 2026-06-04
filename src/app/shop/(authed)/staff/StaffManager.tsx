@@ -9,6 +9,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Chip } from "@/components/ui/Chip";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
+import { PageHeader } from "@/components/layout/PageHeader";
 import {
   parseStaffFormData,
   validateStaffForm,
@@ -56,31 +57,35 @@ export function StaffManager({
   const serviceNameById = new Map(services.map((s) => [s.id, s.name]));
 
   return (
-    <section className="space-y-stack-md">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-on-surface-variant">
-          พนักงานที่เปิดใช้งานแต่ละคนคือ 1 สายบริการ — รับลูกค้าพร้อมกันได้ตามจำนวนพนักงาน
-        </p>
-        <Button iconLeft={<Icon name="person_add" size={20} />} onClick={openAdd}>
-          เพิ่มพนักงาน
-        </Button>
-      </div>
+    <div className="space-y-stack-md">
+      <PageHeader
+        eyebrow="จัดการทีมงาน"
+        title="พนักงาน"
+        description="เพิ่มและจัดการพนักงานของร้าน จำนวนพนักงานที่เปิดใช้งานกำหนดว่ารับได้กี่คิวพร้อมกันในแต่ละช่วงเวลา"
+        action={
+          <Button size="sm" iconLeft={<Icon name="person_add" size={18} />} onClick={openAdd}>
+            เพิ่มพนักงาน
+          </Button>
+        }
+      />
 
-      {staff.length === 0 ? (
-        <EmptyState onAdd={openAdd} />
-      ) : (
-        <ul className="space-y-3">
-          {staff.map((member) => (
-            <StaffRow
-              key={member.id}
-              member={member}
-              serviceNameById={serviceNameById}
-              hasServices={services.length > 0}
-              onEdit={() => openEdit(member)}
-            />
-          ))}
-        </ul>
-      )}
+      <section className="space-y-stack-md">
+        {staff.length === 0 ? (
+          <EmptyState onAdd={openAdd} />
+        ) : (
+          <ul className="space-y-3">
+            {staff.map((member) => (
+              <StaffRow
+                key={member.id}
+                member={member}
+                serviceNameById={serviceNameById}
+                hasServices={services.length > 0}
+                onEdit={() => openEdit(member)}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
 
       {dialogOpen ? (
         <StaffFormModal
@@ -89,7 +94,7 @@ export function StaffManager({
           onClose={() => setDialogOpen(false)}
         />
       ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -113,40 +118,36 @@ function StaffRow({
 
   return (
     <li
-      className={`bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:p-5 flex items-center gap-4 ${
-        member.isActive ? "" : "opacity-70"
+      className={`bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:p-5 flex items-start gap-3 ${
+        member.isActive ? "" : "opacity-60"
       }`}
     >
-      <span className="flex items-center justify-center size-11 rounded-full bg-secondary-container text-on-secondary-container shrink-0">
+      <span className="flex items-center justify-center size-11 rounded-full bg-secondary-container text-on-secondary-container shrink-0 mt-0.5">
         <Icon name="person" />
       </span>
 
-      <div className="min-w-0 flex-1">
+      {/* content */}
+      <div className="min-w-0 flex-1 space-y-1">
+        <h3 className="font-display font-bold text-headline-sm text-on-surface leading-tight">
+          {member.name}
+        </h3>
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="font-display font-bold text-headline-sm text-on-surface truncate">
-            {member.name}
-            {member.nickname ? (
-              <span className="text-on-surface-variant font-normal"> ({member.nickname})</span>
-            ) : null}
-          </h3>
           {member.role ? (
-            <Chip variant="neutral" size="sm">
-              {member.role}
-            </Chip>
+            <Chip variant="neutral" size="sm">{member.role}</Chip>
+          ) : null}
+          {member.phone ? (
+            <span className="text-label-md text-on-surface-variant/60">
+              {formatPhone(member.phone)}
+            </span>
           ) : null}
         </div>
-        <p className="text-label-md text-on-surface-variant/60 mt-0.5">
-          {member.phone ? formatPhone(member.phone) : "ไม่ระบุเบอร์โทร"}
-        </p>
         {!member.providesService ? (
-          <div className="flex items-center gap-1.5 flex-wrap mt-2">
-            <span className="inline-flex items-center gap-1 text-label-sm text-on-surface-variant/60">
-              <Icon name="block" size={14} />
-              ไม่ให้บริการ
-            </span>
-          </div>
+          <span className="inline-flex items-center gap-1 text-label-sm text-on-surface-variant/60">
+            <Icon name="block" size={14} />
+            ไม่ให้บริการ
+          </span>
         ) : hasServices ? (
-          <div className="flex items-center gap-1.5 flex-wrap mt-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {assignedNames.length === 0 ? (
               <span className="inline-flex items-center gap-1 text-label-sm text-on-surface-variant">
                 <Icon name="stacks" size={14} />
@@ -154,53 +155,53 @@ function StaffRow({
               </span>
             ) : (
               assignedNames.map((n) => (
-                <Chip key={n} variant="confirmed" size="sm">
-                  {n}
-                </Chip>
+                <Chip key={n} variant="confirmed" size="sm">{n}</Chip>
               ))
             )}
           </div>
         ) : null}
       </div>
 
-      <Switch
-        checked={member.isActive}
-        disabled={pending}
-        aria-label={member.isActive ? "ปิดการใช้งานพนักงาน" : "เปิดการใช้งานพนักงาน"}
-        onChange={(e) => {
-          const next = e.target.checked;
-          startTransition(() => setStaffActiveAction(member.id, next));
-        }}
-      />
-
-      <div className="flex items-center">
-        <button
-          type="button"
-          onClick={onEdit}
-          aria-label="แก้ไขพนักงาน"
-          className="inline-flex items-center justify-center size-10 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
-        >
-          <Icon name="edit" size={20} />
-        </button>
-
-        <ConfirmDialog
-          trigger={
-            <button
-              type="button"
-              aria-label="ลบพนักงาน"
-              className="inline-flex items-center justify-center size-10 rounded-full text-error hover:bg-error-container/40 transition-colors"
-            >
-              <Icon name="delete" size={20} />
-            </button>
-          }
-          title="ลบพนักงานคนนี้?"
-          description={`"${member.name}" จะถูกลบออกจากรายชื่อ ประวัติการจองเดิมยังอยู่แต่จะไม่ผูกกับพนักงานคนนี้`}
-          confirmLabel="ลบ"
-          cancelLabel="ยกเลิก"
-          destructive
-          onConfirm={() => deleteStaffAction(member.id)}
+      {/* right column: switch + actions */}
+      <div className="flex flex-col items-end gap-2 shrink-0">
+        <Switch
+          checked={member.isActive}
+          disabled={pending}
+          aria-label={member.isActive ? "ปิดการใช้งานพนักงาน" : "เปิดการใช้งานพนักงาน"}
+          onChange={(e) => {
+            const next = e.target.checked;
+            startTransition(() => setStaffActiveAction(member.id, next));
+          }}
         />
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label="แก้ไขพนักงาน"
+            className="inline-flex items-center justify-center size-9 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
+          >
+            <Icon name="edit" size={18} />
+          </button>
+          <ConfirmDialog
+            trigger={
+              <button
+                type="button"
+                aria-label="ลบพนักงาน"
+                className="inline-flex items-center justify-center size-9 rounded-full text-error hover:bg-error-container/40 transition-colors"
+              >
+                <Icon name="delete" size={18} />
+              </button>
+            }
+            title="ลบพนักงานคนนี้?"
+            description={`"${member.name}" จะถูกลบออกจากรายชื่อ ประวัติการจองเดิมยังอยู่แต่จะไม่ผูกกับพนักงานคนนี้`}
+            confirmLabel="ลบ"
+            cancelLabel="ยกเลิก"
+            destructive
+            onConfirm={() => deleteStaffAction(member.id)}
+          />
+        </div>
       </div>
+
     </li>
   );
 }
@@ -284,14 +285,6 @@ function StaffFormModal({
           placeholder="เช่น สมชาย ใจดี"
           errorText={errors.name}
           onChange={clearErr("name")}
-        />
-        <Input
-          name="nickname"
-          label="ชื่อเล่น"
-          defaultValue={editing?.nickname ?? ""}
-          placeholder="เช่น ชาย"
-          errorText={errors.nickname}
-          onChange={clearErr("nickname")}
         />
         <Input
           name="role"

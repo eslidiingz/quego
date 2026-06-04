@@ -5,7 +5,6 @@ import { requireShopSession } from "@/lib/auth/shop-session-server";
 import {
   changeShopPin,
   updateOwnShopProfile,
-  updateServiceDuration as updateServiceDurationSvc,
 } from "@/lib/services/shops";
 import type {
   ChangePinFieldErrors,
@@ -219,31 +218,3 @@ export async function changeShopPinAction(
   return { ok: true };
 }
 
-// ----- Service duration --------------------------------------------------
-
-export type UpdateServiceDurationState =
-  | { ok: true }
-  | { ok: false; message: string }
-  | null;
-
-/**
- * Server action for the per-shop service duration.
- * Lives alongside profile + hours actions but takes its own state object so
- * the three concerns can save independently.
- */
-export async function updateServiceDuration(
-  _prev: UpdateServiceDurationState,
-  formData: FormData,
-): Promise<UpdateServiceDurationState> {
-  const session = await requireShopSession();
-  const minutes = Number(formData.get("durationMinutes"));
-
-  const result = await updateServiceDurationSvc(session.shopId, minutes);
-  if (!result.ok) {
-    return { ok: false, message: result.message };
-  }
-
-  revalidatePath("/shop/profile");
-  revalidatePath("/shop");
-  return { ok: true };
-}

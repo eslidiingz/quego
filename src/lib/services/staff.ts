@@ -19,7 +19,6 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 export type StaffListItem = {
   id: string;
   name: string;
-  nickname: string | null;
   role: string | null;
   phone: string | null;
   isActive: boolean;
@@ -36,7 +35,6 @@ export type StaffListItem = {
 
 export type StaffInput = {
   name: string;
-  nickname?: string | null;
   role?: string | null;
   phone?: string | null;
   isActive?: boolean;
@@ -55,7 +53,6 @@ export type StaffMutationResult =
 type StaffRow = {
   id: string;
   name: string;
-  nickname: string | null;
   role: string | null;
   phone: string | null;
   is_active: boolean;
@@ -67,7 +64,6 @@ function mapRow(r: StaffRow, serviceIds: string[] = []): StaffListItem {
   return {
     id: r.id,
     name: r.name,
-    nickname: r.nickname,
     role: r.role,
     phone: r.phone,
     isActive: r.is_active,
@@ -89,7 +85,7 @@ export async function listStaffByShop(
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("shop_staff")
-    .select("id, name, nickname, role, phone, is_active, sort_order, provides_service")
+    .select("id, name, role, phone, is_active, sort_order, provides_service")
     .eq("shop_id", shopId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
@@ -140,7 +136,6 @@ export async function countActiveStaff(shopId: string): Promise<number> {
 
 function normalize(input: StaffInput): {
   name: string;
-  nickname: string | null;
   role: string | null;
   phone: string | null;
 } | null {
@@ -148,7 +143,6 @@ function normalize(input: StaffInput): {
   if (name.length === 0 || name.length > 120) return null;
   return {
     name,
-    nickname: input.nickname?.trim() || null,
     role: input.role?.trim() || null,
     phone: input.phone?.trim() || null,
   };
@@ -180,7 +174,6 @@ export async function createStaff(
     .insert({
       shop_id: shopId,
       name: fields.name,
-      nickname: fields.nickname,
       role: fields.role,
       phone: fields.phone,
       is_active: input.isActive ?? true,
@@ -213,7 +206,6 @@ export async function updateStaff(
   const supabase = getSupabaseAdmin();
   const update: Record<string, unknown> = {
     name: fields.name,
-    nickname: fields.nickname,
     role: fields.role,
     phone: fields.phone,
     updated_at: new Date().toISOString(),

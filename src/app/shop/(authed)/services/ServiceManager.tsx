@@ -9,6 +9,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Chip } from "@/components/ui/Chip";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
+import { PageHeader } from "@/components/layout/PageHeader";
 import {
   parseServiceFormData,
   validateServiceForm,
@@ -50,29 +51,33 @@ export function ServiceManager({
   }
 
   return (
-    <section className="space-y-stack-md">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-on-surface-variant">
-          ลูกค้าจะเลือกบริการก่อนจองคิว — ระยะเวลาของบริการกำหนดว่าจองรอบไหนได้บ้าง
-        </p>
-        <Button iconLeft={<Icon name="add" size={20} />} onClick={openAdd}>
-          เพิ่มบริการ
-        </Button>
-      </div>
+    <div className="space-y-stack-md">
+      <PageHeader
+        eyebrow="จัดการบริการ"
+        title="บริการ"
+        description="เพิ่มและจัดการบริการของร้าน เช่น ตัดผม ทำสี ดัดวอลลุ่ม ระยะเวลาของแต่ละบริการกำหนดรอบเวลาที่ลูกค้าจองได้"
+        action={
+          <Button size="sm" iconLeft={<Icon name="add" size={18} />} onClick={openAdd}>
+            เพิ่มบริการ
+          </Button>
+        }
+      />
 
-      {services.length === 0 ? (
-        <EmptyState onAdd={openAdd} />
-      ) : (
-        <ul className="space-y-3">
-          {services.map((service) => (
-            <ServiceRow
-              key={service.id}
-              service={service}
-              onEdit={() => openEdit(service)}
-            />
-          ))}
-        </ul>
-      )}
+      <section className="space-y-stack-md">
+        {services.length === 0 ? (
+          <EmptyState onAdd={openAdd} />
+        ) : (
+          <ul className="space-y-3">
+            {services.map((service) => (
+              <ServiceRow
+                key={service.id}
+                service={service}
+                onEdit={() => openEdit(service)}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
 
       {dialogOpen ? (
         <ServiceFormModal
@@ -80,7 +85,7 @@ export function ServiceManager({
           onClose={() => setDialogOpen(false)}
         />
       ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -95,19 +100,19 @@ function ServiceRow({
 
   return (
     <li
-      className={`bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:p-5 flex items-center gap-4 ${
+      className={`bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:p-5 flex items-start gap-3 ${
         service.isActive ? "" : "opacity-70"
       }`}
     >
-      <span className="flex items-center justify-center size-11 rounded-full bg-secondary-container text-on-secondary-container shrink-0">
+      <span className="flex items-center justify-center size-11 rounded-full bg-secondary-container text-on-secondary-container shrink-0 mt-0.5">
         <Icon name="stacks" />
       </span>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 space-y-1">
+        <h3 className="font-display font-bold text-headline-sm text-on-surface leading-tight">
+          {service.name}
+        </h3>
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="font-display font-bold text-headline-sm text-on-surface truncate">
-            {service.name}
-          </h3>
           <Chip variant="neutral" size="sm">
             {service.durationMinutes} นาที
           </Chip>
@@ -118,51 +123,51 @@ function ServiceRow({
           ) : null}
         </div>
         {service.description ? (
-          <p className="text-label-md text-on-surface-variant/60 mt-0.5 line-clamp-2">
+          <p className="text-label-md text-on-surface-variant/60 line-clamp-2">
             {service.description}
           </p>
         ) : null}
       </div>
 
-      <Switch
-        checked={service.isActive}
-        disabled={pending}
-        aria-label={
-          service.isActive ? "ปิดการใช้งานบริการ" : "เปิดการใช้งานบริการ"
-        }
-        onChange={(e) => {
-          const next = e.target.checked;
-          startTransition(() => setServiceActiveAction(service.id, next));
-        }}
-      />
-
-      <div className="flex items-center">
-        <button
-          type="button"
-          onClick={onEdit}
-          aria-label="แก้ไขบริการ"
-          className="inline-flex items-center justify-center size-10 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
-        >
-          <Icon name="edit" size={20} />
-        </button>
-
-        <ConfirmDialog
-        trigger={
+      <div className="flex flex-col items-end gap-2 shrink-0">
+        <Switch
+          checked={service.isActive}
+          disabled={pending}
+          aria-label={
+            service.isActive ? "ปิดการใช้งานบริการ" : "เปิดการใช้งานบริการ"
+          }
+          onChange={(e) => {
+            const next = e.target.checked;
+            startTransition(() => setServiceActiveAction(service.id, next));
+          }}
+        />
+        <div className="flex items-center">
           <button
             type="button"
-            aria-label="ลบบริการ"
-            className="inline-flex items-center justify-center size-10 rounded-full text-error hover:bg-error-container/40 transition-colors"
+            onClick={onEdit}
+            aria-label="แก้ไขบริการ"
+            className="inline-flex items-center justify-center size-9 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
           >
-            <Icon name="delete" size={20} />
+            <Icon name="edit" size={18} />
           </button>
-        }
-        title="ลบบริการนี้?"
-        description={`"${service.name}" จะถูกลบออกจากรายการ ประวัติการจองเดิมยังอยู่แต่จะไม่ผูกกับบริการนี้`}
-        confirmLabel="ลบ"
-        cancelLabel="ยกเลิก"
-        destructive
-        onConfirm={() => deleteServiceAction(service.id)}
-      />
+          <ConfirmDialog
+            trigger={
+              <button
+                type="button"
+                aria-label="ลบบริการ"
+                className="inline-flex items-center justify-center size-9 rounded-full text-error hover:bg-error-container/40 transition-colors"
+              >
+                <Icon name="delete" size={18} />
+              </button>
+            }
+            title="ลบบริการนี้?"
+            description={`"${service.name}" จะถูกลบออกจากรายการ ประวัติการจองเดิมยังอยู่แต่จะไม่ผูกกับบริการนี้`}
+            confirmLabel="ลบ"
+            cancelLabel="ยกเลิก"
+            destructive
+            onConfirm={() => deleteServiceAction(service.id)}
+          />
+        </div>
       </div>
     </li>
   );
