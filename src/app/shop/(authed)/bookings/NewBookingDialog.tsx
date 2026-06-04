@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -113,6 +114,20 @@ export function NewBookingDialog({
   };
 
   const stepBase = showServiceStep ? 1 : 0;
+
+  // A shop with no active services can't take bookings. Point the owner to the
+  // service catalogue instead of opening an unusable picker.
+  if (services.length === 0) {
+    return (
+      <Link
+        href="/shop/services"
+        className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-full bg-secondary-container text-on-secondary-container text-label-md font-medium hover:opacity-90 transition-opacity"
+      >
+        <Icon name="add" size={18} />
+        เพิ่มบริการเพื่อรับจอง
+      </Link>
+    );
+  }
 
   return (
     <>

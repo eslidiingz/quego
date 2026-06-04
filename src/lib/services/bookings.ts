@@ -235,26 +235,17 @@ export async function getBookingContext(
     }
   }
 
-  // Shops that haven't defined any services fall back to a single implicit one
-  // using the shop's default duration, so the booking flow stays uniform.
-  const services: BookingService[] =
-    activeServices.length > 0
-      ? activeServices.map((s) => ({
-          id: s.id,
-          name: s.name,
-          durationMinutes: s.durationMinutes,
-          price: s.price,
-          staffIds: serviceStaffMap ? (serviceStaffMap.get(s.id) ?? []) : null,
-        }))
-      : [
-          {
-            id: null,
-            name: "บริการ",
-            durationMinutes: shop.service_duration_minutes,
-            price: null,
-            staffIds: null,
-          },
-        ];
+  // A shop is bookable only once it has at least one active service. Shops with
+  // an empty catalogue return `services: []`; the booking surfaces render a
+  // "not open for booking yet" state instead of a form, and `createBooking`
+  // rejects any submission that lacks a real service id.
+  const services: BookingService[] = activeServices.map((s) => ({
+    id: s.id,
+    name: s.name,
+    durationMinutes: s.durationMinutes,
+    price: s.price,
+    staffIds: serviceStaffMap ? (serviceStaffMap.get(s.id) ?? []) : null,
+  }));
 
   const byDay = new Map<DayOfWeek, BusinessHour>();
   for (const h of hoursData ?? []) {
@@ -348,7 +339,7 @@ export async function createBooking(
 
   const { data: shopData } = await supabase
     .from("shops")
-    .select("id, status, service_duration_minutes")
+    .select("id, status")
     .eq("id", input.shopId)
     .maybeSingle();
 
@@ -381,9 +372,12 @@ export async function createBooking(
     serviceName = service.name;
     servicePrice = service.price;
   } else {
-    duration = shopData.service_duration_minutes as number;
-    serviceName = null;
-    servicePrice = null;
+    // No service selected — a shop with an empty catalogue is not bookable.
+    return {
+      ok: false,
+      code: "service_unavailable",
+      message: "ร้านนี้ยังไม่เปิดให้จอง — ยังไม่มีบริการให้เลือก",
+    };
   }
 
   // Window check — booking_date must be today..today+13.

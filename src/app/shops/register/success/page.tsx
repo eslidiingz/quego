@@ -46,7 +46,7 @@ export default async function RegisterSuccessPage({
 
         <div className="flex flex-col gap-3">
           <Link href="/">
-            <Button fullWidth size="xl" rounded="full" iconLeft={<Icon name="home" />}>
+            <Button fullWidth size="xl" iconLeft={<Icon name="home" />}>
               กลับสู่หน้าแรก
             </Button>
           </Link>

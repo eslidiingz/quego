@@ -47,7 +47,7 @@ function ShopQueuePage() {
                   เปิดให้บริการตามปกติ
                 </span>
               </div>
-              <Button rounded="full" size="lg" iconLeft={<Icon name="add" />}>
+              <Button size="lg" iconLeft={<Icon name="add" />}>
                 เพิ่มคิวใหม่
               </Button>
             </div>

@@ -13,7 +13,6 @@ export type DiscoveryShop = {
   name: string;
   description: string | null;
   address: string | null;
-  service_duration_minutes: number;
   openState: ShopOpenState;
 };
 
@@ -220,7 +219,6 @@ function CategorySection({
             name={shop.name}
             description={shop.description}
             address={shop.address}
-            serviceDurationMinutes={shop.service_duration_minutes}
             categoryIcon={category.icon}
             openState={shop.openState}
           />

@@ -7,6 +7,10 @@ import {
   type BusinessHour,
   type DayOfWeek,
 } from "@/lib/services/business-hours";
+import {
+  listActiveServicesByShop,
+  type BookableService,
+} from "@/lib/services/services";
 
 // ----- Types --------------------------------------------------------------
 
@@ -84,7 +88,14 @@ export type PublicShopDetail = {
   description: string | null;
   address: string | null;
   contact_phone: string | null;
+  /**
+   * Shop-level default duration. Only meaningful as a fallback for shops that
+   * haven't built a per-service catalogue — prefer `services` below for
+   * customer-facing display so each service shows its own duration/price.
+   */
   service_duration_minutes: number;
+  /** Active services (the บริการ catalogue), ordered for display. */
+  services: BookableService[];
   category: { id: string; name: string; icon: string | null };
   hours: BusinessHour[];
 };
@@ -127,10 +138,13 @@ export async function getPublicShopById(
   if (shopError || !shopData) return null;
   const row = shopData as unknown as ShopDetailRow;
 
-  const { data: hoursData } = await supabase
-    .from("shop_business_hours")
-    .select("day_of_week, is_open, open_time, close_time")
-    .eq("shop_id", id);
+  const [{ data: hoursData }, services] = await Promise.all([
+    supabase
+      .from("shop_business_hours")
+      .select("day_of_week, is_open, open_time, close_time")
+      .eq("shop_id", id),
+    listActiveServicesByShop(id),
+  ]);
 
   const byDay = new Map<DayOfWeek, BusinessHour>();
   for (const h of hoursData ?? []) {
@@ -153,6 +167,7 @@ export async function getPublicShopById(
     address: row.address,
     contact_phone: row.contact_phone,
     service_duration_minutes: row.service_duration_minutes,
+    services,
     category: row.shop_categories ?? { id: "", name: "—", icon: null },
     hours,
   };
@@ -874,47 +889,8 @@ export async function changeShopPin(
   return { ok: true };
 }
 
-// ----- Service duration (operational config) -----------------------------
-
-export type UpdateServiceDurationResult =
-  | { ok: true }
-  | { ok: false; code: "out_of_range" | "unknown"; message: string };
-
-export const SERVICE_DURATION_MIN = 5;
-export const SERVICE_DURATION_MAX = 480;
-
-/**
- * Set how long one service appointment takes at this shop.
- * Mirrors the DB CHECK constraint (5–480 min) so a bad value fails with a
- * friendly message instead of a raw constraint violation.
- *
- * SRP: writes a single column; profile / hours edits stay in their own
- * services so callers don't accidentally touch unrelated fields.
- */
-export async function updateServiceDuration(
-  shopId: string,
-  minutes: number,
-): Promise<UpdateServiceDurationResult> {
-  if (
-    !Number.isInteger(minutes) ||
-    minutes < SERVICE_DURATION_MIN ||
-    minutes > SERVICE_DURATION_MAX
-  ) {
-    return {
-      ok: false,
-      code: "out_of_range",
-      message: `ระยะเวลาให้บริการต้องอยู่ระหว่าง ${SERVICE_DURATION_MIN}–${SERVICE_DURATION_MAX} นาที`,
-    };
-  }
-
-  const supabase = getSupabaseAdmin();
-  const { error } = await supabase
-    .from("shops")
-    .update({ service_duration_minutes: minutes })
-    .eq("id", shopId);
-
-  if (error) {
-    return { ok: false, code: "unknown", message: error.message };
-  }
-  return { ok: true };
-}
+// NOTE: the shop-level `service_duration_minutes` is no longer owner-editable.
+// It is seeded by the column default at registration and read only as a
+// booking fallback for shops that haven't built a per-service catalogue
+// (see getBookingContext). The per-service catalogue (shop_services) is the
+// source of truth for durations everywhere customer-facing.

@@ -3,6 +3,7 @@ import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import type { BookingListItem, BookingStatus } from "@/lib/services/bookings";
 import { CancelBookingByShopButton } from "./CancelBookingByShopButton";
+import { CompleteBookingByShopButton } from "./CompleteBookingByShopButton";
 
 const STATUS_MAP: Record<
   BookingStatus,
@@ -22,7 +23,7 @@ export function BookingRow({ booking }: { booking: BookingListItem }) {
   return (
     <article
       className={cn(
-        "bg-surface-container-lowest border border-outline-variant rounded-xl p-5 md:p-6 hover:shadow-tinted transition-shadow space-y-4",
+        "bg-surface-container-lowest border border-outline-variant rounded-xl p-5 md:p-6 hover:shadow-tinted transition-shadow flex flex-col gap-4",
         muted && "opacity-70",
       )}
     >
@@ -55,16 +56,23 @@ export function BookingRow({ booking }: { booking: BookingListItem }) {
         <DateBadge dateYmd={booking.bookingDate} />
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 sm:flex-1">
           <PhoneRow phone={booking.customerPhone} />
         </div>
         {booking.status === "confirmed" ? (
-          <CancelBookingByShopButton
-            bookingId={booking.id}
-            customerName={booking.customerName}
-            slotTime={booking.slotTime}
-          />
+          <div className="flex items-center gap-2 sm:shrink-0">
+            <CompleteBookingByShopButton
+              bookingId={booking.id}
+              customerName={booking.customerName}
+              slotTime={booking.slotTime}
+            />
+            <CancelBookingByShopButton
+              bookingId={booking.id}
+              customerName={booking.customerName}
+              slotTime={booking.slotTime}
+            />
+          </div>
         ) : null}
       </div>
 

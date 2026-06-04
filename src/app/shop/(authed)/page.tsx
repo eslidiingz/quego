@@ -8,6 +8,7 @@ import {
   type BookingStatus,
 } from "@/lib/services/bookings";
 import { cn } from "@/lib/cn";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { TodayBookingRow } from "./TodayBookingRow";
 import { NewBookingDialog } from "./bookings/NewBookingDialog";
 
@@ -91,15 +92,7 @@ export default async function ShopHomePage({
 
   return (
     <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-lg">
-      <div>
-        <p className="text-label-md text-secondary uppercase tracking-widest mb-1">
-          ยินดีต้อนรับสู่ร้าน
-        </p>
-        <h1 className="font-display text-headline-lg text-on-background">
-          {session.shopName}
-        </h1>
-
-      </div>
+      <PageHeader eyebrow="ยินดีต้อนรับสู่ร้าน" title={session.shopName} />
 
       <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 space-y-stack-md">
         <header className="space-y-2">

@@ -57,7 +57,6 @@ export async function saveStaffAction(
 
   const input = {
     name: fields.name,
-    nickname: fields.nickname ?? null,
     role: fields.role ?? null,
     phone: fields.phone ?? null,
     isActive: fields.isActive,
