@@ -6,9 +6,7 @@
     "dev": "next dev --port 4000",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "lint": "eslint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
@@ -20,28 +18,15 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
-    "@chromatic-com/storybook": "^5.2.1",
-    "@storybook/addon-a11y": "^10.4.1",
-    "@storybook/addon-docs": "^10.4.1",
-    "@storybook/addon-mcp": "^0.6.0",
-    "@storybook/addon-vitest": "^10.4.1",
-    "@storybook/nextjs-vite": "^10.4.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitest/browser-playwright": "^4.1.7",
-    "@vitest/coverage-v8": "^4.1.7",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
-    "eslint-plugin-storybook": "^10.4.1",
-    "playwright": "^1.60.0",
-    "storybook": "^10.4.1",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "vite": "^8.0.14",
-    "vitest": "^4.1.7"
+    "typescript": "^5"
   },
   "packageManager": "pnpm@9.15.9+sha512.68046141893c66fad01c079231128e9afb89ef87e2691d69e4d40eee228988295fd4682181bae55b58418c3a253bde65a505ec7c5f9403ece5cc3cd37dcf2531"
 }

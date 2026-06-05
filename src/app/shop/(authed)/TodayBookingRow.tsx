@@ -68,10 +68,10 @@ export function TodayBookingRow({
           trigger={
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 rounded-full bg-success text-on-success px-3 py-2 text-label-sm font-semibold hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 active:scale-[0.98] transition-all"
+              aria-label={`ทำเครื่องหมายว่าเสร็จสิ้น ${booking.customerName}`}
+              className="inline-flex items-center justify-center size-9 rounded-full bg-success text-on-success hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 active:scale-[0.98] transition-all"
             >
               <Icon name="check" size={18} />
-              เสร็จสิ้น
             </button>
           }
           title="ทำเครื่องหมายว่าเสร็จสิ้น?"
@@ -128,16 +128,22 @@ function RowInner({
   const chip = STATUS_CHIP[booking.status];
   return (
     <>
-      <div className="w-16 text-center font-display text-headline-md text-primary">
+      <div className="shrink-0 self-stretch flex items-center justify-center min-w-[3.75rem] px-2.5 rounded-xl bg-primary/10 text-primary font-display text-headline-md font-bold">
         {booking.slotTime}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-body-md text-on-surface truncate">
+        <p className="text-body-md text-on-surface font-semibold truncate">
           {booking.customerName}
         </p>
-        <p className="text-label-md text-outline-variant">
-          ให้บริการ {booking.serviceDurationMinutes} นาที
+        <p className="text-label-md text-on-surface-variant truncate mt-0.5">
+          {booking.serviceName ?? "บริการ"} · {booking.serviceDurationMinutes} นาที
         </p>
+        {booking.staffName ? (
+          <span className="inline-flex max-w-full items-center gap-1 mt-0.5 px-2 py-0.5 rounded-full bg-primary-container/15 text-primary text-label-sm font-semibold">
+            <Icon name="person" size={13} className="shrink-0" />
+            <span className="truncate">{booking.staffName}</span>
+          </span>
+        ) : null}
       </div>
       {withChip ? (
         <Chip variant={chip.variant} size="sm">

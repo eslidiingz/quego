@@ -30,8 +30,15 @@ export type DiscoveryGroup = {
  * SRP: filtering + layout of the shop list. It does not fetch, and the leaf
  * `PublicShopCard` owns a single card's rendering.
  */
-export function ShopDiscovery({ groups }: { groups: DiscoveryGroup[] }) {
-  const [query, setQuery] = useState("");
+export function ShopDiscovery({
+  groups,
+  initialQuery = "",
+}: {
+  groups: DiscoveryGroup[];
+  /** Seed value from the landing hero search (?q=). */
+  initialQuery?: string;
+}) {
+  const [query, setQuery] = useState(initialQuery);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
 
   const totalShops = useMemo(
@@ -178,7 +185,7 @@ function FilterChip({
       {label}
       <span
         className={cn(
-          "text-[11px] font-bold tabular-nums",
+          "text-label-sm font-bold tabular-nums",
           active ? "text-on-primary/80" : "text-on-surface-variant/70",
         )}
       >

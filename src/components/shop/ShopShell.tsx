@@ -72,10 +72,10 @@ export function ShopShell({
           <Avatar initials={initials(shopName)} ring="secondary" size="lg" />
           <div className="min-w-0">
             <p className="text-label-md text-on-surface font-bold truncate">{shopName}</p>
-            <p className="text-xs text-on-surface-variant">{shopPhone}</p>
+            <p className="text-label-sm text-on-surface-variant">{shopPhone}</p>
             <span
               className={cn(
-                "text-[10px] uppercase font-bold tracking-widest",
+                "text-label-sm uppercase font-bold tracking-widest",
                 isImpersonating ? "text-error" : "text-secondary",
               )}
             >

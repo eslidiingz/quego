@@ -90,7 +90,24 @@ export default async function BookingDetailPage({
               }
             />
           ) : null}
-          <InfoRow icon="person" label="ชื่อผู้จอง" value={booking.customerName} />
+          {booking.staffName ? (
+            <InfoRow
+              icon="person"
+              label="ผู้ให้บริการ"
+              value={
+                <span>
+                  {booking.staffName}
+                  {booking.staffRole ? (
+                    <span className="text-on-surface-variant">
+                      {" "}
+                      · {booking.staffRole}
+                    </span>
+                  ) : null}
+                </span>
+              }
+            />
+          ) : null}
+          <InfoRow icon="badge" label="ชื่อผู้จอง" value={booking.customerName} />
           {booking.customerPhone ? (
             <InfoRow
               icon="phone"

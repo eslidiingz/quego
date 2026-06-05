@@ -337,6 +337,20 @@ export async function deleteService(
   return { ok: true, id: data.id as string };
 }
 
+export async function deleteAllServices(
+  shopId: string,
+): Promise<{ ok: true; deleted: number } | { ok: false; code: string; message: string }> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("shop_services")
+    .delete()
+    .eq("shop_id", shopId)
+    .select("id");
+
+  if (error) return { ok: false, code: "unknown", message: error.message };
+  return { ok: true, deleted: (data ?? []).length };
+}
+
 // ----- Bulk import from category presets ----------------------------------
 
 /** One preset's copyable fields (from `category_service_presets`). */

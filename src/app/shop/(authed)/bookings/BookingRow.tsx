@@ -49,6 +49,15 @@ export function BookingRow({ booking }: { booking: BookingListItem }) {
               </span>
             </p>
           ) : null}
+          {booking.staffName ? (
+            <p className="flex items-center gap-1.5 text-label-md text-on-surface-variant">
+              <Icon name="person" size={16} className="shrink-0" />
+              <span className="break-words">
+                {booking.staffName}
+                {booking.staffRole ? ` · ${booking.staffRole}` : ""}
+              </span>
+            </p>
+          ) : null}
           <p className="text-label-sm text-on-surface-variant uppercase tracking-widest">
             รหัสการจอง <span className="font-mono normal-case tracking-normal">{code}</span>
           </p>

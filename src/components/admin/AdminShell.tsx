@@ -62,8 +62,8 @@ export function AdminShell({
           <Avatar initials={initials(adminName)} ring="primary" size="lg" />
           <div className="min-w-0">
             <p className="text-label-md text-on-surface font-bold truncate">{adminName}</p>
-            <p className="text-xs text-on-surface-variant">{adminPhone}</p>
-            <span className="text-[10px] uppercase font-bold text-primary tracking-widest">
+            <p className="text-label-sm text-on-surface-variant">{adminPhone}</p>
+            <span className="text-label-sm uppercase font-bold text-primary tracking-widest">
               Admin
             </span>
           </div>

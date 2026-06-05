@@ -22,6 +22,7 @@ import {
   saveServiceAction,
   setServiceActiveAction,
   deleteServiceAction,
+  deleteAllServicesAction,
   importPresetsAction,
   type ServiceFormState,
 } from "./actions";
@@ -78,7 +79,7 @@ export function ServiceManager({
         title="บริการ"
         description="เพิ่มและจัดการบริการของร้าน เช่น ตัดผม ทำสี ดัดวอลลุ่ม ระยะเวลาของแต่ละบริการกำหนดรอบเวลาที่ลูกค้าจองได้"
         action={
-          <Button size="sm" iconLeft={<Icon name="add" size={18} />} onClick={openAdd}>
+          <Button size="sm" onClick={openAdd}>
             เพิ่มบริการ
           </Button>
         }
@@ -111,15 +112,35 @@ export function ServiceManager({
         {services.length === 0 ? (
           <EmptyState onAdd={openAdd} />
         ) : (
-          <ul className="space-y-3">
-            {services.map((service) => (
-              <ServiceRow
-                key={service.id}
-                service={service}
-                onEdit={() => openEdit(service)}
+          <>
+            <ul className="space-y-3">
+              {services.map((service) => (
+                <ServiceRow
+                  key={service.id}
+                  service={service}
+                  onEdit={() => openEdit(service)}
+                />
+              ))}
+            </ul>
+            <div className="flex justify-end">
+              <ConfirmDialog
+                trigger={
+                  <button
+                    type="button"
+                    className="text-label-md text-error hover:underline"
+                  >
+                    ลบบริการทั้งหมด
+                  </button>
+                }
+                title="ลบบริการทั้งหมด?"
+                description={`บริการทั้ง ${services.length} รายการจะถูกลบออก ประวัติการจองเดิมยังอยู่แต่จะไม่ผูกกับบริการเหล่านี้`}
+                confirmLabel="ลบทั้งหมด"
+                cancelLabel="ยกเลิก"
+                destructive
+                onConfirm={() => deleteAllServicesAction()}
               />
-            ))}
-          </ul>
+            </div>
+          </>
         )}
       </section>
 
@@ -158,10 +179,6 @@ function ServiceRow({
         service.isActive ? "" : "opacity-70"
       }`}
     >
-      <span className="flex items-center justify-center size-11 rounded-full bg-secondary-container text-on-secondary-container shrink-0 mt-0.5">
-        <Icon name="stacks" />
-      </span>
-
       <div className="min-w-0 flex-1 space-y-1">
         <h3 className="font-display font-bold text-headline-sm text-on-surface leading-tight">
           {service.name}
@@ -376,9 +393,6 @@ function PresetImportBar({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary-container/10 p-4">
-      <span className="flex items-center justify-center size-10 rounded-full bg-primary-container/40 text-primary shrink-0">
-        <Icon name="auto_awesome" />
-      </span>
       <div className="min-w-0 flex-1">
         <p className="text-label-md font-bold text-on-surface">
           ชุดบริการสำเร็จรูป{categoryName ? ` · ${categoryName}` : ""}
@@ -390,7 +404,6 @@ function PresetImportBar({
       <Button
         size="sm"
         variant="outline"
-        iconLeft={<Icon name="library_add" size={18} />}
         onClick={onOpen}
         className="shrink-0"
       >
@@ -423,12 +436,32 @@ function PresetImportModal({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  const selectablePresets = presets.filter(
+    (p) => !existingNames.has(p.name.trim().toLowerCase()),
+  );
+  const allSelected =
+    selectablePresets.length > 0 &&
+    selectablePresets.every((p) => selected.has(p.id));
+
   function toggle(id: string) {
     setError(null);
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setError(null);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const everySelected = selectablePresets.every((p) => next.has(p.id));
+      for (const p of selectablePresets) {
+        if (everySelected) next.delete(p.id);
+        else next.add(p.id);
+      }
       return next;
     });
   }
@@ -464,8 +497,26 @@ function PresetImportModal({
     >
       <p className="text-label-md text-on-surface-variant -mt-2 mb-4">
         ชุดบริการสำเร็จรูป{categoryName ? ` ของหมวด ${categoryName}` : ""} —
-        เลือกบริการที่ต้องการเพิ่มเข้าร้าน
+        เลือกบริการที่ต้องการเพิ่มเข้าร้าน สามารถแก้ไขข้อมูลภายหลังได้
       </p>
+
+      {selectablePresets.length > 0 ? (
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-label-md text-on-surface-variant">
+            {selected.size > 0
+              ? `เลือกแล้ว ${selected.size} รายการ`
+              : `ทั้งหมด ${selectablePresets.length} รายการ`}
+          </span>
+          <button
+            type="button"
+            onClick={toggleAll}
+            disabled={pending}
+            className="text-label-md font-medium text-primary hover:underline disabled:opacity-50"
+          >
+            {allSelected ? "ล้างการเลือก" : "เลือกทั้งหมด"}
+          </button>
+        </div>
+      ) : null}
 
       <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
         {presets.map((preset) => {
@@ -537,7 +588,7 @@ function PresetImportModal({
           disabled={pending}
           type="button"
           fullWidth
-          className="flex-1"
+          className="flex-1 whitespace-nowrap"
           iconLeft={<Icon name="close" />}
         >
           ยกเลิก
@@ -547,7 +598,7 @@ function PresetImportModal({
           onClick={submit}
           disabled={pending || selected.size === 0}
           fullWidth
-          className="flex-1"
+          className="flex-1 whitespace-nowrap"
           iconLeft={
             pending ? (
               <Icon name="progress_activity" className="animate-spin" />
@@ -580,7 +631,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         เพิ่มบริการเพื่อให้ลูกค้าเลือกตอนจองคิว แต่ละบริการกำหนดระยะเวลาของตัวเอง
         ซึ่งใช้คำนวณรอบเวลาที่ลูกค้าจองได้ — หรือเลือกจากชุดบริการสำเร็จรูป (preset) ด้านบน
       </p>
-      <Button iconLeft={<Icon name="add" size={20} />} onClick={onAdd}>
+      <Button onClick={onAdd}>
         เพิ่มบริการแรก
       </Button>
     </div>

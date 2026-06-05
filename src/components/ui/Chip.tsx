@@ -44,7 +44,7 @@ export function Chip({
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full whitespace-nowrap font-semibold uppercase tracking-wider",
-        size === "sm" ? "px-2.5 py-0.5 text-[10px]" : "px-3 py-1 text-label-sm",
+        size === "sm" ? "px-2.5 py-0.5 text-label-sm" : "px-3 py-1 text-label-sm",
         variants[variant],
         className,
       )}

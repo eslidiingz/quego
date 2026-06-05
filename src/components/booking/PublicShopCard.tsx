@@ -19,7 +19,7 @@ export type PublicShopCardProps = {
 /**
  * Customer-facing shop card built around the real data we have today
  * (name / description / address / category icon + live open state).
- * The hero image / rating / distance slots from the storybook `ShopCard`
+ * The hero image / rating / distance slots
  * are deliberately left out — they'll be added when the underlying data
  * is captured by future features.
  *
@@ -53,7 +53,7 @@ export function PublicShopCard({
         ) : null}
       </div>
       <div className="p-3 sm:p-5 flex flex-col gap-1 sm:gap-2 flex-1">
-        <h3 className="font-display text-base sm:text-headline-md text-on-surface leading-tight line-clamp-2">
+        <h3 className="font-display text-body-md sm:text-headline-md text-on-surface leading-tight line-clamp-2">
           {name}
         </h3>
         {description ? (

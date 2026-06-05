@@ -103,6 +103,9 @@ export type BookingDetails = {
   serviceDurationMinutes: number;
   serviceName: string | null;
   servicePrice: number | null;
+  /** Assigned staff member; null for single-queue shops with no staff. */
+  staffName: string | null;
+  staffRole: string | null;
   status: BookingStatus;
   createdAt: string;
 };
@@ -116,6 +119,9 @@ export type BookingListItem = {
   serviceDurationMinutes: number;
   serviceName: string | null;
   servicePrice: number | null;
+  /** Assigned staff member; null for single-queue shops with no staff. */
+  staffName: string | null;
+  staffRole: string | null;
   status: BookingStatus;
   createdAt: string;
 };
@@ -134,6 +140,9 @@ export type CustomerBookingItem = {
   serviceDurationMinutes: number;
   serviceName: string | null;
   servicePrice: number | null;
+  /** Assigned staff member; null for single-queue shops with no staff. */
+  staffName: string | null;
+  staffRole: string | null;
   status: BookingStatus;
 };
 
@@ -171,7 +180,7 @@ export async function getBookingContext(
   const windowStart = window[0].dateYmd;
   const windowEnd = window[window.length - 1].dateYmd;
 
-  const [{ data: hoursData }, { data: bookingsData }, activeStaff, activeServices, { data: activeStaffRows }] =
+  const [{ data: hoursData }, { data: bookingsData }, activeStaff, activeServices, { data: activeStaffRows, error: staffError }] =
     await Promise.all([
       supabase
         .from("shop_business_hours")
@@ -188,7 +197,7 @@ export async function getBookingContext(
       listActiveServicesByShop(shopId),
       supabase
         .from("shop_staff")
-        .select("id, name, nickname")
+        .select("id, name, role")
         .eq("shop_id", shopId)
         .eq("is_active", true)
         .eq("provides_service", true)
@@ -196,16 +205,23 @@ export async function getBookingContext(
         .order("created_at", { ascending: true }),
     ]);
 
+  // The staff-picker step depends on this list; a swallowed error here would
+  // silently collapse the booking flow back to no-staff mode (the original
+  // `nickname`-column bug). Surface it so the failure is loud, not invisible.
+  if (staffError) {
+    throw new Error(`Failed to load shop staff for booking: ${staffError.message}`);
+  }
+
   // Per-slot capacity = number of active staff (parallel service lines), with
   // a floor of 1 so shops that haven't added staff keep the legacy
   // single-queue behaviour.
   const capacity = Math.max(activeStaff, 1);
 
-  const staffList = (activeStaffRows ?? []) as { id: string; name: string; nickname: string | null }[];
+  const staffList = (activeStaffRows ?? []) as { id: string; name: string; role: string | null }[];
   const staffOptions: StaffOption[] = staffList.map((s) => ({
     id: s.id,
     name: s.name,
-    nickname: s.nickname,
+    role: s.role,
   }));
 
   // Build per-service staff assignment: staff with no rows in shop_staff_services
@@ -596,6 +612,10 @@ type BookingJoinRow = {
     address: string | null;
     contact_phone: string | null;
   } | null;
+  shop_staff: {
+    name: string;
+    role: string | null;
+  } | null;
 };
 
 /**
@@ -616,7 +636,8 @@ export async function getBookingById(
         booking_date, slot_time, service_duration_minutes,
         service_name, service_price,
         status, created_at,
-        shops ( name, address, contact_phone )
+        shops ( name, address, contact_phone ),
+        shop_staff ( name, role )
       `,
     )
     .eq("id", bookingId)
@@ -637,6 +658,8 @@ export async function getBookingById(
     serviceDurationMinutes: row.service_duration_minutes,
     serviceName: row.service_name,
     servicePrice: priceFromDb(row.service_price),
+    staffName: row.shop_staff?.name ?? null,
+    staffRole: row.shop_staff?.role ?? null,
     status: row.status,
     createdAt: row.created_at,
   };
@@ -655,6 +678,10 @@ type BookingRowDb = {
   service_price: number | string | null;
   status: BookingStatus;
   created_at: string;
+  shop_staff: {
+    name: string;
+    role: string | null;
+  } | null;
 };
 
 // Status priority for the live "today" queue: still-actionable bookings
@@ -679,6 +706,8 @@ function mapRow(r: BookingRowDb): BookingListItem {
     serviceDurationMinutes: r.service_duration_minutes,
     serviceName: r.service_name,
     servicePrice: priceFromDb(r.service_price),
+    staffName: r.shop_staff?.name ?? null,
+    staffRole: r.shop_staff?.role ?? null,
     status: r.status,
     createdAt: r.created_at,
   };
@@ -714,7 +743,8 @@ export async function listBookingsByShop(
     .select(
       `id, customer_name, customer_phone, booking_date,
        slot_time, service_duration_minutes, service_name, service_price,
-       status, created_at`,
+       status, created_at,
+       shop_staff ( name, role )`,
     )
     .eq("shop_id", shopId);
 
@@ -749,7 +779,7 @@ export async function listBookingsByShop(
 
   const { data, error } = await query;
   if (error || !data) return [];
-  const rows = (data as BookingRowDb[]).map(mapRow);
+  const rows = (data as unknown as BookingRowDb[]).map(mapRow);
 
   // Today's view is the live working queue: lift รอรับบริการ to the top and
   // sink เสร็จสิ้น to the bottom. The query already ordered by slot_time asc,
@@ -974,6 +1004,7 @@ type CustomerBookingRow = {
   service_price: number | string | null;
   status: BookingStatus;
   shops: { name: string; address: string | null } | null;
+  shop_staff: { name: string; role: string | null } | null;
 };
 
 /**
@@ -996,7 +1027,8 @@ export async function listBookingsByCustomerPhone(
     .select(
       `id, shop_id, booking_date, slot_time, service_duration_minutes,
        service_name, service_price, status,
-       shops ( name, address )`,
+       shops ( name, address ),
+       shop_staff ( name, role )`,
     )
     .eq("customer_phone", phone)
     .order("booking_date", { ascending: false })
@@ -1015,6 +1047,8 @@ export async function listBookingsByCustomerPhone(
       serviceDurationMinutes: r.service_duration_minutes,
       serviceName: r.service_name,
       servicePrice: priceFromDb(r.service_price),
+      staffName: r.shop_staff?.name ?? null,
+      staffRole: r.shop_staff?.role ?? null,
       status: r.status,
     }),
   );

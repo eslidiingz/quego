@@ -34,8 +34,6 @@ visual treatments.
   See "Data access" below.
 - **`jose`** for session JWTs (HS256), **`node:crypto` scrypt** for password /
   PIN hashing ([src/lib/auth/password.ts](src/lib/auth/password.ts)).
-- **Storybook 10** on the Next.js Vite framework — design system + page
-  composites are documented there.
 
 ### Environment variables
 
@@ -56,17 +54,9 @@ Copy [.env.example](.env.example) → `.env.local`. Required:
 pnpm dev              # Next.js dev server (Turbopack) → http://localhost:4000
 pnpm build            # Production build (Turbopack)
 pnpm start            # Serve the production build
-pnpm lint             # ESLint (next/core-web-vitals + typescript + storybook)
-pnpm storybook        # Storybook dev → http://localhost:6006
-pnpm build-storybook  # Static Storybook build → ./storybook-static
-pnpm vitest           # Run Storybook addon-vitest tests (browser mode, chromium)
-pnpm vitest run <storyPath>   # Run a single story file's tests
+pnpm lint             # ESLint (next/core-web-vitals + typescript)
 ```
 
-The Vitest setup ([vitest.config.ts](vitest.config.ts)) reuses Storybook
-stories as tests via `@storybook/addon-vitest` running in real Chromium
-(`@vitest/browser-playwright`). There is no separate unit-test suite — write
-component tests by adding stories.
 
 ## Repo map
 
@@ -92,8 +82,6 @@ src/
 │   ├── booking/        # slot-math.ts — pure, browser-safe slot generation
 │   ├── time/           # bangkok.ts — "what time is it in ICT?" helpers
 │   └── validation/     # shop.ts — shared input validators
-└── stories/            # Storybook: Foundations / UI / Booking / Layout / Pages
-.storybook/             # main.ts, preview.tsx, preview-head.html (Material Symbols font)
 design/                 # Source HTML mockups + screenshots + DESIGN.md
 ```
 
@@ -130,19 +118,10 @@ this, `tailwind-merge` would conflate them with color utilities like
   variant colors stay last.
 - Icons come from Material Symbols Outlined via the
   [`Icon`](src/components/ui/Icon.tsx) wrapper, which sets the right
-  `font-variation-settings`. The font is loaded in Storybook by
-  [.storybook/preview-head.html](.storybook/preview-head.html); for Next.js
-  routes it is rendered as a `<link>` in [app/layout.tsx](src/app/layout.tsx)'s
+  `font-variation-settings`. The font is rendered as a `<link>` in [app/layout.tsx](src/app/layout.tsx)'s
   `<head>` (the `@next/next/no-page-custom-font` lint there is a Pages-Router
   false positive and is intentionally disabled).
 
-### Storybook structure & sort order
-
-`.storybook/preview.tsx` defines a story sort order:
-`Foundations → UI → Booking → Layout → Pages`. The `Pages/*` stories compose
-real component sets into full screens that mirror the seven mockups in
-[design/](design/) — use them to validate visual changes across the whole
-flow.
 
 ### Routing & route protection
 
