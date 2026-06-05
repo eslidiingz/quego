@@ -17,7 +17,6 @@ import {
   type StaffFormErrors,
 } from "@/lib/validation/shop";
 import type { StaffListItem } from "@/lib/services/staff";
-import type { ShopServiceListItem } from "@/lib/services/services";
 import {
   saveStaffAction,
   setStaffActiveAction,
@@ -39,7 +38,7 @@ export function StaffManager({
   services,
 }: {
   staff: StaffListItem[];
-  services: ShopServiceListItem[];
+  services: { id: string; name: string }[];
 }) {
   const [editing, setEditing] = useState<StaffListItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -212,7 +211,7 @@ function StaffFormModal({
   onClose,
 }: {
   editing: StaffListItem | null;
-  services: ShopServiceListItem[];
+  services: { id: string; name: string }[];
   onClose: () => void;
 }) {
   const [state, formAction, pending] = useActionState<StaffFormState, FormData>(
@@ -372,7 +371,7 @@ function StaffFormModal({
 
             {serviceSelectionInvalid ? (
               <p className="text-label-sm text-on-surface-variant pl-7">
-                ยังไม่ได้เลือกบริการ — เลือกอย่างน้อย 1 อย่าง หรือกลับไปเลือก "ทุกบริการ"
+                ยังไม่ได้เลือกบริการ — เลือกอย่างน้อย 1 อย่าง หรือกลับไปเลือก &ldquo;ทุกบริการ&rdquo;
               </p>
             ) : null}
 

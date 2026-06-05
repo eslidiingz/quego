@@ -672,6 +672,34 @@ export async function getShopById(id: string): Promise<ShopListItem | null> {
   };
 }
 
+// ----- Shop category reference --------------------------------------------
+
+export type ShopCategoryRef = { id: string; name: string };
+
+/**
+ * The category a shop belongs to (id + name). For surfaces that need to look
+ * up category-scoped data — e.g. the shop-owner services page offering the
+ * service presets curated for that category. Returns null if the shop or its
+ * category can't be found.
+ */
+export async function getShopCategoryRef(
+  shopId: string,
+): Promise<ShopCategoryRef | null> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("shops")
+    .select("shop_categories ( id, name )")
+    .eq("id", shopId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  const cat = (
+    data as unknown as { shop_categories: { id: string; name: string } | null }
+  ).shop_categories;
+  if (!cat) return null;
+  return { id: cat.id, name: cat.name };
+}
+
 // ----- Shop-owner self-edit -----------------------------------------------
 
 export type UpdateOwnShopInput = Omit<UpdateShopInput, "ownerPhone">;

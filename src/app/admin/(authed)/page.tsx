@@ -11,6 +11,7 @@ export default async function AdminHomePage() {
   const [
     { count: categoryCount },
     { count: activeCategoryCount },
+    { count: presetCount },
     shopCounts,
   ] = await Promise.all([
     supabase.from("shop_categories").select("*", { count: "exact", head: true }),
@@ -18,6 +19,9 @@ export default async function AdminHomePage() {
       .from("shop_categories")
       .select("*", { count: "exact", head: true })
       .eq("is_active", true),
+    supabase
+      .from("category_service_presets")
+      .select("*", { count: "exact", head: true }),
     countShopsByStatus(),
   ]);
 
@@ -35,7 +39,7 @@ export default async function AdminHomePage() {
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <DashboardCard
           href="/admin/shops?status=pending"
           icon="hourglass_top"
@@ -63,6 +67,13 @@ export default async function AdminHomePage() {
           tone="primary"
           value={categoryCount ?? 0}
           label={`หมวดหมู่ทั้งหมด (${activeCategoryCount ?? 0} เปิดใช้งาน)`}
+        />
+        <DashboardCard
+          href="/admin/presets"
+          icon="stacks"
+          tone="secondary"
+          value={presetCount ?? 0}
+          label="บริการ preset ทั้งหมด"
         />
       </div>
     </div>

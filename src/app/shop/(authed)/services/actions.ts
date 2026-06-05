@@ -7,7 +7,10 @@ import {
   updateService,
   setServiceActive,
   deleteService,
+  createServicesFromPresets,
 } from "@/lib/services/services";
+import { getShopCategoryRef } from "@/lib/services/shops";
+import { getActivePresetsByIds } from "@/lib/services/service-presets";
 import {
   parseServiceFormData,
   validateServiceForm,
@@ -93,4 +96,43 @@ export async function deleteServiceAction(serviceId: string): Promise<void> {
   const result = await deleteService(session.shopId, serviceId);
   if (!result.ok) throw new Error(result.message);
   revalidateServiceSurfaces(session.shopId);
+}
+
+export type ImportPresetsActionState =
+  | { ok: true; added: number; skipped: number }
+  | { ok: false; message: string };
+
+/**
+ * Import selected category presets into the shop's catalogue. The shop's
+ * category comes from its own row (never the request), and the presets are
+ * re-validated to be active and in that category before copying — a crafted id
+ * from another category can't sneak in. Returns the added/skipped counts so the
+ * client can report the result.
+ */
+export async function importPresetsAction(
+  presetIds: string[],
+): Promise<ImportPresetsActionState> {
+  const session = await requireShopSession();
+
+  if (!Array.isArray(presetIds) || presetIds.length === 0) {
+    return { ok: false, message: "กรุณาเลือกบริการอย่างน้อย 1 รายการ" };
+  }
+
+  const categoryRef = await getShopCategoryRef(session.shopId);
+  if (!categoryRef) {
+    return { ok: false, message: "ไม่พบหมวดหมู่ของร้าน" };
+  }
+
+  const presets = await getActivePresetsByIds(categoryRef.id, presetIds);
+  if (presets.length === 0) {
+    return { ok: false, message: "ไม่พบบริการ preset ที่เลือก" };
+  }
+
+  const result = await createServicesFromPresets(session.shopId, presets);
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidateServiceSurfaces(session.shopId);
+  return { ok: true, added: result.added, skipped: result.skipped };
 }

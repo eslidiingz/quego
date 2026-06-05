@@ -17,29 +17,40 @@ import {
   type ServiceFormErrors,
 } from "@/lib/validation/shop";
 import type { ShopServiceListItem } from "@/lib/services/services";
+import type { ServicePresetListItem } from "@/lib/services/service-presets";
 import {
   saveServiceAction,
   setServiceActiveAction,
   deleteServiceAction,
+  importPresetsAction,
   type ServiceFormState,
 } from "./actions";
 
 /**
  * Service catalogue manager (shop owner). Renders the list and owns the
- * add/edit dialog + delete confirm + active toggle. Data comes in as a prop
- * (the server page reads it); this component only handles UI state and calls
- * the server actions.
+ * add/edit dialog + delete confirm + active toggle, plus a "เลือกจาก preset"
+ * importer that copies the category's curated presets into the catalogue.
+ * Data comes in as props (the server page reads it); this component only
+ * handles UI state and calls the server actions.
  *
- * SRP: list layout + dialog orchestration. The form lives in `ServiceFormModal`
- * and a single row in `ServiceRow`.
+ * SRP: list layout + dialog orchestration. The form lives in `ServiceFormModal`,
+ * a row in `ServiceRow`, and the preset importer in `PresetImportModal`.
  */
 export function ServiceManager({
   services,
+  presets,
+  categoryName,
 }: {
   services: ShopServiceListItem[];
+  presets: ServicePresetListItem[];
+  categoryName: string | null;
 }) {
   const [editing, setEditing] = useState<ShopServiceListItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [toast, setToast] = useState<
+    { kind: "success" | "error"; message: string } | null
+  >(null);
 
   function openAdd() {
     setEditing(null);
@@ -49,6 +60,16 @@ export function ServiceManager({
     setEditing(service);
     setDialogOpen(true);
   }
+  function showToast(kind: "success" | "error", message: string) {
+    setToast({ kind, message });
+    window.setTimeout(() => setToast(null), 4000);
+  }
+
+  // Names already in the catalogue — preset tiles matching these are shown as
+  // "already added" and can't be re-selected.
+  const existingNames = new Set(
+    services.map((s) => s.name.trim().toLowerCase()),
+  );
 
   return (
     <div className="space-y-stack-md">
@@ -62,6 +83,29 @@ export function ServiceManager({
           </Button>
         }
       />
+
+      {toast ? (
+        <div
+          role="status"
+          className={
+            "rounded-lg border px-4 py-3 text-label-md flex items-center gap-2 " +
+            (toast.kind === "success"
+              ? "bg-primary-container/20 border-primary/30 text-primary"
+              : "bg-error-container/40 border-error/30 text-error")
+          }
+        >
+          <Icon name={toast.kind === "success" ? "check_circle" : "error"} />
+          {toast.message}
+        </div>
+      ) : null}
+
+      {presets.length > 0 ? (
+        <PresetImportBar
+          categoryName={categoryName}
+          count={presets.length}
+          onOpen={() => setImportOpen(true)}
+        />
+      ) : null}
 
       <section className="space-y-stack-md">
         {services.length === 0 ? (
@@ -83,6 +127,16 @@ export function ServiceManager({
         <ServiceFormModal
           editing={editing}
           onClose={() => setDialogOpen(false)}
+        />
+      ) : null}
+
+      {importOpen ? (
+        <PresetImportModal
+          presets={presets}
+          categoryName={categoryName}
+          existingNames={existingNames}
+          onClose={() => setImportOpen(false)}
+          onResult={(kind, message) => showToast(kind, message)}
         />
       ) : null}
     </div>
@@ -307,6 +361,212 @@ function ServiceFormModal({
   );
 }
 
+/**
+ * Slim call-to-action that surfaces the category's curated presets as a
+ * one-click way to seed the catalogue. Only rendered when presets exist.
+ */
+function PresetImportBar({
+  categoryName,
+  count,
+  onOpen,
+}: {
+  categoryName: string | null;
+  count: number;
+  onOpen: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary-container/10 p-4">
+      <span className="flex items-center justify-center size-10 rounded-full bg-primary-container/40 text-primary shrink-0">
+        <Icon name="auto_awesome" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-label-md font-bold text-on-surface">
+          ชุดบริการสำเร็จรูป{categoryName ? ` · ${categoryName}` : ""}
+        </p>
+        <p className="text-label-sm text-on-surface-variant">
+          เลือกจากบริการยอดนิยม {count} รายการ มาเพิ่มได้ในคลิกเดียว
+        </p>
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        iconLeft={<Icon name="library_add" size={18} />}
+        onClick={onOpen}
+        className="shrink-0"
+      >
+        เลือก preset
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Preset picker. Lists the category's active presets as selectable tiles;
+ * presets already in the catalogue (by name) are shown as "เพิ่มแล้ว" and can't
+ * be re-selected. On confirm it copies the selected presets server-side and
+ * reports added/skipped counts back to the manager's toast.
+ */
+function PresetImportModal({
+  presets,
+  categoryName,
+  existingNames,
+  onClose,
+  onResult,
+}: {
+  presets: ServicePresetListItem[];
+  categoryName: string | null;
+  existingNames: Set<string>;
+  onClose: () => void;
+  onResult: (kind: "success" | "error", message: string) => void;
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function toggle(id: string) {
+    setError(null);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function submit() {
+    if (selected.size === 0) {
+      setError("กรุณาเลือกอย่างน้อย 1 บริการ");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await importPresetsAction([...selected]);
+      if (result.ok) {
+        const msg =
+          result.added > 0
+            ? `เพิ่ม ${result.added} บริการแล้ว` +
+              (result.skipped > 0 ? ` (ข้าม ${result.skipped} ที่มีอยู่แล้ว)` : "")
+            : "บริการที่เลือกมีอยู่ในรายการแล้วทั้งหมด";
+        onResult("success", msg);
+        onClose();
+      } else {
+        setError(result.message);
+      }
+    });
+  }
+
+  return (
+    <Modal
+      open
+      onClose={pending ? () => undefined : onClose}
+      title="เลือกจาก preset"
+      size="lg"
+    >
+      <p className="text-label-md text-on-surface-variant -mt-2 mb-4">
+        ชุดบริการสำเร็จรูป{categoryName ? ` ของหมวด ${categoryName}` : ""} —
+        เลือกบริการที่ต้องการเพิ่มเข้าร้าน
+      </p>
+
+      <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+        {presets.map((preset) => {
+          const already = existingNames.has(preset.name.trim().toLowerCase());
+          const isSelected = selected.has(preset.id);
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              disabled={already || pending}
+              onClick={() => toggle(preset.id)}
+              aria-pressed={isSelected}
+              className={
+                "w-full text-left rounded-xl border p-3 flex items-center gap-3 transition-colors " +
+                (already
+                  ? "border-outline-variant bg-surface-container-low/40 opacity-60 cursor-not-allowed"
+                  : isSelected
+                    ? "border-primary bg-primary-container/20"
+                    : "border-outline-variant hover:bg-surface-container-low/60")
+              }
+            >
+              <span
+                className={
+                  "flex items-center justify-center size-6 rounded-md border shrink-0 " +
+                  (isSelected && !already
+                    ? "bg-primary border-primary text-on-primary"
+                    : "border-outline-variant text-transparent")
+                }
+                aria-hidden="true"
+              >
+                <Icon name="check" size={16} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-on-surface truncate">{preset.name}</p>
+                <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                  <Chip variant="neutral" size="sm">
+                    {preset.durationMinutes} นาที
+                  </Chip>
+                  {preset.price != null ? (
+                    <Chip variant="success" size="sm">
+                      {formatBaht(preset.price)}
+                    </Chip>
+                  ) : null}
+                </div>
+              </div>
+              {already ? (
+                <Chip variant="neutral" size="sm">
+                  เพิ่มแล้ว
+                </Chip>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {error ? (
+        <div
+          role="alert"
+          className="mt-4 text-label-md text-error bg-error-container/40 border border-error/30 rounded-lg px-3 py-2"
+        >
+          {error}
+        </div>
+      ) : null}
+
+      <div className="flex gap-3 mt-6">
+        <Button
+          variant="outline"
+          onClick={onClose}
+          disabled={pending}
+          type="button"
+          fullWidth
+          className="flex-1"
+          iconLeft={<Icon name="close" />}
+        >
+          ยกเลิก
+        </Button>
+        <Button
+          type="button"
+          onClick={submit}
+          disabled={pending || selected.size === 0}
+          fullWidth
+          className="flex-1"
+          iconLeft={
+            pending ? (
+              <Icon name="progress_activity" className="animate-spin" />
+            ) : (
+              <Icon name="library_add" />
+            )
+          }
+        >
+          {pending
+            ? "กำลังเพิ่ม…"
+            : selected.size > 0
+              ? `เพิ่ม ${selected.size} บริการ`
+              : "เพิ่มบริการ"}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="bg-surface-container-lowest border border-dashed border-outline-variant rounded-xl p-12 text-center space-y-3">
@@ -317,8 +577,8 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         ยังไม่มีบริการ
       </h2>
       <p className="text-body-md text-on-surface-variant max-w-md mx-auto">
-        เพิ่มบริการเพื่อให้ลูกค้าเลือกตอนจองคิว หากยังไม่เพิ่ม
-        ระบบจะใช้ระยะเวลาบริการมาตรฐานของร้านเป็นค่าเริ่มต้น
+        เพิ่มบริการเพื่อให้ลูกค้าเลือกตอนจองคิว แต่ละบริการกำหนดระยะเวลาของตัวเอง
+        ซึ่งใช้คำนวณรอบเวลาที่ลูกค้าจองได้ — หรือเลือกจากชุดบริการสำเร็จรูป (preset) ด้านบน
       </p>
       <Button iconLeft={<Icon name="add" size={20} />} onClick={onAdd}>
         เพิ่มบริการแรก
