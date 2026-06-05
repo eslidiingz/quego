@@ -336,3 +336,99 @@ export async function deleteService(
   if (!data) return { ok: false, code: "not_found", message: "ไม่พบบริการนี้" };
   return { ok: true, id: data.id as string };
 }
+
+// ----- Bulk import from category presets ----------------------------------
+
+/** One preset's copyable fields (from `category_service_presets`). */
+export type ImportPresetItem = {
+  name: string;
+  description: string | null;
+  durationMinutes: number;
+  price: number | null;
+};
+
+export type ImportPresetsResult =
+  | { ok: true; added: number; skipped: number }
+  | { ok: false; code: "invalid" | "unknown"; message: string };
+
+/**
+ * Copy a set of category presets into a shop's catalogue as new services.
+ * Each item runs through the same `normalize` backstop as `createService`,
+ * names that already exist for the shop (case-insensitive) are skipped rather
+ * than duplicated, and survivors append in order after the shop's current
+ * services. Returns how many were added vs. skipped so the UI can report it.
+ *
+ * `shopId` MUST come from the verified session. The presets are fetched and
+ * access-checked by the caller (`getActivePresetsByIds`, constrained to the
+ * shop's own category), so this function only owns the `shop_services` write.
+ */
+export async function createServicesFromPresets(
+  shopId: string,
+  items: ImportPresetItem[],
+): Promise<ImportPresetsResult> {
+  if (items.length === 0) {
+    return { ok: false, code: "invalid", message: "ไม่มีบริการให้เพิ่ม" };
+  }
+
+  const supabase = getSupabaseAdmin();
+
+  // Existing names drive dedupe; the count seeds sort_order so imports append.
+  const { data: existing, error: readError } = await supabase
+    .from("shop_services")
+    .select("name")
+    .eq("shop_id", shopId);
+  if (readError) return { ok: false, code: "unknown", message: readError.message };
+
+  const existingNames = new Set(
+    (existing ?? []).map((r) =>
+      (r as { name: string }).name.trim().toLowerCase(),
+    ),
+  );
+  let sortOrder = existing?.length ?? 0;
+
+  const rows: Record<string, unknown>[] = [];
+  const seenInBatch = new Set<string>();
+  let skipped = 0;
+
+  for (const item of items) {
+    const fields = normalize({
+      name: item.name,
+      description: item.description,
+      durationMinutes: item.durationMinutes,
+      price: item.price,
+    });
+    if (!fields) {
+      skipped += 1;
+      continue;
+    }
+    const key = fields.name.toLowerCase();
+    if (existingNames.has(key) || seenInBatch.has(key)) {
+      skipped += 1;
+      continue;
+    }
+    seenInBatch.add(key);
+    rows.push({
+      shop_id: shopId,
+      name: fields.name,
+      description: fields.description,
+      duration_minutes: fields.durationMinutes,
+      price: fields.price,
+      is_active: true,
+      sort_order: sortOrder,
+    });
+    sortOrder += 1;
+  }
+
+  if (rows.length === 0) {
+    return { ok: true, added: 0, skipped };
+  }
+
+  const { error: insertError } = await supabase
+    .from("shop_services")
+    .insert(rows);
+  if (insertError) {
+    return { ok: false, code: "unknown", message: insertError.message };
+  }
+
+  return { ok: true, added: rows.length, skipped };
+}

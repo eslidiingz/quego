@@ -13,6 +13,7 @@ const navItems = [
   { href: "/admin", label: "Dashboard", icon: "dashboard" },
   { href: "/admin/shops", label: "ร้านในระบบ", icon: "storefront" },
   { href: "/admin/categories", label: "หมวดหมู่ร้าน", icon: "category" },
+  { href: "/admin/presets", label: "บริการ preset", icon: "stacks" },
 ];
 
 export function AdminShell({
