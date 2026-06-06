@@ -1,10 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 type AuthHeroShellProps = {
-  /** Material symbol rendered inside the gradient logo tile. */
-  icon: string;
+  /** Material symbol rendered inside the gradient logo tile. When omitted, the
+   *  tile is not rendered and the title (the queva wordmark) stands alone. */
+  icon?: string;
   /** Accessible label for the logo tile link (defaults to "queva หน้าแรก"
    *  so it reads distinctly from the textual back link). */
   iconLabel?: string;
@@ -43,20 +45,26 @@ export function AuthHeroShell({
       {/* Decorative concentric rings + soft glow — the queva hero signature */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-40 -top-32 size-[520px] rounded-full border border-white/10"
+        className="pointer-events-none absolute -right-40 -top-32 size-[520px] rounded-full border border-on-primary/10"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-16 -top-10 size-[320px] rounded-full border border-white/10"
+        className="pointer-events-none absolute -right-16 -top-10 size-[320px] rounded-full border border-on-primary/10"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -left-44 -bottom-44 size-[500px] rounded-full border border-white/10"
+        className="pointer-events-none absolute -left-44 -bottom-44 size-[500px] rounded-full border border-on-primary/10"
       />
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-1/2 size-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-fixed-dim/[0.06] blur-3xl"
       />
+
+      {/* Theme switch — top-right over the hero. on-primary colours keep it
+          legible on the teal gradient (which stays dark in both themes). */}
+      <div className="absolute right-4 top-4 z-20 md:right-6">
+        <ThemeToggle className="text-on-primary/90 hover:bg-on-primary/15 hover:text-on-primary focus-visible:ring-on-primary focus-visible:ring-offset-primary-container" />
+      </div>
 
       <div className="relative z-10 w-full max-w-md mx-auto">
         <Link
@@ -70,15 +78,17 @@ export function AuthHeroShell({
 
       <div className="relative z-10 w-full max-w-md mx-auto flex-1 flex flex-col justify-center pb-8">
         <div className="queva-reveal flex flex-col items-center text-center mb-8">
-          <Link
-            href="/"
-            aria-label={iconLabel}
-            className="rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-primary focus-visible:ring-offset-2 focus-visible:ring-offset-primary-container"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-luxury-gradient flex items-center justify-center mb-5 shadow-luxury ring-1 ring-white/25 hover:scale-105 transition-transform">
-              <Icon name={icon} className="text-on-primary" size={32} />
-            </div>
-          </Link>
+          {icon ? (
+            <Link
+              href="/"
+              aria-label={iconLabel}
+              className="rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-primary focus-visible:ring-offset-2 focus-visible:ring-offset-primary-container"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-luxury-gradient flex items-center justify-center mb-5 shadow-luxury ring-1 ring-on-primary/25 hover:scale-105 transition-transform duration-200 ease-out">
+                <Icon name={icon} className="text-on-primary" size={32} />
+              </div>
+            </Link>
+          ) : null}
           {eyebrow ? (
             <span className="inline-flex items-center gap-2 font-display text-label-sm font-medium uppercase tracking-wide text-primary-fixed-dim bg-primary-container/70 border border-primary-fixed-dim/40 px-3.5 py-1.5 rounded-full mb-4">
               {eyebrow}
@@ -88,7 +98,7 @@ export function AuthHeroShell({
           <p className="text-body-md text-on-primary/90 mt-3 break-words">{subtitle}</p>
         </div>
 
-        <div className="queva-reveal bg-surface text-on-surface rounded-3xl shadow-luxury ring-1 ring-white/40 p-6 md:p-8">
+        <div className="queva-reveal bg-surface text-on-surface rounded-3xl shadow-luxury ring-1 ring-outline-variant/70 p-6 md:p-8">
           {children}
         </div>
 

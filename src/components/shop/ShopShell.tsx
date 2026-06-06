@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/Icon";
 import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { cn } from "@/lib/cn";
 import { signOutShop } from "@/app/shop/actions";
 
@@ -63,8 +64,7 @@ export function ShopShell({
           menuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        <div className="px-6 py-8 flex items-center gap-3">
-          <Icon name="spa" className="text-primary" size={32} />
+        <div className="px-6 py-8 flex items-center">
           <QuevaWordmark />
         </div>
         <div className="px-4 mx-2 mb-6 py-3 bg-surface-container-high rounded-xl flex items-center gap-3">
@@ -139,7 +139,10 @@ export function ShopShell({
           <h1 className="font-display text-headline-md text-on-surface lg:hidden">
             {shopName}
           </h1>
-          {headerSlot ? <div className="ml-auto">{headerSlot}</div> : <div />}
+          <div className="ml-auto flex items-center gap-2">
+            {headerSlot}
+            <ThemeToggle />
+          </div>
         </header>
         <div className="flex-1">{children}</div>
       </main>

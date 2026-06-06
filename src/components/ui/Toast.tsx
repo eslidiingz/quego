@@ -39,11 +39,16 @@ const styles: Record<ToastKind, { container: string; icon: string }> = {
 export function Toast({ kind = "info", message, duration = 4000, onDismiss }: ToastProps) {
   const [visible, setVisible] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [entered, setEntered] = useState(false);
 
   useEffect(() => {
     // SSR portal guard: flip on first client mount so `document` is defined.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
+    // Flip on the next frame so the toast transitions IN from the hidden state
+    // instead of snapping in already-visible on first paint.
+    const raf = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   useEffect(() => {
@@ -67,9 +72,11 @@ export function Toast({ kind = "info", message, duration = 4000, onDismiss }: To
       role="status"
       aria-live="polite"
       className={cn(
-        "fixed top-6 inset-x-0 mx-auto w-max max-w-[calc(100%-2rem)] z-[60] flex items-center gap-2 px-4 py-3 rounded-full border shadow-luxury text-label-md transition-all duration-200",
+        "fixed top-6 inset-x-0 mx-auto w-max max-w-[calc(100%-2rem)] z-[60] flex items-center gap-2 px-4 py-3 rounded-full border shadow-luxury text-label-md transition-all duration-300 ease-out",
         style.container,
-        visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none",
+        entered && visible
+          ? "opacity-100 translate-y-0"
+          : "opacity-0 -translate-y-2 pointer-events-none",
       )}
     >
       <Icon name={style.icon} />

@@ -176,7 +176,7 @@ export function LocationFieldCombobox({
                 reset();
               }}
               aria-label={`ล้าง${label}`}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200 ease-out"
             >
               <Icon name="close" size={18} />
             </button>
@@ -187,7 +187,7 @@ export function LocationFieldCombobox({
           <ul
             id={listId}
             role="listbox"
-            className="absolute z-50 mt-2 w-full max-h-72 overflow-auto rounded-xl border border-outline-variant bg-surface-container-lowest shadow-lg py-1"
+            className="queva-pop-in absolute z-50 mt-2 w-full max-h-72 overflow-auto rounded-xl border border-outline-variant bg-surface-container-lowest shadow-lg py-1"
           >
             {results.map((opt, i) => {
               const active = i === activeIndex;

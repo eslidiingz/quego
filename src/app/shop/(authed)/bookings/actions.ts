@@ -5,6 +5,7 @@ import { requireShopSession } from "@/lib/auth/shop-session-server";
 import {
   cancelBookingByShop,
   createBooking,
+  markBookingNoShow,
   updateBookingStatus,
 } from "@/lib/services/bookings";
 
@@ -38,6 +39,25 @@ export async function cancelBookingByShopAction(
 ): Promise<void> {
   const session = await requireShopSession();
   const result = await cancelBookingByShop(bookingId, session.shopId);
+  if (!result.ok) {
+    throw new Error(result.message);
+  }
+  revalidatePath("/shop");
+  revalidatePath("/shop/bookings");
+}
+
+/**
+ * Mark one confirmed booking as a no-show. Like `cancelBookingByShopAction`,
+ * the shopId comes from the verified session — never a hidden form field — so
+ * a guessed booking UUID can't be used to touch another shop's row. Only
+ * confirmed bookings can be marked no-show (the service enforces it);
+ * anything else throws not_found.
+ */
+export async function markBookingNoShowAction(
+  bookingId: string,
+): Promise<void> {
+  const session = await requireShopSession();
+  const result = await markBookingNoShow(bookingId, session.shopId);
   if (!result.ok) {
     throw new Error(result.message);
   }

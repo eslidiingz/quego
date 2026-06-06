@@ -32,7 +32,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             aria-invalid={invalid || undefined}
             aria-required={required || undefined}
             className={cn(
-              "w-full h-12 pl-4 pr-12 rounded-lg bg-surface-container-low text-on-surface text-body-md appearance-none transition-all",
+              "w-full h-12 pl-4 pr-12 rounded-lg bg-surface-container-low text-on-surface text-body-md appearance-none transition-all duration-200 ease-out",
               "border-2 border-transparent focus:bg-surface-container-lowest focus:border-primary focus:outline-none",
               invalid && "border-error focus:border-error",
               className,

@@ -66,7 +66,7 @@ export default async function ShopDetailPage({
         {/* Hero */}
         <section className="relative overflow-hidden rounded-2xl bg-luxury-gradient text-on-primary shadow-luxury p-6 md:p-10">
           <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
-            <span className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0">
+            <span className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-on-primary/15 backdrop-blur-sm flex items-center justify-center shrink-0">
               <Icon
                 name={shop.category.icon ?? "storefront"}
                 className="text-on-primary"
@@ -287,7 +287,6 @@ function SiteHeader() {
     <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-outline-variant">
       <div className="max-w-[1280px] mx-auto px-4 md:px-12 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <Icon name="spa" className="text-primary" size={28} />
           <span className="font-display font-bold text-headline-md text-primary tracking-tight">
             queva
           </span>

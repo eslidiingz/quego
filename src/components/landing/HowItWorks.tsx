@@ -11,19 +11,19 @@ const STEPS: Step[] = [
     n: "1",
     title: "เลือกร้าน",
     body: "ค้นหาร้านใกล้ตัวตามหมวดบริการ ดูรีวิว ราคา และสถานะคิวก่อนตัดสินใจ",
-    badge: "bg-primary",
+    badge: "bg-primary text-on-primary",
   },
   {
     n: "2",
     title: "กดรับคิว",
     body: "เลือกบริการและช่างที่ต้องการ แล้วกดรับคิวออนไลน์ ระบบบอกเวลารอให้ทันที",
-    badge: "bg-secondary",
+    badge: "bg-secondary text-on-secondary",
   },
   {
     n: "3",
     title: "รับแจ้งเตือน",
     body: "ใช้เวลาที่เหลือทำอย่างอื่นได้สบาย ๆ แล้วเราจะเตือนผ่าน LINE เมื่อใกล้ถึงคิวคุณ",
-    badge: "bg-tertiary",
+    badge: "bg-tertiary text-on-tertiary",
   },
 ];
 
@@ -51,7 +51,7 @@ export function HowItWorks() {
               className="bg-surface rounded-2xl border border-outline-variant p-7"
             >
               <span
-                className={`flex items-center justify-center size-9 rounded-full font-display font-bold text-label-lg text-white ${s.badge}`}
+                className={`flex items-center justify-center size-9 rounded-full font-display font-bold text-label-lg ${s.badge}`}
               >
                 {s.n}
               </span>

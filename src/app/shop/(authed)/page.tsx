@@ -3,6 +3,7 @@ import { Icon } from "@/components/ui/Icon";
 import { requireShopSession } from "@/lib/auth/shop-session-server";
 import {
   getBookingContext,
+  getShopNoShowCounts,
   listBookingsByShop,
   type BookingListItem,
   type BookingStatus,
@@ -67,9 +68,17 @@ export default async function ShopHomePage({
     Number.isFinite(Number(rawShow)) ? Number(rawShow) : PREVIEW_LIMIT,
   );
 
-  const [bookings, context] = await Promise.all([
-    listBookingsByShop(session.shopId, "today"),
+  // Today's bookings must resolve first (the no-show lookup is keyed on their
+  // phones); context + count reads are independent, so they fan out concurrently.
+  // getShopNoShowCounts is intentionally NOT date-scoped — it counts a phone's
+  // full no-show history at THIS shop, surfaced beside today's rows.
+  const bookings = await listBookingsByShop(session.shopId, "today");
+  const [context, noShowCounts] = await Promise.all([
     getBookingContext(session.shopId),
+    getShopNoShowCounts(
+      session.shopId,
+      bookings.map((b) => b.customerPhone).filter((p): p is string => Boolean(p)),
+    ),
   ]);
 
   const counts = {
@@ -151,7 +160,14 @@ export default async function ShopHomePage({
         ) : (
           <ul className="space-y-1">
             {preview.map((b, i) => (
-              <TodayBookingRow key={b.id} booking={b} index={i} />
+              <TodayBookingRow
+                key={b.id}
+                booking={b}
+                index={i}
+                noShowCount={
+                  b.customerPhone ? (noShowCounts.get(b.customerPhone) ?? 0) : 0
+                }
+              />
             ))}
             {overflow > 0 ? (
               <li>

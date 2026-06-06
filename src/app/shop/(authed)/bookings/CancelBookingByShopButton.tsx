@@ -26,7 +26,7 @@ export function CancelBookingByShopButton({
       trigger={
         <button
           type="button"
-          className="flex-1 sm:flex-none whitespace-nowrap border-2 border-outline-variant rounded-full px-4 py-2 text-on-surface-variant hover:bg-error/5 hover:border-error/40 hover:text-error transition-colors text-label-md font-semibold flex items-center justify-center gap-2"
+          className="w-full sm:w-auto whitespace-nowrap border-2 border-outline-variant rounded-full px-3 sm:px-4 py-2 text-on-surface-variant hover:bg-error/5 hover:border-error/40 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-2 transition-colors text-label-sm sm:text-label-md font-semibold flex items-center justify-center gap-1.5"
         >
           <Icon name="cancel" size={18} />
           ยกเลิก

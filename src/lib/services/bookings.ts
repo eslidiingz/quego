@@ -915,6 +915,41 @@ export async function cancelBookingByShop(
 }
 
 /**
+ * Shop-initiated no-show. Mirrors `cancelBookingByShop` but transitions to
+ * `no_show` instead of `cancelled`. Keyed by `shopId` (which MUST come from
+ * the caller's verified session) so a shop can only mark its own bookings.
+ * Only confirmed bookings can be marked no-show; completed / cancelled /
+ * already-no_show return not_found.
+ */
+export async function markBookingNoShow(
+  bookingId: string,
+  shopId: string,
+): Promise<UpdateBookingStatusResult> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("bookings")
+    .update({ status: "no_show" })
+    .eq("id", bookingId)
+    .eq("shop_id", shopId)
+    .eq("status", "confirmed")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("markBookingNoShow error:", error);
+    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
+  }
+  if (!data) {
+    return {
+      ok: false,
+      code: "not_found",
+      message: "ไม่พบการจองนี้ หรือสถานะไม่อนุญาตให้ทำรายการ",
+    };
+  }
+  return { ok: true };
+}
+
+/**
  * Returns the count for each filter in a single round-trip. The query
  * fetches just `booking_date` for every booking and buckets client-side —
  * cheap because there's no realistic universe in which a single shop has
@@ -944,6 +979,59 @@ export async function countBookingsByShop(
     if (row.booking_date === today) counts.today += 1;
     else if (row.booking_date > today) counts.upcoming += 1;
     else counts.past += 1;
+  }
+  return counts;
+}
+
+// ----- Read: per-customer no-show history (this shop only) ----------------
+
+/**
+ * Count no-show bookings per customer phone, scoped to ONE shop. Lets the
+ * shop's today/bookings views flag repeat no-shows beside each row.
+ *
+ * Strictly per-shop: every count is filtered by `shop_id` taken from the
+ * caller's verified session, so this never leaks another shop's history.
+ *
+ * Takes the distinct phones already loaded by `listBookingsByShop` and runs
+ * ONE grouped read (`.in("customer_phone", phones)`), then tallies in JS —
+ * supabase-js has no first-class GROUP BY, and an N+1 (one query per phone)
+ * would be wasteful. Returns a Map keyed by phone; a phone with no no-shows
+ * is simply absent — callers default to 0.
+ *
+ * Bookings with a null `customer_phone` (anonymous / shop-made without a
+ * number) can't be attributed to a customer, so they're never counted.
+ */
+export async function getShopNoShowCounts(
+  shopId: string,
+  phones: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+
+  // Distinct, non-empty phones only — drop nulls/blanks before the round-trip.
+  const distinct = Array.from(
+    new Set(phones.filter((p) => p.trim().length > 0)),
+  );
+  if (distinct.length === 0) return counts;
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("customer_phone")
+    .eq("shop_id", shopId)
+    .eq("status", "no_show")
+    .in("customer_phone", distinct);
+
+  if (error || !data) {
+    // Non-fatal: a missing badge must never break the queue view. Log the
+    // real detail server-side and degrade to "no known no-shows".
+    console.error("getShopNoShowCounts error:", error);
+    return counts;
+  }
+
+  for (const row of data as { customer_phone: string | null }[]) {
+    const phone = row.customer_phone;
+    if (!phone) continue;
+    counts.set(phone, (counts.get(phone) ?? 0) + 1);
   }
   return counts;
 }

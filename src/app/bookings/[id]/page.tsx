@@ -41,7 +41,7 @@ export default async function BookingDetailPage({
       <div className="max-w-2xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
         <section className="relative overflow-hidden rounded-2xl bg-luxury-gradient text-on-primary p-6 md:p-10 shadow-luxury">
           <div className="flex flex-col items-center text-center gap-3">
-            <span className="w-16 h-16 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center">
+            <span className="w-16 h-16 rounded-full bg-on-primary/15 backdrop-blur-sm flex items-center justify-center">
               <Icon name="check_circle" size={40} />
             </span>
             <div>
@@ -283,7 +283,6 @@ function SiteHeader() {
     <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-outline-variant">
       <div className="max-w-[1280px] mx-auto px-4 md:px-12 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <Icon name="spa" className="text-primary" size={28} />
           <span className="font-display font-bold text-headline-md text-primary tracking-tight">
             queva
           </span>

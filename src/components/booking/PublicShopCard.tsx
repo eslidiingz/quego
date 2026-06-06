@@ -55,14 +55,14 @@ export function PublicShopCard({
     <Link
       href={`/shops/${id}`}
       className={cn(
-        "group flex flex-col bg-surface-container-lowest rounded-xl overflow-hidden border border-outline-variant/40 shadow-sm hover:shadow-luxury hover:border-primary/30 transition-all",
+        "group flex flex-col bg-surface-container-lowest rounded-xl overflow-hidden border border-outline-variant/40 shadow-sm hover:shadow-luxury hover:border-primary/30 transition-all duration-300 ease-out",
         className,
       )}
     >
       <div className="relative h-20 sm:h-28 bg-luxury-gradient flex items-center justify-center">
         <Icon
           name={categoryIcon ?? "storefront"}
-          className="text-on-primary opacity-90 text-[34px] sm:text-[44px] transition-transform group-hover:scale-110"
+          className="text-on-primary opacity-90 text-[34px] sm:text-[44px] transition-transform duration-300 ease-out group-hover:scale-110"
         />
         {openState !== "unknown" ? (
           <OpenStateBadge state={openState} />
@@ -148,7 +148,7 @@ function OpenStateBadge({ state }: { state: "open" | "closed" }) {
         <Chip
           variant="neutral"
           size="sm"
-          className="bg-white/90 backdrop-blur-sm text-on-surface-variant shadow-sm"
+          className="bg-surface/90 backdrop-blur-sm text-on-surface-variant shadow-sm"
         >
           ปิดแล้ว
         </Chip>

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/Icon";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { cn } from "@/lib/cn";
 import { signOutAdmin } from "@/app/admin/actions";
 
@@ -52,8 +53,7 @@ export function AdminShell({
           menuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        <div className="px-6 py-8 flex items-center gap-3">
-          <Icon name="spa" className="text-primary" size={32} />
+        <div className="px-6 py-8 flex items-center">
           <span className="font-display font-bold text-headline-md text-primary tracking-tight">
             queva
           </span>
@@ -125,7 +125,9 @@ export function AdminShell({
           <h1 className="font-display text-headline-md text-on-surface lg:hidden">
             queva Admin
           </h1>
-          <div />
+          <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
+          </div>
         </header>
         <div className="flex-1">{children}</div>
       </main>

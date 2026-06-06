@@ -11,6 +11,7 @@ import type {
 import {
   cancelBookingByShopAction,
   markBookingCompleted,
+  markBookingNoShowAction,
 } from "./bookings/actions";
 
 /**
@@ -25,9 +26,11 @@ import {
 export function TodayBookingRow({
   booking,
   index,
+  noShowCount = 0,
 }: {
   booking: BookingListItem;
   index: number;
+  noShowCount?: number;
 }) {
   // Zebra striping for readability: every other row gets a faint fill.
   const striped = index % 2 === 1;
@@ -40,7 +43,7 @@ export function TodayBookingRow({
           striped && "bg-surface-container-low/50",
         )}
       >
-        <RowInner booking={booking} />
+        <RowInner booking={booking} noShowCount={noShowCount} />
       </li>
     );
   }
@@ -61,7 +64,7 @@ export function TodayBookingRow({
         striped && "bg-surface-container-low/50",
       )}
     >
-      <RowInner booking={booking} withChip={false} />
+      <RowInner booking={booking} withChip={false} noShowCount={noShowCount} />
 
       <div className="flex items-center gap-2 shrink-0">
         <ConfirmDialog
@@ -87,6 +90,31 @@ export function TodayBookingRow({
           confirmLabel="เสร็จสิ้น"
           cancelLabel="ปิด"
           onConfirm={() => markBookingCompleted(booking.id)}
+        />
+
+        <ConfirmDialog
+          trigger={
+            <button
+              type="button"
+              aria-label={`ทำเครื่องหมายว่าไม่มาตามนัด ${booking.customerName}`}
+              className="inline-flex items-center justify-center size-9 rounded-full border-2 border-outline-variant text-on-surface-variant hover:border-tertiary hover:text-tertiary hover:bg-tertiary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-tertiary focus-visible:ring-offset-2 active:scale-[0.98] transition-all"
+            >
+              <Icon name="event_busy" size={18} />
+            </button>
+          }
+          title="ทำเครื่องหมายว่าไม่มาตามนัด?"
+          description={
+            <div className="space-y-1">
+              {customer}
+              <p>
+                เมื่อยืนยันแล้ว คิวนี้จะถูกบันทึกว่าลูกค้าไม่มาตามนัด
+                และนับรวมในประวัติการไม่มาของลูกค้ารายนี้ที่ร้านของคุณ
+              </p>
+            </div>
+          }
+          confirmLabel="ไม่มาตามนัด"
+          cancelLabel="ปิด"
+          onConfirm={() => markBookingNoShowAction(booking.id)}
         />
 
         <ConfirmDialog
@@ -121,9 +149,11 @@ export function TodayBookingRow({
 function RowInner({
   booking,
   withChip = true,
+  noShowCount = 0,
 }: {
   booking: BookingListItem;
   withChip?: boolean;
+  noShowCount?: number;
 }) {
   const chip = STATUS_CHIP[booking.status];
   return (
@@ -135,6 +165,18 @@ function RowInner({
         <p className="text-body-md text-on-surface font-semibold truncate">
           {booking.customerName}
         </p>
+        {booking.status === "confirmed" &&
+        booking.customerPhone &&
+        noShowCount > 0 ? (
+          <Chip
+            variant="danger"
+            size="sm"
+            className="mt-0.5"
+            iconLeft={<Icon name="event_busy" size={12} />}
+          >
+            ไม่มาตามนัด {noShowCount} ครั้ง
+          </Chip>
+        ) : null}
         <p className="text-label-md text-on-surface-variant truncate mt-0.5">
           {booking.serviceName ?? "บริการ"} · {booking.serviceDurationMinutes} นาที
         </p>
@@ -156,10 +198,12 @@ function RowInner({
 
 const STATUS_CHIP: Record<
   BookingStatus,
-  { label: string; variant: "confirmed" | "success" | "danger" }
+  { label: string; variant: "confirmed" | "success" | "danger" | "tertiary" }
 > = {
   confirmed: { label: "รอรับบริการ", variant: "confirmed" },
   completed: { label: "เสร็จสิ้น", variant: "success" },
   cancelled: { label: "ยกเลิก", variant: "danger" },
-  no_show: { label: "ไม่มาตามนัด", variant: "danger" },
+  // Gold (tertiary), not red — distinguishes "didn't show" from shop "ยกเลิก",
+  // and matches the gold no-show action button.
+  no_show: { label: "ไม่มาตามนัด", variant: "tertiary" },
 };

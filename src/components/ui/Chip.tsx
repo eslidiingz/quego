@@ -10,7 +10,8 @@ type Variant =
   | "premium"
   | "confirmed"
   | "success"
-  | "danger";
+  | "danger"
+  | "tertiary";
 
 const variants: Record<Variant, string> = {
   neutral: "bg-surface-container-high text-on-surface-variant",
@@ -22,6 +23,7 @@ const variants: Record<Variant, string> = {
   confirmed: "bg-secondary-container text-on-secondary-container",
   success: "bg-success text-on-success",
   danger: "bg-error-container text-on-error-container",
+  tertiary: "bg-tertiary-container text-on-tertiary-container",
 };
 
 export type ChipProps = React.HTMLAttributes<HTMLSpanElement> & {
@@ -52,7 +54,7 @@ export function Chip({
     >
       {pulse ? (
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75" />
+          <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-current" />
         </span>
       ) : null}

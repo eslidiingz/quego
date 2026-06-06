@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SiteAuthLink } from "@/components/layout/SiteAuthLink";
 import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const NAV_LINKS: { label: string; href: string }[] = [
   { label: "ค้นหาร้าน", href: "#shops" },
@@ -24,13 +25,16 @@ export function LandingNav() {
 
       <div className="hidden md:flex items-center gap-7 text-body-sm text-on-surface-variant">
         {NAV_LINKS.map((l) => (
-          <Link key={l.href} href={l.href} className="hover:text-primary transition-colors">
+          <Link key={l.href} href={l.href} className="hover:text-primary transition-colors duration-200">
             {l.label}
           </Link>
         ))}
       </div>
 
-      <SiteAuthLink />
+      <div className="flex items-center gap-1">
+        <ThemeToggle />
+        <SiteAuthLink />
+      </div>
     </nav>
   );
 }

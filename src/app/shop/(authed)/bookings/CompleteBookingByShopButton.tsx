@@ -26,7 +26,7 @@ export function CompleteBookingByShopButton({
       trigger={
         <button
           type="button"
-          className="flex-1 sm:flex-none whitespace-nowrap rounded-full border-2 border-transparent bg-success text-on-success px-4 py-2 text-label-md font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+          className="w-full sm:w-auto whitespace-nowrap rounded-full border-2 border-transparent bg-success text-on-success px-3 sm:px-4 py-2 text-label-sm sm:text-label-md font-semibold flex items-center justify-center gap-1.5 hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 transition-opacity"
         >
           <Icon name="check" size={18} />
           เสร็จสิ้น
