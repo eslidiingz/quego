@@ -54,6 +54,15 @@ export function ConfirmDialog({
         await onConfirm();
         setOpen(false);
       } catch (err) {
+        // Next.js redirect() throws a special internal error — let it propagate
+        // so the router can handle the navigation instead of showing it as an error.
+        if (
+          err instanceof Object &&
+          "digest" in err &&
+          String((err as { digest: unknown }).digest).startsWith("NEXT_REDIRECT")
+        ) {
+          throw err;
+        }
         // Never fail silently: domain errors throw the service's Thai message.
         // A caller may still intercept via onError; otherwise show it inline so
         // the shop owner always sees an explicit failure (no native alert).

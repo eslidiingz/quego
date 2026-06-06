@@ -388,6 +388,30 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
     };
   }
 
+  // owner_phone is the shop's login key (findApprovedShopByPhone), so it must
+  // be unique among live shops — two shops on one phone would make shop login
+  // ambiguous. Block re-use unless the prior shop was rejected (those owners
+  // may legitimately re-apply). App-level guard; the DB 23505 path below is the
+  // race backstop if a unique index is added later.
+  const { data: phoneOwner, error: phoneError } = await supabase
+    .from("shops")
+    .select("id")
+    .eq("owner_phone", input.ownerPhone)
+    .neq("status", "rejected")
+    .limit(1)
+    .maybeSingle();
+
+  if (phoneError) {
+    return { ok: false, code: "unknown", message: phoneError.message };
+  }
+  if (phoneOwner) {
+    return {
+      ok: false,
+      code: "duplicate",
+      message: "เบอร์โทรนี้ถูกใช้สมัครร้านในระบบแล้ว",
+    };
+  }
+
   const { data, error } = await supabase
     .from("shops")
     .insert({
@@ -488,6 +512,58 @@ export async function listShops(filter?: {
     service_duration_minutes: r.service_duration_minutes,
     created_at: r.created_at,
     reviewed_at: r.reviewed_at,
+  }));
+}
+
+// ----- Read: admin new-registration notifications -------------------------
+
+export type NewPendingShopAlert = {
+  id: string;
+  name: string;
+  ownerName: string;
+  /** จังหวัด, may be null for legacy rows. */
+  province: string | null;
+  createdAt: string; // UTC ISO
+};
+
+/**
+ * List shops still awaiting moderation that were registered strictly after
+ * `sinceIso`. Backs the admin's live "new registration" notifier, which polls
+ * this on a short interval with a server-supplied cursor.
+ *
+ * SRP: a thin "what registered since T?" read — no UI shaping, no side effects.
+ * `.gt` (strict) pairs with the caller advancing its cursor to the server's
+ * current time each tick, so a row is never emitted twice on the boundary.
+ * Only `pending` rows count — a shop approved/rejected in the same window is no
+ * longer actionable and must not ping. Capped at 20 to bound a burst.
+ */
+export async function listNewPendingShops(
+  sinceIso: string,
+): Promise<NewPendingShopAlert[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("shops")
+    .select("id, name, owner_name, province, created_at")
+    .eq("status", "pending")
+    .gt("created_at", sinceIso)
+    .order("created_at", { ascending: true })
+    .limit(20);
+
+  if (error || !data) return [];
+  return (
+    data as {
+      id: string;
+      name: string;
+      owner_name: string;
+      province: string | null;
+      created_at: string;
+    }[]
+  ).map((r) => ({
+    id: r.id,
+    name: r.name,
+    ownerName: r.owner_name,
+    province: r.province,
+    createdAt: r.created_at,
   }));
 }
 

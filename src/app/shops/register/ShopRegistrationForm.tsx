@@ -118,6 +118,7 @@ export function ShopRegistrationForm({
           placeholder="0xxxxxxxxx"
           iconLeft={<Icon name="phone" />}
           autoComplete="tel"
+          helperText="เบอร์นี้ใช้สำหรับเข้าสู่ระบบร้าน"
           errorText={errors?.ownerPhone}
           disabled={pending}
         />

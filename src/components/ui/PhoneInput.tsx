@@ -15,7 +15,11 @@ export type PhoneInputProps = Omit<
 };
 
 function sanitize(raw: string, maxDigits: number): string {
-  return raw.replace(/\D+/gu, "").slice(0, maxDigits);
+  const digits = raw.replace(/\D+/gu, "").slice(0, maxDigits);
+  if (digits.length > 0 && digits[0] !== "0") {
+    return ("0" + digits).slice(0, maxDigits);
+  }
+  return digits;
 }
 
 /**

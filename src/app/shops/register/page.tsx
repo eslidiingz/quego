@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
+import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
 import { listActiveCategories } from "@/lib/services/shops";
 import { ShopRegistrationForm } from "./ShopRegistrationForm";
 
@@ -20,9 +21,7 @@ export default async function ShopRegisterPage() {
       <header className="w-full sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-outline-variant">
         <div className="max-w-[1280px] mx-auto px-4 md:px-12 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <span className="font-display font-bold text-headline-md text-primary tracking-tight">
-              queva
-            </span>
+            <QuevaWordmark />
           </Link>
           <Link
             href="/"

@@ -5,8 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/Icon";
+import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { PendingShopsNotifier } from "@/components/admin/PendingShopsNotifier";
 import { cn } from "@/lib/cn";
 import { signOutAdmin } from "@/app/admin/actions";
 
@@ -20,10 +22,16 @@ const navItems = [
 export function AdminShell({
   adminName,
   adminPhone,
+  initialSinceIso,
+  pendingCount,
   children,
 }: {
   adminName: string;
   adminPhone: string;
+  /** Server's "now" at render — baseline cursor for the live notifier. */
+  initialSinceIso: string;
+  /** Shops awaiting moderation, for the "ร้านในระบบ" nav badge. */
+  pendingCount: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -54,9 +62,7 @@ export function AdminShell({
         )}
       >
         <div className="px-6 py-8 flex items-center">
-          <span className="font-display font-bold text-headline-md text-primary tracking-tight">
-            queva
-          </span>
+          <QuevaWordmark />
         </div>
         <div className="px-4 mx-2 mb-6 py-3 bg-surface-container-high rounded-xl flex items-center gap-3">
           <Avatar initials={initials(adminName)} ring="primary" size="lg" />
@@ -82,12 +88,25 @@ export function AdminShell({
                 className={cn(
                   "flex items-center gap-3 px-6 py-3 rounded-full transition-all text-left mx-2",
                   active
-                    ? "bg-secondary-container text-on-secondary-container font-bold"
+                    ? "bg-primary text-on-primary font-bold shadow-sm"
                     : "text-on-surface-variant hover:bg-surface-container-high",
                 )}
               >
                 <Icon name={item.icon} />
                 <span className="text-label-md">{item.label}</span>
+                {item.href === "/admin/shops" && pendingCount > 0 ? (
+                  <span
+                    aria-label={`${pendingCount} ร้านรออนุมัติ`}
+                    className={cn(
+                      "ml-auto min-w-[20px] h-5 px-1.5 rounded-full text-label-sm font-bold flex items-center justify-center",
+                      active
+                        ? "bg-on-primary/20 text-on-primary"
+                        : "bg-error text-on-error",
+                    )}
+                  >
+                    {pendingCount > 99 ? "99+" : pendingCount}
+                  </span>
+                ) : null}
               </Link>
             );
           })}
@@ -127,6 +146,9 @@ export function AdminShell({
           </h1>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
+            {/* Bell is the right-most item so its `right-0` dropdown anchors to
+                the viewport edge and stays on-screen on narrow widths. */}
+            <PendingShopsNotifier initialSinceIso={initialSinceIso} />
           </div>
         </header>
         <div className="flex-1">{children}</div>
