@@ -494,7 +494,10 @@ export async function createBooking(
 
     if (insertError) {
       if (isConflict(insertError.code)) return slotTaken;
-      return { ok: false, code: "unknown", message: insertError.message };
+      // Log the real DB detail server-side; return a generic message so we
+      // don't leak schema/constraint names to the client.
+      console.error("createBooking insert error (no-staff path):", insertError);
+      return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
     }
     return { ok: true, bookingId: inserted!.id as string };
   }
@@ -578,7 +581,10 @@ export async function createBooking(
     // 23P01 = this staff was just taken by a concurrent booking; try the next
     // free one. Any other error is fatal.
     if (!isConflict(insertError.code)) {
-      return { ok: false, code: "unknown", message: insertError.message };
+      // Log the real DB detail server-side; return a generic message so we
+      // don't leak schema/constraint names to the client.
+      console.error("createBooking insert error (staffed path):", insertError);
+      return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
     }
   }
 
@@ -829,7 +835,8 @@ export async function updateBookingStatus(
     .maybeSingle();
 
   if (error) {
-    return { ok: false, code: "unknown", message: error.message };
+    console.error("updateBookingStatus error:", error);
+    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
   }
   if (!data) {
     return { ok: false, code: "not_found", message: "ไม่พบรายการจองนี้" };
@@ -859,7 +866,8 @@ export async function cancelOwnBooking(
     .maybeSingle();
 
   if (error) {
-    return { ok: false, code: "unknown", message: error.message };
+    console.error("cancelOwnBooking error:", error);
+    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
   }
   if (!data) {
     return {
@@ -893,7 +901,8 @@ export async function cancelBookingByShop(
     .maybeSingle();
 
   if (error) {
-    return { ok: false, code: "unknown", message: error.message };
+    console.error("cancelBookingByShop error:", error);
+    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
   }
   if (!data) {
     return {
@@ -1064,4 +1073,46 @@ export async function listBookingsByCustomerPhone(
   }
   upcoming.reverse();
   return [...upcoming, ...past];
+}
+
+// ----- Read: public queue status for shop detail page ---------------------
+
+export type ShopQueueStatus = {
+  /** Confirmed bookings remaining today (slot hasn't started yet). */
+  waitingCount: number;
+  /** Sum of remaining service durations — rough customer-facing wait estimate. */
+  estimatedWaitMinutes: number;
+};
+
+/**
+ * Returns how many confirmed bookings are still ahead for today and an
+ * estimated total wait time. Used on the public shop detail page so customers
+ * can gauge busyness before deciding to book.
+ *
+ * "Remaining" = slot_time >= now (slots in the past are already being served
+ * or done, so they don't add to the wait).
+ */
+export async function getShopPublicQueueStatus(
+  shopId: string,
+): Promise<ShopQueueStatus> {
+  const supabase = getSupabaseAdmin();
+  const today = getBangkokToday();
+  const now = getBangkokNow();
+
+  const { data } = await supabase
+    .from("bookings")
+    .select("service_duration_minutes")
+    .eq("shop_id", shopId)
+    .eq("booking_date", today)
+    .eq("status", "confirmed")
+    .gte("slot_time", now.timeHHMM);
+
+  if (!data || data.length === 0) return { waitingCount: 0, estimatedWaitMinutes: 0 };
+
+  const estimatedWaitMinutes = (data as { service_duration_minutes: number | null }[]).reduce(
+    (sum, b) => sum + (b.service_duration_minutes ?? 30),
+    0,
+  );
+
+  return { waitingCount: data.length, estimatedWaitMinutes };
 }

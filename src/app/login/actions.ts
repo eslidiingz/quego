@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { setCustomerLoginIntent } from "@/lib/auth/customer-session-server";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 
 const PHONE_RE = /^0\d{9}$/u;
 
@@ -34,6 +35,13 @@ export async function startCustomerLogin(
       message: "เบอร์โทรไม่ถูกต้อง",
       fieldErrors: { phone: "เบอร์โทรไม่ถูกต้อง (10 หลัก ขึ้นต้นด้วย 0)" },
     };
+  }
+
+  // Rate limit per client IP: bound how fast login-intent cookies can be minted
+  // (each one feeds the PIN setup/verify flow), mirroring the shop step-1 cap.
+  const ip = await getClientIp();
+  if (!(await checkRateLimit(`custlogin:${ip}`, 20, 600))) {
+    return { ok: false, message: "คำขอถี่เกินไป กรุณาลองใหม่อีกครั้งในภายหลัง" };
   }
 
   await setCustomerLoginIntent({ phone });

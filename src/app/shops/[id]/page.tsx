@@ -5,6 +5,10 @@ import { SiteAuthLink } from "@/components/layout/SiteAuthLink";
 import { Chip } from "@/components/ui/Chip";
 import { BusinessHoursDisplay } from "@/components/booking/BusinessHoursDisplay";
 import { getPublicShopById } from "@/lib/services/shops";
+import {
+  getShopPublicQueueStatus,
+  type ShopQueueStatus,
+} from "@/lib/services/bookings";
 import { getBangkokNow } from "@/lib/time/bangkok";
 
 export const dynamic = "force-dynamic";
@@ -15,12 +19,12 @@ export async function generateMetadata({ params }: { params: RouteParams }) {
   const { id } = await params;
   const shop = await getPublicShopById(id);
   if (!shop) {
-    return { title: "ไม่พบร้านที่ต้องการ · LuxeQueue" };
+    return { title: "ไม่พบร้านที่ต้องการ · queva" };
   }
   return {
-    title: `${shop.name} · LuxeQueue`,
+    title: `${shop.name} · queva`,
     description:
-      shop.description ?? `จองคิวร้าน ${shop.name} ผ่าน LuxeQueue ได้ทันที`,
+      shop.description ?? `จองคิวร้าน ${shop.name} ผ่าน queva ได้ทันที`,
   };
 }
 
@@ -30,7 +34,10 @@ export default async function ShopDetailPage({
   params: RouteParams;
 }) {
   const { id } = await params;
-  const shop = await getPublicShopById(id);
+  const [shop, queueStatus] = await Promise.all([
+    getPublicShopById(id),
+    getShopPublicQueueStatus(id),
+  ]);
   if (!shop) notFound();
 
   const now = getBangkokNow();
@@ -93,6 +100,9 @@ export default async function ShopDetailPage({
           </div>
         </section>
 
+        {/* Live queue status — helps the customer decide whether to book now */}
+        <QueueStatusPanel status={queueStatus} isOpen={isOpenNow} />
+
         {/* Description */}
         {shop.description ? (
           <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 md:p-6">
@@ -146,6 +156,15 @@ export default async function ShopDetailPage({
           </h2>
           {shop.address ? (
             <InfoRow icon="location_on" label="ที่อยู่" value={shop.address} />
+          ) : null}
+          {shop.province ? (
+            <InfoRow
+              icon="map"
+              label="พื้นที่"
+              value={[shop.subdistrict, shop.district, shop.province]
+                .filter(Boolean)
+                .join(", ")}
+            />
           ) : null}
           {shop.contact_phone ? (
             <InfoRow
@@ -215,6 +234,54 @@ export default async function ShopDetailPage({
   );
 }
 
+function QueueStatusPanel({
+  status,
+  isOpen,
+}: {
+  status: ShopQueueStatus;
+  isOpen: boolean;
+}) {
+  const { waitingCount, estimatedWaitMinutes } = status;
+  const waitLabel =
+    estimatedWaitMinutes === 0
+      ? "ไม่มีคิวรอ"
+      : estimatedWaitMinutes < 60
+        ? `~${estimatedWaitMinutes} นาที`
+        : `~${Math.round(estimatedWaitMinutes / 60)} ชม.`;
+
+  return (
+    <section className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 md:px-6 py-4 border-b border-outline-variant/40">
+        <h2 className="font-display text-headline-md text-on-surface">
+          สถานะคิววันนี้
+        </h2>
+        {isOpen ? (
+          <span className="inline-flex items-center gap-1.5 text-label-sm font-medium text-secondary">
+            <span className="size-2 rounded-full bg-secondary animate-queue-pulse" />
+            กำลังเปิด
+          </span>
+        ) : (
+          <span className="text-label-sm text-on-surface-variant">ปิดอยู่</span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-3 p-5 md:p-6">
+        <div className="bg-surface-container-low rounded-xl p-4">
+          <p className="text-label-md text-on-surface-variant">คิวที่รออยู่</p>
+          <p className="font-display font-semibold text-[28px] text-secondary mt-0.5">
+            {waitingCount} คิว
+          </p>
+        </div>
+        <div className="bg-surface-container-low rounded-xl p-4">
+          <p className="text-label-md text-on-surface-variant">เวลารอโดยประมาณ</p>
+          <p className="font-display font-semibold text-[28px] text-tertiary mt-0.5">
+            {waitLabel}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-outline-variant">
@@ -222,7 +289,7 @@ function SiteHeader() {
         <Link href="/" className="flex items-center gap-2">
           <Icon name="spa" className="text-primary" size={28} />
           <span className="font-display font-bold text-headline-md text-primary tracking-tight">
-            LuxeQueue
+            queva
           </span>
         </Link>
         <SiteAuthLink />
@@ -235,7 +302,7 @@ function SiteFooter() {
   return (
     <footer className="border-t border-outline-variant bg-surface-container-low mt-auto">
       <div className="max-w-[1280px] mx-auto px-4 md:px-12 py-8 text-center md:text-left text-label-sm text-on-surface-variant">
-        © {new Date().getFullYear()} LuxeQueue Premium Concierge
+        © {new Date().getFullYear()} queva · ไม่ต้องรอเก้อ แค่กดจอง
       </div>
     </footer>
   );

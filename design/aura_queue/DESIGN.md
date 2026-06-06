@@ -220,7 +220,7 @@ The design system uses a **Rounded** shape language with this radius ramp: `sm` 
 
 ### Input Fields
 
-- Inputs feature a soft background (`surface-container-low`) that transitions to a **White background with a Coral (`secondary`) border** on focus.
+- Inputs feature a soft background (`surface-container-low`) that transitions to a **White background with a Teal (`primary`) border** on focus. The 2px teal border alone is the focus affordance (no glow ring); its high contrast against the near-white field carries the indicator. Reserve Coral for CTAs and alerts, not field focus.
 - Field radius is `rounded-lg`; height is `h-12` (48px).
 - Labels are always persistent (top-aligned). Required fields show a red asterisk via the `required` prop (not native HTML `required`); validation runs on submit only.
 

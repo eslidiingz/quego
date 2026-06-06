@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SiteAuthLink } from "@/components/layout/SiteAuthLink";
+import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
 
 const NAV_LINKS: { label: string; href: string }[] = [
   { label: "ค้นหาร้าน", href: "#shops" },
@@ -31,16 +32,5 @@ export function LandingNav() {
 
       <SiteAuthLink />
     </nav>
-  );
-}
-
-/** Brand wordmark: "queva" in teal with a coral full-stop. */
-export function QuevaWordmark({ className }: { className?: string }) {
-  return (
-    <span
-      className={`font-display font-semibold text-[26px] leading-none tracking-tight text-primary ${className ?? ""}`}
-    >
-      queva<span className="text-secondary">.</span>
-    </span>
   );
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { QuevaWordmark } from "@/components/landing/LandingNav";
+import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
 
 type FootCol = { title: string; links: { label: string; href: string }[] };
 

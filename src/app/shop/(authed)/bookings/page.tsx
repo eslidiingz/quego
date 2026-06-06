@@ -14,7 +14,7 @@ import { NewBookingDialog } from "./NewBookingDialog";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "รายการจอง · LuxeQueue",
+  title: "รายการจอง · queva",
 };
 
 const VALID_VIEWS: Record<BookingsFilter, true> = {

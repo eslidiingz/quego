@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 type RouteParams = Promise<{ id: string }>;
 
 export const metadata = {
-  title: "ยืนยันการจอง · LuxeQueue",
+  title: "ยืนยันการจอง · queva",
 };
 
 const STATUS_LABEL: Record<
@@ -112,7 +112,7 @@ export default async function BookingDetailPage({
             <InfoRow
               icon="phone"
               label="เบอร์ติดต่อ"
-              value={formatPhone(booking.customerPhone)}
+              value={maskPhone(booking.customerPhone)}
             />
           ) : null}
           <InfoRow
@@ -233,6 +233,19 @@ function formatPhone(raw: string): string {
   return raw;
 }
 
+// SEC-03: this page is UUID-gated and link-shareable, so the customer's phone
+// must not be shown in full — reveal only enough for the booker to recognise
+// their own number.
+function maskPhone(raw: string): string {
+  if (/^\d{10}$/u.test(raw)) {
+    return `${raw.slice(0, 3)}-xxx-xx${raw.slice(8)}`;
+  }
+  if (/^\d{4,}$/u.test(raw)) {
+    return `${"x".repeat(raw.length - 2)}${raw.slice(-2)}`;
+  }
+  return "•••";
+}
+
 function formatBaht(price: number): string {
   return `${price.toLocaleString("th-TH", {
     minimumFractionDigits: 0,
@@ -272,7 +285,7 @@ function SiteHeader() {
         <Link href="/" className="flex items-center gap-2">
           <Icon name="spa" className="text-primary" size={28} />
           <span className="font-display font-bold text-headline-md text-primary tracking-tight">
-            LuxeQueue
+            queva
           </span>
         </Link>
         <SiteAuthLink />
@@ -285,7 +298,7 @@ function SiteFooter() {
   return (
     <footer className="border-t border-outline-variant bg-surface-container-low mt-auto">
       <div className="max-w-[1280px] mx-auto px-4 md:px-12 py-8 text-center md:text-left text-label-sm text-on-surface-variant">
-        © {new Date().getFullYear()} LuxeQueue Premium Concierge
+        © {new Date().getFullYear()} queva · ไม่ต้องรอเก้อ แค่กดจอง
       </div>
     </footer>
   );

@@ -8,11 +8,23 @@
  * SRP: validation only — no persistence, no redirects, no cookies.
  */
 
+import {
+  isValidProvince,
+  isValidDistrict,
+  isValidSubdistrict,
+} from "@/lib/location/thailand";
+
 export type ShopFormFields = {
   name: string;
   categoryId: string;
   description?: string;
   address?: string;
+  /** Thai province (จังหวัด) — canonical name; required. */
+  province: string;
+  /** Thai district (เขต/อำเภอ) — canonical name belonging to province; required. */
+  district: string;
+  /** Thai sub-district (แขวง/ตำบล) — canonical name belonging to district; required. */
+  subdistrict: string;
   contactPhone?: string;
   ownerName: string;
   ownerPhone: string;
@@ -31,6 +43,9 @@ export function parseShopFormData(formData: FormData): ShopFormFields {
     categoryId: get("categoryId"),
     description: get("description") || undefined,
     address: get("address") || undefined,
+    province: get("province"),
+    district: get("district"),
+    subdistrict: get("subdistrict"),
     contactPhone: get("contactPhone") || undefined,
     ownerName: get("ownerName"),
     ownerPhone: get("ownerPhone"),
@@ -47,7 +62,49 @@ export function validateShopForm(input: ShopFormFields): ShopFormErrors {
 
   if (!input.categoryId) errors.categoryId = "กรุณาเลือกประเภทธุรกิจ";
 
+  // Server-side length caps. The client forms set `maxLength`, but that is a
+  // browser convenience only — a direct POST to the action bypasses it, and the
+  // service inserts these verbatim, so the bound must live here (the canonical
+  // location fields are implicitly bounded by the dataset membership check).
+  if (input.description && input.description.length > 500)
+    errors.description = "คำอธิบายต้องไม่เกิน 500 ตัวอักษร";
+
+  if (input.address && input.address.length > 200)
+    errors.address = "ที่อยู่ต้องไม่เกิน 200 ตัวอักษร";
+
+  // Location is required and must be internally consistent: the district has to
+  // belong to the chosen province. Both come from the same canonical dataset
+  // (thailand.ts) the picker is built from, so a mismatch means a tampered or
+  // stale submission, not normal use.
+  if (!input.province) {
+    errors.province = "กรุณาเลือกจังหวัด";
+  } else if (!isValidProvince(input.province)) {
+    errors.province = "จังหวัดไม่ถูกต้อง";
+  }
+
+  const districtConsistent =
+    Boolean(input.province) &&
+    isValidProvince(input.province) &&
+    isValidDistrict(input.province, input.district);
+
+  if (!input.district) {
+    errors.district = "กรุณาเลือกเขต/อำเภอ";
+  } else if (input.province && isValidProvince(input.province) && !districtConsistent) {
+    errors.district = "เขต/อำเภอไม่ตรงกับจังหวัดที่เลือก";
+  }
+
+  if (!input.subdistrict) {
+    errors.subdistrict = "กรุณาเลือกแขวง/ตำบล";
+  } else if (
+    districtConsistent &&
+    !isValidSubdistrict(input.province, input.district, input.subdistrict)
+  ) {
+    errors.subdistrict = "แขวง/ตำบลไม่ตรงกับเขต/อำเภอที่เลือก";
+  }
+
   if (!input.ownerName) errors.ownerName = "กรุณากรอกชื่อผู้ติดต่อ";
+  else if (input.ownerName.length > 120)
+    errors.ownerName = "ชื่อผู้ติดต่อต้องไม่เกิน 120 ตัวอักษร";
 
   if (!input.ownerPhone) {
     errors.ownerPhone = "กรุณากรอกเบอร์โทร";
@@ -59,8 +116,12 @@ export function validateShopForm(input: ShopFormFields): ShopFormErrors {
     errors.contactPhone = "เบอร์โทรร้านไม่ถูกต้อง (10 หลัก ขึ้นต้นด้วย 0)";
   }
 
-  if (input.ownerEmail && !EMAIL_RE.test(input.ownerEmail)) {
-    errors.ownerEmail = "รูปแบบอีเมลไม่ถูกต้อง";
+  if (input.ownerEmail) {
+    if (input.ownerEmail.length > 254) {
+      errors.ownerEmail = "อีเมลต้องไม่เกิน 254 ตัวอักษร";
+    } else if (!EMAIL_RE.test(input.ownerEmail)) {
+      errors.ownerEmail = "รูปแบบอีเมลไม่ถูกต้อง";
+    }
   }
 
   return errors;

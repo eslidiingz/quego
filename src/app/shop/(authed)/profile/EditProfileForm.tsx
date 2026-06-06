@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
+import { LocationSearchPicker } from "@/components/ui/LocationSearchPicker";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Toast } from "@/components/ui/Toast";
 import { Icon } from "@/components/ui/Icon";
@@ -101,6 +102,16 @@ export function EditProfileForm({
             errorText={errors?.address}
             disabled={pending}
           />
+          <LocationSearchPicker
+            required
+            defaultProvince={shop.province ?? ""}
+            defaultDistrict={shop.district ?? ""}
+            defaultSubdistrict={shop.subdistrict ?? ""}
+            provinceError={errors?.province}
+            districtError={errors?.district}
+            subdistrictError={errors?.subdistrict}
+            disabled={pending}
+          />
           <PhoneInput
             name="contactPhone"
             label="เบอร์โทรร้าน"
@@ -114,7 +125,7 @@ export function EditProfileForm({
         <Section
           icon="badge"
           title="ผู้ติดต่อ"
-          description="ข้อมูลที่ทีมงาน LuxeQueue ใช้ติดต่อกลับ"
+          description="ข้อมูลที่ทีมงาน queva ใช้ติดต่อกลับ"
         >
           <Input
             name="ownerName"
@@ -131,7 +142,7 @@ export function EditProfileForm({
             value={shop.owner_phone}
             readOnly
             disabled
-            helperText="หากต้องการเปลี่ยนเบอร์โทรนี้ ติดต่อทีมงาน LuxeQueue"
+            helperText="หากต้องการเปลี่ยนเบอร์โทรนี้ ติดต่อทีมงาน queva"
           />
           <Input
             name="ownerEmail"

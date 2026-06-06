@@ -1,6 +1,11 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { lockedMessage } from "@/lib/auth/lockout";
+import {
+  registerFailedAttempt,
+  clearFailedAttempts,
+} from "@/lib/auth/lockout-store";
 
 /**
  * Customer (end-user) service. Mirrors the shape of `shops.ts`'s PIN flow
@@ -26,7 +31,13 @@ export type PinResult =
   | { ok: true; customerId: string }
   | {
       ok: false;
-      code: "not_found" | "bad_pin" | "pin_already_set" | "duplicate" | "unknown";
+      code:
+        | "not_found"
+        | "bad_pin"
+        | "pin_already_set"
+        | "duplicate"
+        | "locked"
+        | "unknown";
       message: string;
     };
 
@@ -95,7 +106,16 @@ export async function createOrSetCustomerPin(
       .from("customers")
       .update({ pin_hash: pinHash })
       .eq("id", existing.id);
-    if (error) return { ok: false, code: "unknown", message: error.message };
+    if (error) {
+      // Log the real DB detail server-side; keep the client message generic so
+      // schema/constraint names aren't leaked on this public PIN-setup path.
+      console.error("createOrSetCustomerPin update error:", error);
+      return {
+        ok: false,
+        code: "unknown",
+        message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+      };
+    }
     return { ok: true, customerId: existing.id };
   }
 
@@ -116,7 +136,12 @@ export async function createOrSetCustomerPin(
         message: "เบอร์โทรนี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบด้วย PIN",
       };
     }
-    return { ok: false, code: "unknown", message: error.message };
+    console.error("createOrSetCustomerPin insert error:", error);
+    return {
+      ok: false,
+      code: "unknown",
+      message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+    };
   }
 
   return { ok: true, customerId: data!.id as string };
@@ -137,19 +162,54 @@ export async function verifyCustomerPin(
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("customers")
-    .select("id, pin_hash")
+    .select("id, pin_hash, failed_pin_attempts, locked_until")
     .eq("phone", phone)
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) {
+    console.error("verifyCustomerPin read error:", error);
+    return {
+      ok: false,
+      code: "unknown",
+      message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+    };
+  }
   if (!data || !data.pin_hash) {
     return { ok: false, code: "not_found", message: "ไม่พบบัญชีนี้" };
   }
 
+  const lockTarget = {
+    table: "customers",
+    counter: "failed_pin_attempts",
+  } as const;
+
+  // (a) Currently locked → reject before touching the PIN hash at all.
+  if (data.locked_until) {
+    const lockedUntil = new Date(data.locked_until as string);
+    if (lockedUntil.getTime() > Date.now()) {
+      return { ok: false, code: "locked", message: lockedMessage(lockedUntil) };
+    }
+  }
+
+  // (b) Verify the PIN.
   const ok = await verifyPassword(pin, data.pin_hash as string);
+
+  // (c) Wrong PIN → register the failed attempt atomically (compare-and-swap,
+  // so concurrent guesses can't race past the lock).
   if (!ok) {
+    const lockedUntil = await registerFailedAttempt(
+      lockTarget,
+      data.id as string,
+      (data.failed_pin_attempts as number | null) ?? 0,
+    );
+    if (lockedUntil) {
+      return { ok: false, code: "locked", message: lockedMessage(lockedUntil) };
+    }
     return { ok: false, code: "bad_pin", message: "รหัส PIN ไม่ถูกต้อง" };
   }
+
+  // (d) Success → clear the counter and any stale lock.
+  await clearFailedAttempts(lockTarget, data.id as string);
 
   return { ok: true, customerId: data.id as string };
 }

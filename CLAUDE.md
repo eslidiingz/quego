@@ -199,7 +199,7 @@ The schema (`admins`, `customers`, `shops`, `shop_categories`,
 `shop_business_hours`, `bookings`) lives in the **remote Supabase project**, not
 in repo migrations. Inspect/alter it via the Supabase MCP tools (`list_tables`,
 `apply_migration`) rather than expecting SQL files locally. A super-admin is
-seeded directly in Supabase (phone `0811129499`).
+seeded directly in Supabase (phone `08XXXXXXXX`).
 
 ## Gotchas
 

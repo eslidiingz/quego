@@ -24,7 +24,7 @@ export default async function MeLayout({
           >
             <Icon name="spa" size={28} />
             <span className="font-display font-bold text-headline-md tracking-tight">
-              LuxeQueue
+              queva
             </span>
           </Link>
 

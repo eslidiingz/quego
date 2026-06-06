@@ -1,18 +1,27 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
+import { locationLabel, type LocationValue } from "@/components/ui/LocationCombobox";
 import {
   PublicShopCard,
   type ShopOpenState,
 } from "@/components/booking/PublicShopCard";
+
+export type DiscoveryService = { name: string; price: number | null };
 
 export type DiscoveryShop = {
   id: string;
   name: string;
   description: string | null;
   address: string | null;
+  province: string | null;
+  district: string | null;
+  subdistrict: string | null;
+  /** Active services — searchable + shown as chips on the card. */
+  services: DiscoveryService[];
   openState: ShopOpenState;
 };
 
@@ -21,138 +30,222 @@ export type DiscoveryGroup = {
   shops: DiscoveryShop[];
 };
 
+type GridItem = { shop: DiscoveryShop; categoryIcon: string | null };
+
 /**
- * Client-side discovery surface for the customer home: free-text search over
- * shop name / description / address, plus category filter chips. Pure
- * presentation + local UI state — it receives the already-assembled groups as
- * a prop (DIP: the server route owns the Supabase read).
+ * Customer discovery surface for the home page. The *search* (location +
+ * free-text) lives in the landing hero and seeds this section through the URL
+ * (`?q` / `?province` / `?cat`); here we only own the live **category chips**
+ * + the results grid, so there's a single search box on the page rather than a
+ * duplicate one. Selecting a chip filters client-side with no reload.
  *
- * SRP: filtering + layout of the shop list. It does not fetch, and the leaf
- * `PublicShopCard` owns a single card's rendering.
+ * SRP: filter + lay out the shop list. It does not fetch — the server route
+ * owns the Supabase read (DIP) and remounts this via a `key` when the URL seed
+ * changes, keeping local chip state honest without a prop→state effect.
  */
 export function ShopDiscovery({
   groups,
   initialQuery = "",
+  initialCategoryId = "",
+  initialProvince = "",
+  initialDistrict = "",
+  initialSubdistrict = "",
 }: {
   groups: DiscoveryGroup[];
-  /** Seed value from the landing hero search (?q=). */
+  /** Free-text seed from the hero search (?q=). */
   initialQuery?: string;
+  /** Category seed from a hero category pill (?cat=). */
+  initialCategoryId?: string;
+  /** Location seed from the hero search (?province=/?district=/?subdistrict=). */
+  initialProvince?: string;
+  initialDistrict?: string;
+  initialSubdistrict?: string;
 }) {
-  const [query, setQuery] = useState(initialQuery);
-  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
-
-  const totalShops = useMemo(
-    () => groups.reduce((sum, g) => sum + g.shops.length, 0),
-    [groups],
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(
+    initialCategoryId || null,
   );
 
-  const normalizedQuery = query.trim().toLowerCase();
+  const location: LocationValue | null = initialProvince
+    ? {
+        province: initialProvince,
+        district: initialDistrict || null,
+        subdistrict: initialSubdistrict || null,
+      }
+    : null;
+  const normalizedQuery = initialQuery.trim().toLowerCase();
+  const hasSearch = Boolean(normalizedQuery || location);
 
-  const filteredGroups = useMemo(() => {
-    return groups
-      .filter((g) => !activeCategoryId || g.category.id === activeCategoryId)
-      .map((g) => ({
-        ...g,
-        shops: normalizedQuery
-          ? g.shops.filter((s) => matchesQuery(s, normalizedQuery))
-          : g.shops,
-      }))
-      .filter((g) => g.shops.length > 0);
-  }, [groups, activeCategoryId, normalizedQuery]);
+  // Location + free-text narrow the dataset; category chips refine it live.
+  const filteredGroups = useMemo(
+    () =>
+      groups.map((g) => ({
+        category: g.category,
+        shops: g.shops.filter(
+          (s) =>
+            matchesLocation(s, location) && matchesQuery(s, normalizedQuery),
+        ),
+      })),
+    [groups, location, normalizedQuery],
+  );
 
-  const resultCount = filteredGroups.reduce((sum, g) => sum + g.shops.length, 0);
+  const totalCount = filteredGroups.reduce((n, g) => n + g.shops.length, 0);
+
+  // Only categories that still have shops get a chip — no dead chips.
+  const chipGroups = filteredGroups.filter((g) => g.shops.length > 0);
+
+  // If the active category has no shops under the current search, fall back to
+  // "ทั้งหมด" so the grid never looks empty while another category has results.
+  const effectiveCategoryId =
+    activeCategoryId &&
+    chipGroups.some((g) => g.category.id === activeCategoryId)
+      ? activeCategoryId
+      : null;
+
+  const items = useMemo<GridItem[]>(() => {
+    const chosen = effectiveCategoryId
+      ? filteredGroups.filter((g) => g.category.id === effectiveCategoryId)
+      : filteredGroups;
+    const flat = chosen.flatMap((g) =>
+      g.shops.map((shop) => ({ shop, categoryIcon: g.category.icon })),
+    );
+    // Open shops first (stable sort keeps the server's newest-first order within
+    // each open/closed bucket).
+    return flat.sort((a, b) => openRank(a.shop.openState) - openRank(b.shop.openState));
+  }, [filteredGroups, effectiveCategoryId]);
 
   return (
-    <div className="flex flex-col">
-      {/* Search */}
-      <div className="max-w-xl mx-auto w-full px-4 md:px-12">
-        <SearchField
-          value={query}
-          onChange={setQuery}
-          onClear={() => setQuery("")}
+    <div className="flex flex-col gap-stack-md">
+      {hasSearch ? (
+        <ActiveFilters
+          query={initialQuery}
+          location={location}
+          resultCount={totalCount}
         />
-      </div>
+      ) : null}
 
       {/* Category filter chips */}
-      <div className="mt-stack-md">
-        <div className="max-w-[1280px] mx-auto w-full">
-          <div className="flex gap-2 overflow-x-auto px-4 md:px-12 pb-1 no-scrollbar">
+      <div className="max-w-[1180px] mx-auto w-full">
+        <div className="flex gap-2 overflow-x-auto px-4 md:px-12 pb-1 no-scrollbar">
+          <FilterChip
+            label="ทั้งหมด"
+            icon="apps"
+            count={totalCount}
+            active={effectiveCategoryId === null}
+            onClick={() => setActiveCategoryId(null)}
+          />
+          {chipGroups.map((g) => (
             <FilterChip
-              label="ทั้งหมด"
-              icon="apps"
-              count={totalShops}
-              active={activeCategoryId === null}
-              onClick={() => setActiveCategoryId(null)}
+              key={g.category.id}
+              label={g.category.name}
+              icon={g.category.icon ?? "category"}
+              count={g.shops.length}
+              active={effectiveCategoryId === g.category.id}
+              onClick={() => setActiveCategoryId(g.category.id)}
             />
-            {groups.map((g) => (
-              <FilterChip
-                key={g.category.id}
-                label={g.category.name}
-                icon={g.category.icon ?? "category"}
-                count={g.shops.length}
-                active={activeCategoryId === g.category.id}
-                onClick={() => setActiveCategoryId(g.category.id)}
-              />
-            ))}
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* Results */}
-      <div className="max-w-[1280px] mx-auto w-full px-4 md:px-12 py-stack-lg space-y-stack-lg">
-        {resultCount === 0 ? (
-          <NoResults query={query} />
+      {/* Results grid */}
+      <div className="max-w-[1180px] mx-auto w-full px-4 md:px-12 pb-stack-md">
+        {items.length === 0 ? (
+          <NoResults query={initialQuery} location={location} />
         ) : (
-          filteredGroups.map(({ category, shops }) => (
-            <CategorySection key={category.id} category={category} shops={shops} />
-          ))
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+            {items.map(({ shop, categoryIcon }) => (
+              <PublicShopCard
+                key={shop.id}
+                id={shop.id}
+                name={shop.name}
+                categoryIcon={categoryIcon}
+                province={shop.province}
+                district={shop.district}
+                services={shop.services}
+                openState={shop.openState}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>
   );
 }
 
+/** Sort key: open (0) before unknown (1) before closed (2). */
+function openRank(state: ShopOpenState): number {
+  return state === "open" ? 0 : state === "unknown" ? 1 : 2;
+}
+
+/**
+ * Free-text match across the fields a customer would actually search by — the
+ * shop name, its **services** (the key fix: "ทำสีผม"/"นวดเท้า" now find the shop),
+ * and its area/address. Empty query matches everything.
+ */
 function matchesQuery(shop: DiscoveryShop, q: string): boolean {
+  if (!q) return true;
+  if (shop.name.toLowerCase().includes(q)) return true;
+  if (shop.services.some((s) => s.name.toLowerCase().includes(q))) return true;
+  const haystack = [
+    shop.description,
+    shop.address,
+    shop.subdistrict,
+    shop.district,
+    shop.province,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
+/**
+ * Exact-match on the canonical (province, district, subdistrict) strings. A
+ * district filter implies its province; a province-only filter matches every
+ * district in it. Shops without a saved location never match an active filter.
+ */
+function matchesLocation(shop: DiscoveryShop, loc: LocationValue | null): boolean {
+  if (!loc) return true;
+  if (shop.province !== loc.province) return false;
+  if (loc.district && shop.district !== loc.district) return false;
+  if (loc.subdistrict && shop.subdistrict !== loc.subdistrict) return false;
+  return true;
+}
+
+function ActiveFilters({
+  query,
+  location,
+  resultCount,
+}: {
+  query: string;
+  location: LocationValue | null;
+  resultCount: number;
+}) {
+  const q = query.trim();
+  const where = location ? locationLabel(location) : null;
   return (
-    shop.name.toLowerCase().includes(q) ||
-    (shop.description?.toLowerCase().includes(q) ?? false) ||
-    (shop.address?.toLowerCase().includes(q) ?? false)
+    <div className="max-w-[1180px] mx-auto w-full px-4 md:px-12 flex flex-wrap items-center gap-2">
+      <span className="text-label-md font-semibold text-on-surface">
+        พบ {resultCount} ร้าน
+      </span>
+      {q ? <FilterPill icon="search" label={`“${q}”`} /> : null}
+      {where ? <FilterPill icon="location_on" label={where} /> : null}
+      <Link
+        href="/#shops"
+        className="inline-flex items-center gap-1 text-label-md text-on-surface-variant hover:text-primary transition-colors"
+      >
+        <Icon name="close" size={16} />
+        ล้างตัวกรอง
+      </Link>
+    </div>
   );
 }
 
-function SearchField({
-  value,
-  onChange,
-  onClear,
-}: {
-  value: string;
-  onChange: (next: string) => void;
-  onClear: () => void;
-}) {
+function FilterPill({ icon, label }: { icon: string; label: string }) {
   return (
-    <div className="relative">
-      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">
-        <Icon name="search" size={22} />
-      </span>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="ค้นหาร้านที่ต้องการ…"
-        aria-label="ค้นหาร้าน"
-        className="w-full h-12 sm:h-14 pl-12 pr-11 rounded-full bg-surface-container-lowest border border-outline-variant shadow-sm text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-colors"
-      />
-      {value ? (
-        <button
-          type="button"
-          onClick={onClear}
-          aria-label="ล้างการค้นหา"
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
-        >
-          <Icon name="close" size={18} />
-        </button>
-      ) : null}
-    </div>
+    <span className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-primary/10 text-primary text-label-sm font-medium">
+      <Icon name={icon} size={14} />
+      {label}
+    </span>
   );
 }
 
@@ -195,57 +288,33 @@ function FilterChip({
   );
 }
 
-function CategorySection({
-  category,
-  shops,
+function NoResults({
+  query,
+  location,
 }: {
-  category: { id: string; name: string; icon: string | null };
-  shops: DiscoveryShop[];
+  query: string;
+  location: LocationValue | null;
 }) {
-  return (
-    <section aria-labelledby={`cat-${category.id}`}>
-      <header className="flex items-center gap-3 mb-4">
-        <span className="w-10 h-10 rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15 flex items-center justify-center shrink-0">
-          <Icon name={category.icon ?? "category"} />
-        </span>
-        <h2
-          id={`cat-${category.id}`}
-          className="font-display text-headline-md text-on-background"
-        >
-          {category.name}
-        </h2>
-        <span className="text-label-md text-on-surface-variant">
-          ({shops.length} ร้าน)
-        </span>
-      </header>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
-        {shops.map((shop) => (
-          <PublicShopCard
-            key={shop.id}
-            id={shop.id}
-            name={shop.name}
-            description={shop.description}
-            address={shop.address}
-            categoryIcon={category.icon}
-            openState={shop.openState}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
+  const q = query.trim();
+  const where = location ? locationLabel(location) : null;
 
-function NoResults({ query }: { query: string }) {
+  const message =
+    q && where
+      ? `ไม่พบ “${q}” ในพื้นที่ ${where}`
+      : q
+        ? `ไม่พบร้านที่ตรงกับ “${q}”`
+        : where
+          ? `ยังไม่มีร้านในพื้นที่ ${where}`
+          : "ไม่พบร้าน";
+
   return (
     <div className="bg-surface-container-lowest border border-dashed border-outline-variant rounded-xl p-12 text-center max-w-2xl mx-auto">
       <div className="w-16 h-16 mx-auto rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant mb-4">
         <Icon name="search_off" size={32} />
       </div>
-      <p className="text-body-md text-on-surface">
-        ไม่พบร้านที่ตรงกับ “{query.trim()}”
-      </p>
+      <p className="text-body-md text-on-surface">{message}</p>
       <p className="text-label-md text-on-surface-variant mt-1">
-        ลองค้นด้วยคำอื่น หรือเลือกหมวดหมู่ด้านบน
+        ลองเปลี่ยนพื้นที่ คำค้น หรือเลือกหมวดหมู่ด้านบน
       </p>
     </div>
   );

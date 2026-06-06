@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createBooking } from "@/lib/services/bookings";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 
 export type CreateBookingState =
   | {
@@ -35,6 +36,16 @@ export async function createBookingAction(
   const slotTime = String(formData.get("slotTime") ?? "");
   const customerName = String(formData.get("customerName") ?? "");
   const customerPhone = String(formData.get("customerPhone") ?? "");
+
+  // Rate limit per client IP: anonymous/public endpoint, so cap booking spam.
+  const ip = await getClientIp();
+  if (!(await checkRateLimit(`book:${ip}`, 10, 600))) {
+    return {
+      ok: false,
+      code: "rate_limited",
+      message: "คำขอถี่เกินไป กรุณาลองใหม่อีกครั้งในภายหลัง",
+    };
+  }
 
   const result = await createBooking({
     shopId,

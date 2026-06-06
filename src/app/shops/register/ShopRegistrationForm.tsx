@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
+import { LocationSearchPicker } from "@/components/ui/LocationSearchPicker";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Icon } from "@/components/ui/Icon";
 import { registerShop, type RegisterShopState } from "./actions";
@@ -75,6 +76,13 @@ export function ShopRegistrationForm({
           placeholder="ระบุที่อยู่หรือชื่ออาคาร / ห้าง"
           iconLeft={<Icon name="location_on" />}
           errorText={errors?.address}
+          disabled={pending}
+        />
+        <LocationSearchPicker
+          required
+          provinceError={errors?.province}
+          districtError={errors?.district}
+          subdistrictError={errors?.subdistrict}
           disabled={pending}
         />
         <PhoneInput

@@ -3,7 +3,6 @@ import { Icon } from "@/components/ui/Icon";
 import { ShopDiscovery } from "@/components/booking/ShopDiscovery";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingHero } from "@/components/landing/LandingHero";
-import { FeaturedQueue } from "@/components/landing/FeaturedQueue";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { listPublicShopsByCategory } from "@/lib/services/shops";
@@ -19,21 +18,46 @@ export const metadata = {
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[] }>;
+  searchParams: Promise<{
+    q?: string | string[];
+    cat?: string | string[];
+    province?: string | string[];
+    district?: string | string[];
+    subdistrict?: string | string[];
+  }>;
 }) {
   const [groups, params] = await Promise.all([
     listPublicShopsByCategory(),
     searchParams,
   ]);
 
-  const initialQuery = Array.isArray(params.q) ? params.q[0] : params.q ?? "";
+  const first = (v?: string | string[]) => (Array.isArray(v) ? v[0] : v ?? "");
+  const initialQuery = first(params.q);
+  const initialCategoryId = first(params.cat);
+  const initialProvince = first(params.province);
+  const initialDistrict = first(params.district);
+  const initialSubdistrict = first(params.subdistrict);
   const shopCount = groups.reduce((sum, g) => sum + g.shops.length, 0);
+  const categories = groups.map((g) => g.category);
+
+  const areaLabel = initialSubdistrict
+    ? `${initialSubdistrict}, ${initialDistrict}, ${initialProvince}`
+    : initialDistrict
+      ? `${initialDistrict}, ${initialProvince}`
+      : initialProvince;
+  const sectionTitle = initialProvince ? `ร้านใน ${areaLabel}` : "ร้านใกล้คุณ";
 
   return (
     <main className="min-h-screen flex flex-col bg-background">
       <LandingNav />
-      <LandingHero shopCount={shopCount} categoryCount={groups.length} />
-      <FeaturedQueue />
+      <LandingHero
+        shopCount={shopCount}
+        categoryCount={groups.length}
+        categories={categories}
+        initialProvince={initialProvince}
+        initialDistrict={initialDistrict}
+        initialSubdistrict={initialSubdistrict}
+      />
 
       {/* Real, bookable shops — the hero search + category pills jump here */}
       <section
@@ -42,7 +66,7 @@ export default async function HomePage({
       >
         <div className="mb-6">
           <h2 className="font-headline font-semibold text-[24px] sm:text-[30px] tracking-tight text-on-background">
-            ร้านใกล้คุณ
+            {sectionTitle}
           </h2>
           <p className="text-body-sm text-on-surface-variant mt-1">
             เลือกร้าน เช็กคิว แล้วจองได้ในไม่กี่วินาที
@@ -56,7 +80,15 @@ export default async function HomePage({
             <EmptyState />
           </div>
         ) : (
-          <ShopDiscovery groups={groups} initialQuery={initialQuery} />
+          <ShopDiscovery
+            key={`${initialProvince}|${initialDistrict}|${initialSubdistrict}|${initialQuery}|${initialCategoryId}`}
+            groups={groups}
+            initialQuery={initialQuery}
+            initialCategoryId={initialCategoryId}
+            initialProvince={initialProvince}
+            initialDistrict={initialDistrict}
+            initialSubdistrict={initialSubdistrict}
+          />
         )}
       </div>
 

@@ -10,6 +10,7 @@ import {
   createOrSetCustomerPin,
   verifyCustomerPin,
 } from "@/lib/services/customers";
+import { checkRateLimits, getClientIp } from "@/lib/security/rate-limit";
 
 export type PinFormState =
   | {
@@ -46,6 +47,22 @@ export async function setupCustomerPin(
   }
   if (fieldErrors.pin || fieldErrors.pinConfirm) {
     return { ok: false, message: "กรอกข้อมูลไม่ถูกต้อง", fieldErrors };
+  }
+
+  // Throttle account creation: per-phone caps how often a PIN can be set for one
+  // number (anti-squatting / pre-takeover of the phone identity), per-IP caps
+  // bulk customer-row creation across many numbers.
+  const setupIp = await getClientIp();
+  if (
+    !(await checkRateLimits([
+      { bucket: `custpinsetup:phone:${intent.phone}`, limit: 5, windowSeconds: 3600 },
+      { bucket: `custpinsetup:ip:${setupIp}`, limit: 15, windowSeconds: 3600 },
+    ]))
+  ) {
+    return {
+      ok: false,
+      message: "ดำเนินการถี่เกินไป กรุณาลองใหม่อีกครั้งในภายหลัง",
+    };
   }
 
   const result = await createOrSetCustomerPin(intent.phone, pin);
@@ -89,8 +106,31 @@ export async function verifyCustomerPinAction(
     };
   }
 
+  // Throttle PIN guessing: per-phone is the strong key (not header-rotatable),
+  // per-IP is defence-in-depth. The atomic lockout is the deterministic ceiling;
+  // this caps the rate before it.
+  const verifyIp = await getClientIp();
+  if (
+    !(await checkRateLimits([
+      { bucket: `custpin:phone:${intent.phone}`, limit: 10, windowSeconds: 600 },
+      { bucket: `custpin:ip:${verifyIp}`, limit: 30, windowSeconds: 600 },
+    ]))
+  ) {
+    return {
+      ok: false,
+      message: "ลองกรอก PIN ถี่เกินไป กรุณาลองใหม่อีกครั้งในภายหลัง",
+    };
+  }
+
   const result = await verifyCustomerPin(intent.phone, pin);
   if (!result.ok) {
+    if (result.code === "locked") {
+      return {
+        ok: false,
+        message: result.message,
+        fieldErrors: { pin: result.message },
+      };
+    }
     return {
       ok: false,
       message: "รหัส PIN ไม่ถูกต้อง",

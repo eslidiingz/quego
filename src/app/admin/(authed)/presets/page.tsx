@@ -11,7 +11,7 @@ import { PresetsManager } from "./PresetsManager";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "บริการ preset · LuxeQueue Admin",
+  title: "บริการ preset · queva Admin",
 };
 
 type SearchParams = Promise<{ category?: string }>;
@@ -31,10 +31,13 @@ export default async function PresetsPage({
     .order("name", { ascending: true });
 
   if (error) {
+    // Log the real DB detail server-side; keep the rendered message generic so
+    // schema/constraint names aren't leaked into the page.
+    console.error("PresetsPage: shop_categories load error:", error);
     return (
       <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full">
         <div className="rounded-lg border border-error/30 bg-error-container/30 text-error px-4 py-3">
-          โหลดข้อมูลหมวดหมู่ไม่สำเร็จ: {error.message}
+          โหลดข้อมูลหมวดหมู่ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง
         </div>
       </div>
     );

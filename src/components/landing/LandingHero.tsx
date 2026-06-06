@@ -3,16 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
+import {
+  LocationCombobox,
+  type LocationValue,
+} from "@/components/ui/LocationCombobox";
 
 type HeroStat = { num: string; label: string };
 
-const CATEGORY_PILLS: { label: string; icon: string }[] = [
-  { label: "ตัดผม", icon: "content_cut" },
-  { label: "แฮร์ซาลอน", icon: "cut" },
-  { label: "นวด", icon: "spa" },
-  { label: "สปา", icon: "self_improvement" },
-  { label: "ทำเล็บ", icon: "back_hand" },
-];
+export type HeroCategory = { id: string; name: string; icon: string | null };
 
 /**
  * queva landing hero — teal gradient, headline, and a search affordance that
@@ -27,12 +25,31 @@ const CATEGORY_PILLS: { label: string; icon: string }[] = [
 export function LandingHero({
   shopCount,
   categoryCount,
+  categories = [],
+  initialProvince = "",
+  initialDistrict = "",
+  initialSubdistrict = "",
 }: {
   shopCount: number;
   categoryCount: number;
+  /** Real bookable categories for the quick-jump pills (navigate to ?cat=). */
+  categories?: HeroCategory[];
+  /** Seed the location field from the URL so a reload keeps the chosen area. */
+  initialProvince?: string;
+  initialDistrict?: string;
+  initialSubdistrict?: string;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [location, setLocation] = useState<LocationValue | null>(
+    initialProvince
+      ? {
+          province: initialProvince,
+          district: initialDistrict || null,
+          subdistrict: initialSubdistrict || null,
+        }
+      : null,
+  );
 
   const stats: HeroStat[] = [
     { num: shopCount > 0 ? `${shopCount}` : "—", label: "ร้านพร้อมให้จอง" },
@@ -42,8 +59,27 @@ export function LandingHero({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const params = new URLSearchParams();
+    if (location) {
+      params.set("province", location.province);
+      if (location.district) params.set("district", location.district);
+      if (location.subdistrict) params.set("subdistrict", location.subdistrict);
+    }
     const q = query.trim();
-    router.push(q ? `/?q=${encodeURIComponent(q)}#shops` : "/#shops");
+    if (q) params.set("q", q);
+    const qs = params.toString();
+    router.push(qs ? `/?${qs}#shops` : "/#shops");
+  }
+
+  function goToCategory(categoryId: string) {
+    const params = new URLSearchParams();
+    if (location) {
+      params.set("province", location.province);
+      if (location.district) params.set("district", location.district);
+      if (location.subdistrict) params.set("subdistrict", location.subdistrict);
+    }
+    params.set("cat", categoryId);
+    router.push(`/?${params.toString()}#shops`);
   }
 
   return (
@@ -74,23 +110,40 @@ export function LandingHero({
           ตอนใกล้ถึงคิวของคุณ
         </p>
 
-        {/* Search — seeds the real discovery filter below */}
+        {/* Search — location + service, seeds the real discovery filter below */}
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="queva-reveal flex flex-col sm:flex-row sm:items-center gap-2 bg-surface rounded-2xl sm:rounded-full p-2 sm:pl-6 max-w-[640px] shadow-luxury"
+          className="queva-reveal flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 bg-surface rounded-2xl sm:rounded-full p-2 sm:pl-5 max-w-[680px] shadow-luxury"
         >
-          <div className="flex items-center gap-2.5 flex-1 text-on-surface px-2 sm:px-0">
+          {/* Location (จังหวัด / เขต-อำเภอ) */}
+          <div className="flex-1 sm:basis-[42%] sm:min-w-0 px-1">
+            <LocationCombobox
+              variant="bare"
+              value={location}
+              onChange={setLocation}
+              placeholder="ตำบล เขต/อำเภอ หรือจังหวัด"
+              ariaLabel="เลือกพื้นที่ที่ต้องการค้นหา"
+            />
+          </div>
+
+          {/* Divider: horizontal on mobile, vertical on desktop */}
+          <div className="h-px bg-outline-variant/70 mx-2 sm:hidden" />
+          <div className="hidden sm:block w-px self-stretch bg-outline-variant/70 my-2" />
+
+          {/* Service / shop free-text */}
+          <div className="flex items-center gap-2.5 flex-1 sm:min-w-0 text-on-surface px-2 sm:px-1">
             <Icon name="search" size={20} className="text-primary shrink-0" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="ค้นหาร้าน บริการ หรือย่านที่ต้องการ"
+              placeholder="ร้าน หรือบริการที่ต้องการ"
               aria-label="ค้นหาร้านหรือบริการ"
               className="w-full bg-transparent border-none outline-none text-body-md text-on-surface placeholder:text-on-surface-variant py-2.5 sm:py-3"
             />
           </div>
+
           <button
             type="submit"
             className="inline-flex items-center justify-center gap-2 shrink-0 rounded-full bg-secondary text-on-secondary font-medium text-label-lg px-7 py-3 shadow-coral-glow hover:bg-secondary-fixed-variant active:scale-[0.98] transition-all"
@@ -100,23 +153,22 @@ export function LandingHero({
           </button>
         </form>
 
-        {/* Category quick-jumps */}
-        <div className="queva-reveal flex flex-wrap gap-2.5 mt-6">
-          {CATEGORY_PILLS.map((c, i) => (
-            <a
-              key={c.label}
-              href="#shops"
-              className={`inline-flex items-center gap-2 text-label-lg font-medium px-4 py-2 rounded-full border transition-all active:scale-95 ${
-                i === 0
-                  ? "bg-surface text-primary border-surface"
-                  : "bg-white/10 text-on-primary border-white/20 hover:bg-white/20"
-              }`}
-            >
-              <Icon name={c.icon} size={18} />
-              {c.label}
-            </a>
-          ))}
-        </div>
+        {/* Category quick-jumps — real bookable categories that filter below */}
+        {categories.length > 0 ? (
+          <div className="queva-reveal flex flex-wrap gap-2.5 mt-6">
+            {categories.slice(0, 6).map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => goToCategory(c.id)}
+                className="inline-flex items-center gap-2 text-label-lg font-medium px-4 py-2 rounded-full border bg-white/10 text-on-primary border-white/20 hover:bg-white/20 transition-all active:scale-95"
+              >
+                <Icon name={c.icon ?? "category"} size={18} />
+                {c.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         {/* Stats */}
         <dl className="queva-reveal flex flex-wrap gap-x-9 gap-y-4 mt-10">

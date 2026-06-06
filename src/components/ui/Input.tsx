@@ -57,7 +57,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             aria-required={required || undefined}
             className={cn(
               "w-full h-12 rounded-lg bg-surface-container-low text-on-surface placeholder:text-outline text-body-md transition-all",
-              "border-2 border-transparent focus:bg-surface-container-lowest focus:border-secondary focus:outline-none",
+              "border-2 border-transparent focus:bg-surface-container-lowest focus:border-primary focus:outline-none",
               iconLeft ? "pl-12 pr-4" : "px-4",
               iconRight ? "pr-12" : undefined,
               invalid && "border-error focus:border-error",

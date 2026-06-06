@@ -11,6 +11,7 @@ import {
   createShopSession,
   getShopLoginIntent,
 } from "@/lib/auth/shop-session-server";
+import { checkRateLimits, getClientIp } from "@/lib/security/rate-limit";
 
 export type PinFormState =
   | { ok: false; message: string; fieldErrors?: { pin?: string; confirmPin?: string } }
@@ -43,6 +44,21 @@ export async function setupShopPin(
   }
   if (fieldErrors.pin || fieldErrors.confirmPin) {
     return { ok: false, message: "กรอกข้อมูลไม่ถูกต้อง", fieldErrors };
+  }
+
+  // Throttle PIN setup per shop + per IP (the login-intent cookie alone shouldn't
+  // grant unlimited write attempts to the shop's pin_hash).
+  const setupIp = await getClientIp();
+  if (
+    !(await checkRateLimits([
+      { bucket: `shoppinsetup:shop:${intent.shopId}`, limit: 5, windowSeconds: 3600 },
+      { bucket: `shoppinsetup:ip:${setupIp}`, limit: 15, windowSeconds: 3600 },
+    ]))
+  ) {
+    return {
+      ok: false,
+      message: "ดำเนินการถี่เกินไป กรุณาลองใหม่อีกครั้งในภายหลัง",
+    };
   }
 
   const result = await setShopPin(intent.shopId, pin);
@@ -93,8 +109,29 @@ export async function verifyShopPinAction(
     };
   }
 
+  // Throttle PIN guessing per shop + per IP, ahead of the atomic lockout ceiling.
+  const verifyIp = await getClientIp();
+  if (
+    !(await checkRateLimits([
+      { bucket: `shoppin:shop:${intent.shopId}`, limit: 10, windowSeconds: 600 },
+      { bucket: `shoppin:ip:${verifyIp}`, limit: 30, windowSeconds: 600 },
+    ]))
+  ) {
+    return {
+      ok: false,
+      message: "ลองกรอก PIN ถี่เกินไป กรุณาลองใหม่อีกครั้งในภายหลัง",
+    };
+  }
+
   const result = await verifyShopPin(intent.shopId, pin);
   if (!result.ok) {
+    if (result.code === "locked") {
+      return {
+        ok: false,
+        message: result.message,
+        fieldErrors: { pin: result.message },
+      };
+    }
     return {
       ok: false,
       message: "รหัส PIN ไม่ถูกต้อง",

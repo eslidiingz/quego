@@ -8,7 +8,7 @@ import { changeCustomerPinAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "โปรไฟล์ของฉัน · LuxeQueue",
+  title: "โปรไฟล์ของฉัน · queva",
 };
 
 export default async function CustomerProfilePage() {

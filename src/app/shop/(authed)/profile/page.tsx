@@ -12,7 +12,7 @@ import { changeShopPinAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "ข้อมูลร้าน · LuxeQueue",
+  title: "ข้อมูลร้าน · queva",
 };
 
 export default async function ShopProfilePage() {

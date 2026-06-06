@@ -50,7 +50,7 @@ export function LoginForm({ next }: { next?: string }) {
         type="submit"
         size="xl"
         fullWidth
-        rounded="lg"
+        rounded="full"
         disabled={pending}
         iconRight={pending ? <Icon name="progress_activity" className="animate-spin" /> : <Icon name="login" />}
       >
