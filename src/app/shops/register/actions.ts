@@ -45,6 +45,14 @@ export async function registerShop(
         fieldErrors: { categoryId: result.message },
       };
     }
+    if (result.code === "duplicate") {
+      // Surface the clash at the phone field so the owner can correct it inline.
+      return {
+        ok: false,
+        message: result.message,
+        fieldErrors: { ownerPhone: result.message },
+      };
+    }
     return { ok: false, message: result.message };
   }
 

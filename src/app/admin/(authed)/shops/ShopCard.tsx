@@ -45,7 +45,12 @@ export function ShopApplicationCard({
   const canImpersonate = shop.status === "approved";
 
   return (
-    <article className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm hover:shadow-tinted transition-shadow space-y-4">
+    <article
+      id={`shop-${shop.id}`}
+      // Deep-link target from the admin bell: `?status=pending#shop-<id>`
+      // scrolls here (offset for the sticky header) and briefly rings the card.
+      className="scroll-mt-24 target:ring-2 target:ring-primary target:ring-offset-2 target:ring-offset-background bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm hover:shadow-tinted transition-shadow space-y-4"
+    >
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
