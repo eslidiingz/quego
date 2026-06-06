@@ -298,8 +298,8 @@ export function BookingForm({
               {capableStaff.map((member) => (
                 <StaffCard
                   key={member.id}
-                  name={member.nickname || member.name}
-                  subtitle={member.nickname ? member.name : undefined}
+                  name={member.name}
+                  subtitle={member.role ?? undefined}
                   icon="person"
                   selected={selectedStaffId === member.id}
                   onClick={() => handleSelectStaff(member.id)}
@@ -611,7 +611,7 @@ function DateChip({
       {!selected ? (
         <span
           className={cn(
-            "text-[10px] uppercase tracking-widest font-bold mt-1",
+            "text-label-sm uppercase tracking-widest font-bold mt-1",
             day.status === "closed" && "text-on-surface-variant/60",
             day.status === "full" && "text-error",
             day.status === "available" && "text-primary/70",

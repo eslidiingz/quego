@@ -1,120 +1,153 @@
 @import "tailwindcss";
 
 /* =========================================================================
-   Aura Queue / LuxeQueue — Design Tokens
-   Modern-luxury palette, anchored by Deep Teal + Metallic Gold + Deep Purple.
+   queva — Design Tokens
+   Brand CI: Deep Teal (primary) + Warm Coral (accent/CTA) + Soft Gold (premium).
+   Surfaces on Cloud, text in Ink. Roles are Material-3 style so a single
+   swap here re-skins the whole app.
    ========================================================================= */
 @theme {
   /* ---------- Colors: Material 3 style tonal roles ---------- */
-  --color-background: #f8f9fa;
-  --color-on-background: #191c1d;
+  /* Cloud background, Ink text */
+  --color-background: #f4f6f5;
+  --color-on-background: #14302c;
 
-  --color-surface: #f8f9fa;
-  --color-surface-dim: #d9dadb;
-  --color-surface-bright: #f8f9fa;
+  --color-surface: #ffffff;
+  --color-surface-dim: #e2e7e5;
+  --color-surface-bright: #ffffff;
   --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f3f4f5;
-  --color-surface-container: #edeeef;
-  --color-surface-container-high: #e7e8e9;
-  --color-surface-container-highest: #e1e3e4;
-  --color-surface-variant: #e1e3e4;
-  --color-surface-tint: #156874;
+  --color-surface-container-low: #f4f6f5;
+  --color-surface-container: #eef2f0;
+  --color-surface-container-high: #e8efed;
+  --color-surface-container-highest: #e2e9e6;
+  --color-surface-variant: #e8efed;
+  --color-surface-tint: #0f766e;
 
-  --color-on-surface: #191c1d;
-  --color-on-surface-variant: #3f484a;
-  --color-inverse-surface: #2e3132;
-  --color-inverse-on-surface: #f0f1f2;
+  --color-on-surface: #14302c;
+  --color-on-surface-variant: #5c726c;
+  --color-inverse-surface: #14302c;
+  --color-inverse-on-surface: #f4f6f5;
 
-  --color-outline: #6f797b;
-  --color-outline-variant: #bec8ca;
+  --color-outline: #8a9b95;
+  --color-outline-variant: #d5deda;
 
-  /* Primary — Deep Teal */
-  --color-primary: #00464f;
+  /* Primary — Deep Teal (#0F766E) */
+  --color-primary: #0f766e;
   --color-on-primary: #ffffff;
-  --color-primary-container: #005f6b;
-  --color-on-primary-container: #90d6e4;
-  --color-inverse-primary: #8bd2df;
-  --color-primary-fixed: #a7eefc;
-  --color-primary-fixed-dim: #8bd2df;
-  --color-on-primary-fixed: #001f24;
-  --color-on-primary-fixed-variant: #004e59;
+  --color-primary-container: #0b5a54;
+  --color-on-primary-container: #c9f0e4;
+  --color-inverse-primary: #9fe1cb;
+  --color-primary-fixed: #c9f0e4;
+  --color-primary-fixed-dim: #9fe1cb;
+  --color-on-primary-fixed: #07312d;
+  --color-on-primary-fixed-variant: #0b5a54;
 
-  /* Secondary — Metallic Gold */
-  --color-secondary: #775a19;
+  /* Secondary — Warm Coral (#F97362) · accent / primary CTA */
+  --color-secondary: #f97362;
   --color-on-secondary: #ffffff;
-  --color-secondary-container: #fed488;
-  --color-on-secondary-container: #785a1a;
-  --color-secondary-fixed: #ffdea5;
-  --color-secondary-fixed-dim: #e9c176;
-  --color-on-secondary-fixed: #261900;
-  --color-on-secondary-fixed-variant: #5d4201;
+  --color-secondary-container: #ffdad2;
+  --color-on-secondary-container: #5a1a10;
+  --color-secondary-fixed: #ffdad2;
+  --color-secondary-fixed-dim: #f9a99d;
+  --color-on-secondary-fixed: #3a0e07;
+  --color-on-secondary-fixed-variant: #e0563f;
 
-  /* Tertiary — Deep Purple */
-  --color-tertiary: #5e009f;
+  /* Tertiary — Soft Gold · premium / VIP. Token value is the text-safe gold
+     (#C9912F); the lighter #E8B864 brand swatch lives in tertiary-fixed-dim. */
+  --color-tertiary: #c9912f;
   --color-on-tertiary: #ffffff;
-  --color-tertiary-container: #7829bc;
-  --color-on-tertiary-container: #e1bdff;
-  --color-tertiary-fixed: #f1dbff;
-  --color-tertiary-fixed-dim: #deb7ff;
-  --color-on-tertiary-fixed: #2d0050;
-  --color-on-tertiary-fixed-variant: #680eac;
+  --color-tertiary-container: #fae2b0;
+  --color-on-tertiary-container: #4a3306;
+  --color-tertiary-fixed: #f7e6c0;
+  --color-tertiary-fixed-dim: #e8b864;
+  --color-on-tertiary-fixed: #2a1c00;
+  --color-on-tertiary-fixed-variant: #8a6312;
 
   /* Status */
   --color-error: #ba1a1a;
   --color-on-error: #ffffff;
   --color-error-container: #ffdad6;
   --color-on-error-container: #93000a;
-  --color-success: #2ecc71;
+  --color-success: #1d9e75;
   --color-on-success: #ffffff;
-  --color-success-container: #b8f3c2;
+  --color-success-container: #c6f0de;
   --color-on-success-container: #00210d;
 
   /* ---------- Typography ---------- */
-  /* IBM Plex Sans Thai — single family for body and display. Weights drive hierarchy. */
-  --font-display: var(--font-plex-thai), "IBM Plex Sans Thai", system-ui, sans-serif;
-  --font-headline: var(--font-plex-thai), "IBM Plex Sans Thai", system-ui, sans-serif;
-  --font-body: var(--font-plex-thai), "IBM Plex Sans Thai", system-ui, sans-serif;
-  --font-sans: var(--font-plex-thai), "IBM Plex Sans Thai", system-ui, sans-serif;
+  /* queva: Sora leads display (Latin/numerals) with Anuphan as the Thai
+     fallback; Anuphan carries all prose + Thai headings. */
+  --font-display: var(--font-sora), var(--font-anuphan), "Anuphan", system-ui, sans-serif;
+  --font-headline: var(--font-anuphan), "Anuphan", system-ui, sans-serif;
+  --font-body: var(--font-anuphan), "Anuphan", system-ui, sans-serif;
+  --font-sans: var(--font-anuphan), "Anuphan", system-ui, sans-serif;
 
-  --text-display-lg: 48px;
-  --text-display-lg--line-height: 56px;
-  --text-display-lg--letter-spacing: -0.02em;
+  /* Display — ตัวเลขเด่น/หัวข้อใหญ่ */
+  --text-display-lg: 30px;
+  --text-display-lg--line-height: 42px;
+  --text-display-lg--letter-spacing: -0.01em;
   --text-display-lg--font-weight: 700;
 
-  --text-display-lg-mobile: 32px;
-  --text-display-lg-mobile--line-height: 40px;
+  --text-display-lg-mobile: 30px;
+  --text-display-lg-mobile--line-height: 42px;
   --text-display-lg-mobile--letter-spacing: -0.01em;
   --text-display-lg-mobile--font-weight: 700;
 
-  --text-headline-lg: 32px;
-  --text-headline-lg--line-height: 40px;
+  /* Display SM — ตัวเลขสถิติ/ตัวเลขเด่นรอง */
+  --text-display-sm: 26px;
+  --text-display-sm--line-height: 32px;
+  --text-display-sm--letter-spacing: -0.01em;
+  --text-display-sm--font-weight: 700;
+
+  /* Heading 1 — ชื่อหน้าหลัก */
+  --text-headline-lg: 22px;
+  --text-headline-lg--line-height: 32px;
   --text-headline-lg--font-weight: 600;
 
-  --text-headline-lg-mobile: 24px;
+  --text-headline-lg-mobile: 22px;
   --text-headline-lg-mobile--line-height: 32px;
   --text-headline-lg-mobile--font-weight: 600;
 
-  --text-headline-md: 24px;
-  --text-headline-md--line-height: 32px;
-  --text-headline-md--font-weight: 600;
+  /* Heading 2 — หัวข้อการ์ด/เมนู */
+  --text-headline-md: 18px;
+  --text-headline-md--line-height: 26px;
+  --text-headline-md--font-weight: 500;
 
-  --text-body-lg: 18px;
-  --text-body-lg--line-height: 28px;
+  /* Heading 3 — หัวข้อย่อย/ตัวเลขเวลา (compact, SemiBold ให้เด่นในขนาดเล็ก) */
+  --text-headline-sm: 16px;
+  --text-headline-sm--line-height: 24px;
+  --text-headline-sm--font-weight: 600;
+
+  /* Body — เนื้อหาหลัก */
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
   --text-body-lg--font-weight: 400;
 
   --text-body-md: 16px;
   --text-body-md--line-height: 24px;
   --text-body-md--font-weight: 400;
 
+  /* Body SM — คำอธิบายสั้น/ข้อความรอง */
+  --text-body-sm: 15px;
+  --text-body-sm--line-height: 24px;
+  --text-body-sm--font-weight: 400;
+
+  /* Label LG — ป้ายปุ่ม CTA/หัวข้อแจ้งเตือน (SemiBold) */
+  --text-label-lg: 15px;
+  --text-label-lg--line-height: 20px;
+  --text-label-lg--letter-spacing: 0.01em;
+  --text-label-lg--font-weight: 600;
+
+  /* Label — แจ้งเตือน/ข้อความผิดพลาด/ป้ายกำกับ (Medium ช่วยแยกแยะตัวอักษรไทยบนจอเล็ก) */
   --text-label-md: 14px;
   --text-label-md--line-height: 20px;
   --text-label-md--letter-spacing: 0.01em;
   --text-label-md--font-weight: 500;
 
+  /* Caption — ตัวกำกับ/เมนูด้านล่าง */
   --text-label-sm: 12px;
-  --text-label-sm--line-height: 16px;
+  --text-label-sm--line-height: 18px;
   --text-label-sm--letter-spacing: 0.05em;
-  --text-label-sm--font-weight: 600;
+  --text-label-sm--font-weight: 500;
 
   /* ---------- Spacing scale (additive to Tailwind defaults) ---------- */
   --spacing-base: 8px;
@@ -135,7 +168,8 @@
   /* ---------- Shadows ---------- */
   --shadow-tinted: 0 8px 24px -8px color-mix(in oklab, var(--color-primary) 18%, transparent);
   --shadow-luxury: 0 20px 40px -16px color-mix(in oklab, var(--color-primary) 22%, transparent);
-  --shadow-gold-glow: 0 0 20px color-mix(in oklab, var(--color-secondary) 18%, transparent);
+  --shadow-gold-glow: 0 0 20px color-mix(in oklab, var(--color-tertiary) 22%, transparent);
+  --shadow-coral-glow: 0 8px 22px color-mix(in oklab, var(--color-secondary) 38%, transparent);
 }
 
 /* Gradients used in headers, hero panels, status chips, progress fills */
@@ -143,6 +177,18 @@
   .bg-luxury-gradient {
     background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-container) 100%);
   }
+  /* queva hero: teal gradient with a warm gold glow bleeding from top-right */
+  .bg-queva-hero {
+    background:
+      radial-gradient(120% 120% at 85% -10%, color-mix(in oklab, var(--color-tertiary-fixed-dim) 18%, transparent), transparent 50%),
+      linear-gradient(165deg, var(--color-primary) 0%, var(--color-primary-container) 100%);
+  }
+  .bg-queva-panel {
+    background:
+      radial-gradient(100% 100% at 0% 0%, color-mix(in oklab, var(--color-tertiary-fixed-dim) 22%, transparent), transparent 55%),
+      linear-gradient(150deg, #15706a, var(--color-primary-container));
+  }
+  .shadow-coral-glow { box-shadow: var(--shadow-coral-glow); }
   .bg-progress-gradient {
     background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-secondary) 100%);
   }
@@ -175,6 +221,30 @@
 
 .animate-pulse-subtle {
   animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Live queue dot — coral ring pulse (queva featured card) */
+@keyframes queue-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-secondary) 60%, transparent); }
+  70% { box-shadow: 0 0 0 9px color-mix(in oklab, var(--color-secondary) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-secondary) 0%, transparent); }
+}
+.animate-queue-pulse {
+  animation: queue-pulse 1.6s infinite;
+}
+
+/* Section entrance — subtle rise-in */
+@keyframes queva-rise {
+  to { opacity: 1; transform: none; }
+}
+.queva-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  animation: queva-rise 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .queva-reveal { opacity: 1; transform: none; animation: none; }
+  .animate-queue-pulse { animation: none; }
 }
 
 html, body {

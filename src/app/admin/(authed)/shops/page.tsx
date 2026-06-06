@@ -11,7 +11,7 @@ import { StatusTabs, type TabKey } from "./StatusTabs";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "จัดการร้าน · LuxeQueue Admin",
+  title: "จัดการร้าน · queva Admin",
 };
 
 const VALID_STATUSES: Record<ShopStatus, true> = {

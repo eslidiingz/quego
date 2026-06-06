@@ -3,7 +3,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 
 export const metadata = {
-  title: "ส่งใบสมัครสำเร็จ · LuxeQueue",
+  title: "ส่งใบสมัครสำเร็จ · queva",
 };
 
 type SearchParams = Promise<{ id?: string }>;

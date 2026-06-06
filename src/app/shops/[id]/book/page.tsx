@@ -14,9 +14,9 @@ type RouteParams = Promise<{ id: string }>;
 export async function generateMetadata({ params }: { params: RouteParams }) {
   const { id } = await params;
   const ctx = await getBookingContext(id);
-  if (!ctx) return { title: "จองคิว · LuxeQueue" };
+  if (!ctx) return { title: "จองคิว · queva" };
   return {
-    title: `จองคิวร้าน ${ctx.shop.name} · LuxeQueue`,
+    title: `จองคิวร้าน ${ctx.shop.name} · queva`,
   };
 }
 
@@ -123,7 +123,7 @@ function SiteHeader() {
         <Link href="/" className="flex items-center gap-2">
           <Icon name="spa" className="text-primary" size={28} />
           <span className="font-display font-bold text-headline-md text-primary tracking-tight">
-            LuxeQueue
+            queva
           </span>
         </Link>
         <SiteAuthLink />
@@ -136,7 +136,7 @@ function SiteFooter() {
   return (
     <footer className="border-t border-outline-variant bg-surface-container-low mt-auto">
       <div className="max-w-[1280px] mx-auto px-4 md:px-12 py-8 text-center md:text-left text-label-sm text-on-surface-variant">
-        © {new Date().getFullYear()} LuxeQueue Premium Concierge
+        © {new Date().getFullYear()} queva · ไม่ต้องรอเก้อ แค่กดจอง
       </div>
     </footer>
   );

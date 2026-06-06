@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { findApprovedShopByPhone } from "@/lib/services/shops";
 import { setShopLoginIntent } from "@/lib/auth/shop-session-server";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 
 export type StartLoginState =
   | { ok: false; message: string; fieldErrors?: { phone?: string } }
@@ -20,6 +21,13 @@ export async function startShopLogin(
   formData: FormData,
 ): Promise<StartLoginState> {
   const phone = String(formData.get("phone") ?? "").trim();
+
+  // Rate limit per client IP: throttles brute-force PIN attempts and shop
+  // phone-number enumeration (SEC-04) on this public phone-lookup step.
+  const ip = await getClientIp();
+  if (!(await checkRateLimit(`shoplogin:${ip}`, 20, 600))) {
+    return { ok: false, message: "คำขอถี่เกินไป กรุณาลองใหม่อีกครั้งในภายหลัง" };
+  }
 
   if (!phone) {
     return {

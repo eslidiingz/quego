@@ -6,9 +6,9 @@ import { ShopRegistrationForm } from "./ShopRegistrationForm";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "สมัครเป็นร้าน · LuxeQueue",
+  title: "สมัครเป็นร้าน · queva",
   description:
-    "เพิ่มร้านของคุณเข้าสู่ระบบ LuxeQueue เพื่อให้ลูกค้าจองคิวได้สะดวกขึ้น",
+    "เพิ่มร้านของคุณเข้าสู่ระบบ queva เพื่อให้ลูกค้าจองคิวได้สะดวกขึ้น",
 };
 
 export default async function ShopRegisterPage() {
@@ -22,7 +22,7 @@ export default async function ShopRegisterPage() {
           <Link href="/" className="flex items-center gap-2">
             <Icon name="spa" className="text-primary" size={28} />
             <span className="font-display font-bold text-headline-md text-primary tracking-tight">
-              LuxeQueue
+              queva
             </span>
           </Link>
           <Link
@@ -41,7 +41,7 @@ export default async function ShopRegisterPage() {
             สำหรับร้าน
           </span>
           <h1 className="font-display text-headline-lg text-on-background mb-2">
-            สมัครเป็นร้านใน LuxeQueue
+            สมัครเป็นร้านใน queva
           </h1>
           <p className="text-body-md text-on-surface-variant max-w-xl mx-auto">
             กรอกข้อมูลด้านล่างเพื่อให้ทีมงานตรวจสอบ

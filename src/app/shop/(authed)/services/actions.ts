@@ -7,6 +7,7 @@ import {
   updateService,
   setServiceActive,
   deleteService,
+  deleteAllServices,
   createServicesFromPresets,
 } from "@/lib/services/services";
 import { getShopCategoryRef } from "@/lib/services/shops";
@@ -94,6 +95,13 @@ export async function setServiceActiveAction(
 export async function deleteServiceAction(serviceId: string): Promise<void> {
   const session = await requireShopSession();
   const result = await deleteService(session.shopId, serviceId);
+  if (!result.ok) throw new Error(result.message);
+  revalidateServiceSurfaces(session.shopId);
+}
+
+export async function deleteAllServicesAction(): Promise<void> {
+  const session = await requireShopSession();
+  const result = await deleteAllServices(session.shopId);
   if (!result.ok) throw new Error(result.message);
   revalidateServiceSurfaces(session.shopId);
 }

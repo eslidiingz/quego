@@ -106,6 +106,7 @@ export async function getShopLoginIntent(): Promise<ShopLoginIntent | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, getSecret(), {
+      algorithms: ["HS256"],
       audience: "shop-login-intent",
     });
     if (typeof payload.shopId === "string" && typeof payload.phone === "string") {

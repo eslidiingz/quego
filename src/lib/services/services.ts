@@ -136,6 +136,53 @@ export async function listActiveServicesByShop(
 }
 
 /**
+ * Active services for *many* shops in one round-trip, grouped by shop id.
+ * The discovery surface (home page) needs each shop's service list to show
+ * service chips + a "from ฿" price and to make services searchable — fetching
+ * them per shop would be N+1, so we batch with a single `shop_id IN (...)`
+ * query and bucket the rows client-side. Shops with no active services simply
+ * don't appear in the returned map (callers default to `[]`).
+ *
+ * Order within each shop mirrors `listActiveServicesByShop` (sort_order, then
+ * created_at) so the first few chips are the shop's headline services.
+ */
+export async function listActiveServicesForShops(
+  shopIds: string[],
+): Promise<Map<string, BookableService[]>> {
+  const byShop = new Map<string, BookableService[]>();
+  if (shopIds.length === 0) return byShop;
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("shop_services")
+    .select("shop_id, id, name, duration_minutes, price")
+    .in("shop_id", shopIds)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error || !data) return byShop;
+
+  for (const r of data as {
+    shop_id: string;
+    id: string;
+    name: string;
+    duration_minutes: number;
+    price: number | string | null;
+  }[]) {
+    const list = byShop.get(r.shop_id) ?? [];
+    list.push({
+      id: r.id,
+      name: r.name,
+      durationMinutes: r.duration_minutes,
+      price: toPrice(r.price),
+    });
+    byShop.set(r.shop_id, list);
+  }
+  return byShop;
+}
+
+/**
  * Look up one active service for booking-time validation. Ownership is
  * enforced by the compound `id + shop_id` filter, and inactive services are
  * excluded so a stale client can't book a service the shop just disabled.
@@ -335,6 +382,20 @@ export async function deleteService(
   if (error) return { ok: false, code: "unknown", message: error.message };
   if (!data) return { ok: false, code: "not_found", message: "ไม่พบบริการนี้" };
   return { ok: true, id: data.id as string };
+}
+
+export async function deleteAllServices(
+  shopId: string,
+): Promise<{ ok: true; deleted: number } | { ok: false; code: string; message: string }> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("shop_services")
+    .delete()
+    .eq("shop_id", shopId)
+    .select("id");
+
+  if (error) return { ok: false, code: "unknown", message: error.message };
+  return { ok: true, deleted: (data ?? []).length };
 }
 
 // ----- Bulk import from category presets ----------------------------------

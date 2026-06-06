@@ -7,7 +7,7 @@ import { BookingCard } from "./BookingCard";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "คิวของฉัน · LuxeQueue",
+  title: "คิวของฉัน · queva",
 };
 
 export default async function MyBookingsPage() {

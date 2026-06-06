@@ -4,11 +4,15 @@ import { extendTailwindMerge } from "tailwind-merge";
 const fontSizeTokens = [
   "display-lg",
   "display-lg-mobile",
+  "display-sm",
   "headline-lg",
   "headline-lg-mobile",
   "headline-md",
+  "headline-sm",
   "body-lg",
   "body-md",
+  "body-sm",
+  "label-lg",
   "label-md",
   "label-sm",
 ];

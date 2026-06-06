@@ -31,7 +31,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           aria-required={required || undefined}
           className={cn(
             "w-full p-4 rounded-lg bg-surface-container-low text-on-surface placeholder:text-outline text-body-md transition-all",
-            "border-2 border-transparent focus:bg-surface-container-lowest focus:border-secondary focus:outline-none",
+            "border-2 border-transparent focus:bg-surface-container-lowest focus:border-primary focus:outline-none",
             invalid && "border-error focus:border-error",
             className,
           )}

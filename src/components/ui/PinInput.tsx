@@ -166,9 +166,9 @@ export function PinInput({
             onPaste={handlePaste}
             onFocus={(e) => e.currentTarget.select()}
             className={cn(
-              "h-14 w-full min-w-0 rounded-lg text-center font-display text-headline-md text-on-surface caret-secondary",
+              "h-14 w-full min-w-0 rounded-lg text-center font-display text-headline-md text-on-surface caret-primary",
               "bg-surface-container-low border-2 border-transparent transition-all",
-              "focus:bg-surface-container-lowest focus:border-secondary focus:outline-none",
+              "focus:bg-surface-container-lowest focus:border-primary focus:outline-none",
               invalid && "border-error focus:border-error",
               disabled && "opacity-60 cursor-not-allowed",
             )}

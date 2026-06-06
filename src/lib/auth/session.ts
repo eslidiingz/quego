@@ -52,7 +52,7 @@ export async function verifySessionToken(
   token: string,
 ): Promise<AdminSession | null> {
   try {
-    const { payload } = await jwtVerify(token, getSecret(), { audience: "admin" });
+    const { payload } = await jwtVerify(token, getSecret(), { algorithms: ["HS256"], audience: "admin" });
     if (
       typeof payload.adminId === "string" &&
       typeof payload.phone === "string" &&
@@ -84,7 +84,7 @@ export async function verifyShopSessionToken(
   token: string,
 ): Promise<ShopSession | null> {
   try {
-    const { payload } = await jwtVerify(token, getSecret(), { audience: "shop" });
+    const { payload } = await jwtVerify(token, getSecret(), { algorithms: ["HS256"], audience: "shop" });
     if (
       typeof payload.shopId === "string" &&
       typeof payload.phone === "string" &&
@@ -123,6 +123,7 @@ export async function verifyCustomerSessionToken(
 ): Promise<CustomerSession | null> {
   try {
     const { payload } = await jwtVerify(token, getSecret(), {
+      algorithms: ["HS256"],
       audience: "customer",
     });
     if (

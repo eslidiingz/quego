@@ -75,7 +75,10 @@ export async function createCategory(
         fieldErrors: { name: "ซ้ำกับหมวดหมู่ที่มีอยู่", slug: "ซ้ำกับหมวดหมู่ที่มีอยู่" },
       };
     }
-    return { ok: false, message: "บันทึกไม่สำเร็จ: " + error.message };
+    // Log the real DB detail server-side; keep the client message generic so
+    // schema/constraint names aren't leaked.
+    console.error("createCategory error:", error);
+    return { ok: false, message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
   }
 
   revalidatePath("/admin/categories");
@@ -115,7 +118,10 @@ export async function updateCategory(
         fieldErrors: { name: "ซ้ำกับหมวดหมู่ที่มีอยู่", slug: "ซ้ำกับหมวดหมู่ที่มีอยู่" },
       };
     }
-    return { ok: false, message: "บันทึกไม่สำเร็จ: " + error.message };
+    // Log the real DB detail server-side; keep the client message generic so
+    // schema/constraint names aren't leaked.
+    console.error("updateCategory error:", error);
+    return { ok: false, message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
   }
 
   revalidatePath("/admin/categories");
@@ -127,7 +133,10 @@ export async function deleteCategory(id: string): Promise<CategoryFormState> {
   const supabase = getSupabaseAdmin();
   const { error } = await supabase.from("shop_categories").delete().eq("id", id);
   if (error) {
-    return { ok: false, message: "ลบไม่สำเร็จ: " + error.message };
+    // Log the real DB detail server-side; keep the client message generic so
+    // schema/constraint names aren't leaked.
+    console.error("deleteCategory error:", error);
+    return { ok: false, message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
   }
   revalidatePath("/admin/categories");
   revalidatePath("/admin");

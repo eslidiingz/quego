@@ -1,6 +1,11 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { lockedMessage } from "@/lib/auth/lockout";
+import {
+  registerFailedAttempt,
+  clearFailedAttempts,
+} from "@/lib/auth/lockout-store";
 import { getBangkokNow } from "@/lib/time/bangkok";
 import {
   DAYS_OF_WEEK,
@@ -9,6 +14,7 @@ import {
 } from "@/lib/services/business-hours";
 import {
   listActiveServicesByShop,
+  listActiveServicesForShops,
   type BookableService,
 } from "@/lib/services/services";
 
@@ -26,6 +32,12 @@ export type CreateShopInput = {
   categoryId: string;
   description?: string;
   address?: string;
+  /** Thai province (จังหวัด), canonical name from the location dataset. */
+  province: string;
+  /** Thai district (เขต/อำเภอ), canonical name belonging to province. */
+  district: string;
+  /** Thai sub-district (แขวง/ตำบล), canonical name belonging to district. */
+  subdistrict: string;
   contactPhone?: string;
   ownerName: string;
   ownerPhone: string;
@@ -47,6 +59,9 @@ export type ShopListItem = {
   contact_phone: string | null;
   description: string | null;
   address: string | null;
+  province: string | null;
+  district: string | null;
+  subdistrict: string | null;
   rejection_reason: string | null;
   service_duration_minutes: number;
   created_at: string;
@@ -75,7 +90,11 @@ export type ShopLoginInfo = {
 
 export type PinResult =
   | { ok: true }
-  | { ok: false; code: "not_found" | "bad_pin" | "pin_already_set" | "unknown"; message: string };
+  | {
+      ok: false;
+      code: "not_found" | "bad_pin" | "pin_already_set" | "locked" | "unknown";
+      message: string;
+    };
 
 const PIN_LENGTH = 6;
 const PIN_RE = /^\d{6}$/u;
@@ -87,6 +106,9 @@ export type PublicShopDetail = {
   name: string;
   description: string | null;
   address: string | null;
+  province: string | null;
+  district: string | null;
+  subdistrict: string | null;
   contact_phone: string | null;
   /**
    * Shop-level default duration. Only meaningful as a fallback for shops that
@@ -105,6 +127,9 @@ type ShopDetailRow = {
   name: string;
   description: string | null;
   address: string | null;
+  province: string | null;
+  district: string | null;
+  subdistrict: string | null;
   contact_phone: string | null;
   service_duration_minutes: number;
   shop_categories: { id: string; name: string; icon: string | null } | null;
@@ -127,7 +152,7 @@ export async function getPublicShopById(
     .from("shops")
     .select(
       `
-        id, name, description, address, contact_phone, service_duration_minutes,
+        id, name, description, address, province, district, subdistrict, contact_phone, service_duration_minutes,
         shop_categories ( id, name, icon )
       `,
     )
@@ -165,6 +190,9 @@ export async function getPublicShopById(
     name: row.name,
     description: row.description,
     address: row.address,
+    province: row.province,
+    district: row.district,
+    subdistrict: row.subdistrict,
     contact_phone: row.contact_phone,
     service_duration_minutes: row.service_duration_minutes,
     services,
@@ -185,7 +213,13 @@ export type PublicShop = {
   name: string;
   description: string | null;
   address: string | null;
+  province: string | null;
+  district: string | null;
+  subdistrict: string | null;
   service_duration_minutes: number;
+  /** Active services (บริการ) — drives the card's service chips, "เริ่มต้น ฿"
+   *  price, and free-text service search on the discovery page. */
+  services: BookableService[];
   openState: ShopOpenState;
 };
 
@@ -238,7 +272,7 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
     supabase
       .from("shops")
       .select(
-        "id, name, description, address, service_duration_minutes, category_id",
+        "id, name, description, address, province, district, subdistrict, service_duration_minutes, category_id",
       )
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
@@ -253,14 +287,21 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
   // instead of N detail fetches.
   const now = getBangkokNow();
   const openByShop = new Map<string, ShopOpenState>();
+  let servicesByShop = new Map<string, BookableService[]>();
   const shopIds = shopRows.map((s) => s.id);
   if (shopIds.length > 0) {
-    const { data: hoursRows } = await supabase
-      .from("shop_business_hours")
-      .select("shop_id, is_open, open_time, close_time")
-      .in("shop_id", shopIds)
-      .eq("day_of_week", now.dayOfWeek);
-    for (const h of hoursRows ?? []) {
+    // Today's hours + every shop's active services in two parallel batched
+    // queries — the card needs both, and N+1 per shop would be wasteful.
+    const [hoursResult, services] = await Promise.all([
+      supabase
+        .from("shop_business_hours")
+        .select("shop_id, is_open, open_time, close_time")
+        .in("shop_id", shopIds)
+        .eq("day_of_week", now.dayOfWeek),
+      listActiveServicesForShops(shopIds),
+    ]);
+    servicesByShop = services;
+    for (const h of hoursResult.data ?? []) {
       openByShop.set(
         h.shop_id,
         computeOpenState(
@@ -279,7 +320,11 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
       name: s.name,
       description: s.description,
       address: s.address,
+      province: s.province,
+      district: s.district,
+      subdistrict: s.subdistrict,
       service_duration_minutes: s.service_duration_minutes,
+      services: servicesByShop.get(s.id) ?? [],
       openState: openByShop.get(s.id) ?? "unknown",
     });
     shopsByCategory.set(s.category_id, list);
@@ -350,6 +395,9 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
       category_id: input.categoryId,
       description: input.description || null,
       address: input.address || null,
+      province: input.province,
+      district: input.district,
+      subdistrict: input.subdistrict,
       contact_phone: input.contactPhone || null,
       owner_name: input.ownerName,
       owner_phone: input.ownerPhone,
@@ -384,6 +432,9 @@ type ShopRow = {
   contact_phone: string | null;
   description: string | null;
   address: string | null;
+  province: string | null;
+  district: string | null;
+  subdistrict: string | null;
   rejection_reason: string | null;
   service_duration_minutes: number;
   created_at: string;
@@ -405,7 +456,7 @@ export async function listShops(filter?: {
       `
         id, name, status,
         owner_name, owner_phone, owner_email,
-        contact_phone, description, address,
+        contact_phone, description, address, province, district, subdistrict,
         rejection_reason, service_duration_minutes, created_at, reviewed_at,
         shop_categories ( name )
       `,
@@ -430,6 +481,9 @@ export async function listShops(filter?: {
     contact_phone: r.contact_phone,
     description: r.description,
     address: r.address,
+    province: r.province,
+    district: r.district,
+    subdistrict: r.subdistrict,
     rejection_reason: r.rejection_reason,
     service_duration_minutes: r.service_duration_minutes,
     created_at: r.created_at,
@@ -606,6 +660,9 @@ export async function updateShop(
       category_id: input.categoryId,
       description: input.description || null,
       address: input.address || null,
+      province: input.province,
+      district: input.district,
+      subdistrict: input.subdistrict,
       contact_phone: input.contactPhone || null,
       owner_name: input.ownerName,
       owner_phone: input.ownerPhone,
@@ -644,7 +701,7 @@ export async function getShopById(id: string): Promise<ShopListItem | null> {
       `
         id, name, status,
         owner_name, owner_phone, owner_email,
-        contact_phone, description, address,
+        contact_phone, description, address, province, district, subdistrict,
         rejection_reason, service_duration_minutes, created_at, reviewed_at,
         shop_categories ( name )
       `,
@@ -665,6 +722,9 @@ export async function getShopById(id: string): Promise<ShopListItem | null> {
     contact_phone: r.contact_phone,
     description: r.description,
     address: r.address,
+    province: r.province,
+    district: r.district,
+    subdistrict: r.subdistrict,
     rejection_reason: r.rejection_reason,
     service_duration_minutes: r.service_duration_minutes,
     created_at: r.created_at,
@@ -742,6 +802,9 @@ export async function updateOwnShopProfile(
       category_id: input.categoryId,
       description: input.description || null,
       address: input.address || null,
+      province: input.province,
+      district: input.district,
+      subdistrict: input.subdistrict,
       contact_phone: input.contactPhone || null,
       owner_name: input.ownerName,
       owner_email: input.ownerEmail || null,
@@ -815,7 +878,12 @@ export async function setShopPin(
     .eq("id", shopId)
     .maybeSingle();
   if (readError) {
-    return { ok: false, code: "unknown", message: readError.message };
+    console.error("setShopPin read error:", readError);
+    return {
+      ok: false,
+      code: "unknown",
+      message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+    };
   }
   if (!existing || existing.status !== "approved") {
     return { ok: false, code: "not_found", message: "ไม่พบร้านในระบบ" };
@@ -834,7 +902,12 @@ export async function setShopPin(
     .update({ pin_hash: hash })
     .eq("id", shopId);
   if (updateError) {
-    return { ok: false, code: "unknown", message: updateError.message };
+    console.error("setShopPin update error:", updateError);
+    return {
+      ok: false,
+      code: "unknown",
+      message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+    };
   }
   return { ok: true };
 }
@@ -854,19 +927,49 @@ export async function verifyShopPin(
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("shops")
-    .select("pin_hash, status")
+    .select("pin_hash, status, failed_pin_attempts, locked_until")
     .eq("id", shopId)
     .maybeSingle();
   if (error || !data) {
     return { ok: false, code: "bad_pin", message: "รหัส PIN ไม่ถูกต้อง" };
   }
+
+  const lockTarget = {
+    table: "shops",
+    counter: "failed_pin_attempts",
+  } as const;
+
+  // (a) Currently locked → reject before touching the PIN hash at all.
+  if (data.locked_until) {
+    const lockedUntil = new Date(data.locked_until as string);
+    if (lockedUntil.getTime() > Date.now()) {
+      return { ok: false, code: "locked", message: lockedMessage(lockedUntil) };
+    }
+  }
+
   if (data.status !== "approved" || !data.pin_hash) {
     return { ok: false, code: "bad_pin", message: "รหัส PIN ไม่ถูกต้อง" };
   }
+
+  // (b) Verify the PIN.
   const ok = await verifyPassword(pin, data.pin_hash);
+
+  // (c) Wrong PIN → register the failed attempt atomically (compare-and-swap,
+  // so concurrent guesses can't race past the lock).
   if (!ok) {
+    const lockedUntil = await registerFailedAttempt(
+      lockTarget,
+      shopId,
+      (data.failed_pin_attempts as number | null) ?? 0,
+    );
+    if (lockedUntil) {
+      return { ok: false, code: "locked", message: lockedMessage(lockedUntil) };
+    }
     return { ok: false, code: "bad_pin", message: "รหัส PIN ไม่ถูกต้อง" };
   }
+
+  // (d) Success → clear the counter and any stale lock.
+  await clearFailedAttempts(lockTarget, shopId);
   return { ok: true };
 }
 
@@ -895,7 +998,14 @@ export async function changeShopPin(
     .eq("id", shopId)
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) {
+    console.error("changeShopPin read error:", error);
+    return {
+      ok: false,
+      code: "unknown",
+      message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+    };
+  }
   if (!data || data.status !== "approved" || !data.pin_hash) {
     return { ok: false, code: "not_found", message: "ไม่พบร้านในระบบ" };
   }
@@ -912,7 +1022,12 @@ export async function changeShopPin(
     .eq("id", shopId);
 
   if (updateError) {
-    return { ok: false, code: "unknown", message: updateError.message };
+    console.error("changeShopPin update error:", updateError);
+    return {
+      ok: false,
+      code: "unknown",
+      message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+    };
   }
   return { ok: true };
 }

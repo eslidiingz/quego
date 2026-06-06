@@ -55,15 +55,15 @@ export function AdminShell({
         <div className="px-6 py-8 flex items-center gap-3">
           <Icon name="spa" className="text-primary" size={32} />
           <span className="font-display font-bold text-headline-md text-primary tracking-tight">
-            LuxeQueue
+            queva
           </span>
         </div>
         <div className="px-4 mx-2 mb-6 py-3 bg-surface-container-high rounded-xl flex items-center gap-3">
           <Avatar initials={initials(adminName)} ring="primary" size="lg" />
           <div className="min-w-0">
             <p className="text-label-md text-on-surface font-bold truncate">{adminName}</p>
-            <p className="text-xs text-on-surface-variant">{adminPhone}</p>
-            <span className="text-[10px] uppercase font-bold text-primary tracking-widest">
+            <p className="text-label-sm text-on-surface-variant">{adminPhone}</p>
+            <span className="text-label-sm uppercase font-bold text-primary tracking-widest">
               Admin
             </span>
           </div>
@@ -123,7 +123,7 @@ export function AdminShell({
             <Icon name={menuOpen ? "close" : "menu"} />
           </button>
           <h1 className="font-display text-headline-md text-on-surface lg:hidden">
-            LuxeQueue Admin
+            queva Admin
           </h1>
           <div />
         </header>

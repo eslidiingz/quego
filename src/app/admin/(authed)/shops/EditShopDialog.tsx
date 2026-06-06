@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
+import { LocationSearchPicker } from "@/components/ui/LocationSearchPicker";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Modal } from "@/components/ui/Modal";
 import { Icon } from "@/components/ui/Icon";
@@ -106,6 +107,16 @@ export function EditShopDialog({
           iconLeft={<Icon name="location_on" />}
           defaultValue={shop.address ?? ""}
           errorText={errors?.address}
+          disabled={pending}
+        />
+        <LocationSearchPicker
+          required
+          defaultProvince={shop.province ?? ""}
+          defaultDistrict={shop.district ?? ""}
+          defaultSubdistrict={shop.subdistrict ?? ""}
+          provinceError={errors?.province}
+          districtError={errors?.district}
+          subdistrictError={errors?.subdistrict}
           disabled={pending}
         />
         <PhoneInput

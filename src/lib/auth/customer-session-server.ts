@@ -92,6 +92,7 @@ export async function getCustomerLoginIntent(): Promise<CustomerLoginIntent | nu
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, getSecret(), {
+      algorithms: ["HS256"],
       audience: "customer-login-intent",
     });
     if (typeof payload.phone === "string") {

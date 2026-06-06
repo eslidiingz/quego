@@ -46,7 +46,8 @@ export type BookingService = {
 export type StaffOption = {
   id: string;
   name: string;
-  nickname: string | null;
+  /** Job role shown as the card subtitle (e.g. "ช่างตัดผม"). */
+  role: string | null;
 };
 
 /**

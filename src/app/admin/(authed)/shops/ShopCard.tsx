@@ -18,7 +18,7 @@ const statusMap: Record<
 /**
  * SRP: render one shop application card and dispatch approve/reject callbacks.
  * Knows nothing about Supabase, server actions, or status transitions —
- * those are upstream. Tests/Storybook can mount this with mock data only.
+ * those are upstream. Tests can mount this with mock data only.
  */
 export function ShopApplicationCard({
   shop,

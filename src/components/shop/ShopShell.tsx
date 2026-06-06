@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/Icon";
+import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/cn";
 import { signOutShop } from "@/app/shop/actions";
@@ -64,18 +65,16 @@ export function ShopShell({
       >
         <div className="px-6 py-8 flex items-center gap-3">
           <Icon name="spa" className="text-primary" size={32} />
-          <span className="font-display font-bold text-headline-md text-primary tracking-tight">
-            LuxeQueue
-          </span>
+          <QuevaWordmark />
         </div>
         <div className="px-4 mx-2 mb-6 py-3 bg-surface-container-high rounded-xl flex items-center gap-3">
-          <Avatar initials={initials(shopName)} ring="secondary" size="lg" />
+          <Avatar initials={initials(shopName)} ring="primary" size="lg" />
           <div className="min-w-0">
             <p className="text-label-md text-on-surface font-bold truncate">{shopName}</p>
-            <p className="text-xs text-on-surface-variant">{shopPhone}</p>
+            <p className="text-label-sm text-on-surface-variant">{shopPhone}</p>
             <span
               className={cn(
-                "text-[10px] uppercase font-bold tracking-widest",
+                "text-label-sm uppercase font-bold tracking-widest",
                 isImpersonating ? "text-error" : "text-secondary",
               )}
             >
@@ -97,7 +96,7 @@ export function ShopShell({
                 className={cn(
                   "flex items-center gap-3 px-6 py-3 rounded-full transition-all text-left mx-2",
                   active
-                    ? "bg-secondary-container text-on-secondary-container font-bold"
+                    ? "bg-primary text-on-primary font-bold shadow-sm"
                     : "text-on-surface-variant hover:bg-surface-container-high",
                 )}
               >

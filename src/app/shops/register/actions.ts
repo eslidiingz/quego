@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createShop } from "@/lib/services/shops";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import {
   hasErrors,
   parseShopFormData,
@@ -23,6 +24,12 @@ export async function registerShop(
   _prev: RegisterShopState,
   formData: FormData,
 ): Promise<RegisterShopState> {
+  // Rate limit per client IP: public registration is a prime abuse target.
+  const ip = await getClientIp();
+  if (!(await checkRateLimit(`register:${ip}`, 3, 3600))) {
+    return { ok: false, message: "คำขอถี่เกินไป กรุณาลองใหม่อีกครั้งในภายหลัง" };
+  }
+
   const parsed = parseShopFormData(formData);
   const fieldErrors = validateShopForm(parsed);
   if (hasErrors(fieldErrors)) {

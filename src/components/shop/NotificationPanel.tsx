@@ -6,7 +6,7 @@ import type { NewBookingAlert } from "@/lib/services/bookings";
 /**
  * Presentational dropdown for the shop's new-booking bell. Pure: it just
  * renders the supplied alerts — all polling/state lives in
- * `NewBookingNotifier`. Split out so the visual can be exercised in Storybook
+ * `NewBookingNotifier`. Split out so the visual can be exercised in isolation
  * (which has no shop session to poll with) and so the notifier stays focused
  * on data + behaviour.
  */

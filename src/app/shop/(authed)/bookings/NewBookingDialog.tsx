@@ -12,6 +12,7 @@ import {
   evaluateSlots,
   type BookingContext,
   type BookingService,
+  type StaffOption,
 } from "@/lib/booking/slot-math";
 import {
   createManualBookingAction,
@@ -46,6 +47,8 @@ export function NewBookingDialog({
   const [selectedServiceKey, setSelectedServiceKey] = useState<string | null>(
     autoKey,
   );
+  // Shop's chosen staff for this booking; null = "ใครก็ได้" (any free staff).
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -66,6 +69,7 @@ export function NewBookingDialog({
     /* eslint-disable react-hooks/set-state-in-effect */
     setOpen(false);
     setSelectedServiceKey(autoKey);
+    setSelectedStaffId(null);
     setSelectedDate(null);
     setSelectedSlot(null);
     setName("");
@@ -79,17 +83,59 @@ export function NewBookingDialog({
   );
   const duration = selectedService?.durationMinutes ?? null;
 
+  // Staff capable of the selected service. `staffIds === null` means a
+  // single-queue shop (no staff configured) — the staff step is hidden and
+  // the legacy capacity model applies. Otherwise only listed staff appear.
+  const serviceStaffIds = selectedService?.staffIds ?? null;
+  const capableStaff = useMemo<StaffOption[]>(() => {
+    if (serviceStaffIds === null) return [];
+    const allow = new Set(serviceStaffIds);
+    return context.staff.filter((s) => allow.has(s.id));
+  }, [context.staff, serviceStaffIds]);
+  const showStaffStep = serviceStaffIds !== null && capableStaff.length > 0;
+
+  // Slot-availability inputs depend on the staff choice (mirrors the customer
+  // form): single-queue → context.capacity, no filter; "ใครก็ได้" → capacity =
+  // #capable staff, filter = them; specific staff → capacity 1, filter = them.
+  const { effectiveCapacity, staffFilter } = useMemo(() => {
+    if (serviceStaffIds === null) {
+      return {
+        effectiveCapacity: context.capacity,
+        staffFilter: null as ReadonlySet<string> | null,
+      };
+    }
+    if (selectedStaffId) {
+      return {
+        effectiveCapacity: 1,
+        staffFilter: new Set([selectedStaffId]) as ReadonlySet<string>,
+      };
+    }
+    return {
+      effectiveCapacity: Math.max(capableStaff.length, 1),
+      staffFilter: new Set(capableStaff.map((s) => s.id)) as ReadonlySet<string>,
+    };
+  }, [serviceStaffIds, selectedStaffId, capableStaff, context.capacity]);
+
   const days = useMemo(
-    () => (duration == null ? [] : buildDays(context, duration)),
-    [context, duration],
+    () =>
+      duration == null
+        ? []
+        : buildDays(context, duration, effectiveCapacity, staffFilter),
+    [context, duration, effectiveCapacity, staffFilter],
   );
   const selectedDay = days.find((d) => d.dateYmd === selectedDate) ?? null;
 
   const slots = useMemo(() => {
     if (duration == null || !selectedDay || selectedDay.status === "closed")
       return [];
-    return computeSlotsForDay(selectedDay, context, duration);
-  }, [selectedDay, context, duration]);
+    return computeSlotsForDay(
+      selectedDay,
+      context,
+      duration,
+      effectiveCapacity,
+      staffFilter,
+    );
+  }, [selectedDay, context, duration, effectiveCapacity, staffFilter]);
 
   // Phone is optional on the shop-side manual flow — but if any digits were
   // typed, they must form a valid Thai phone (9-10 digits) so we don't
@@ -104,6 +150,14 @@ export function NewBookingDialog({
 
   const handleSelectService = (svc: BookingService) => {
     setSelectedServiceKey(serviceKey(svc));
+    setSelectedStaffId(null);
+    setSelectedDate(null);
+    setSelectedSlot(null);
+  };
+
+  const handleSelectStaff = (staffId: string | null) => {
+    setSelectedStaffId(staffId);
+    // Staff choice changes which slots are free — reset downstream picks.
     setSelectedDate(null);
     setSelectedSlot(null);
   };
@@ -113,7 +167,11 @@ export function NewBookingDialog({
     setSelectedSlot(null);
   };
 
-  const stepBase = showServiceStep ? 1 : 0;
+  // Step numbers shift as optional steps (service, staff) appear before the
+  // date → time → info core.
+  const staffStepNum = showServiceStep ? 2 : 1;
+  const stepBase =
+    (showServiceStep ? 1 : 0) + (showStaffStep ? 1 : 0);
 
   // A shop with no active services can't take bookings. Point the owner to the
   // service catalogue instead of opening an unusable picker.
@@ -158,6 +216,11 @@ export function NewBookingDialog({
             name="serviceId"
             value={selectedService?.id ?? ""}
           />
+          <input
+            type="hidden"
+            name="preferredStaffId"
+            value={showStaffStep ? (selectedStaffId ?? "") : ""}
+          />
           <input type="hidden" name="date" value={selectedDate ?? ""} />
           <input type="hidden" name="slotTime" value={selectedSlot ?? ""} />
 
@@ -170,6 +233,30 @@ export function NewBookingDialog({
                     service={svc}
                     selected={serviceKey(svc) === selectedServiceKey}
                     onClick={() => handleSelectService(svc)}
+                  />
+                ))}
+              </div>
+            </Section>
+          ) : null}
+
+          {showStaffStep ? (
+            <Section step={staffStepNum} title="เลือกผู้ให้บริการ">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <StaffCard
+                  name="ใครก็ได้"
+                  subtitle="จัดช่างที่ว่างให้"
+                  icon="groups"
+                  selected={selectedStaffId === null}
+                  onClick={() => handleSelectStaff(null)}
+                />
+                {capableStaff.map((member) => (
+                  <StaffCard
+                    key={member.id}
+                    name={member.name}
+                    subtitle={member.role ?? undefined}
+                    icon="person"
+                    selected={selectedStaffId === member.id}
+                    onClick={() => handleSelectStaff(member.id)}
                   />
                 ))}
               </div>
@@ -363,6 +450,59 @@ function ServiceCard({
   );
 }
 
+function StaffCard({
+  name,
+  subtitle,
+  icon,
+  selected,
+  onClick,
+}: {
+  name: string;
+  subtitle?: string;
+  icon: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={cn(
+        "flex flex-col items-center gap-1 rounded-xl p-3 text-center transition-all border-2",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        selected
+          ? "bg-primary text-on-primary border-primary shadow-tinted"
+          : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
+      )}
+    >
+      <span
+        className={cn(
+          "flex items-center justify-center size-9 rounded-full",
+          selected
+            ? "bg-on-primary/15"
+            : "bg-secondary-container text-on-secondary-container",
+        )}
+      >
+        <Icon name={icon} size={20} />
+      </span>
+      <span className="font-semibold text-label-md leading-tight truncate max-w-full">
+        {name}
+      </span>
+      {subtitle ? (
+        <span
+          className={cn(
+            "text-label-sm truncate max-w-full",
+            selected ? "opacity-80" : "text-on-surface-variant",
+          )}
+        >
+          {subtitle}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
 function DateChip({
   day,
   selected,
@@ -403,7 +543,7 @@ function DateChip({
       {!selected ? (
         <span
           className={cn(
-            "text-[10px] uppercase tracking-widest font-bold mt-1",
+            "text-label-sm uppercase tracking-widest font-bold mt-1",
             day.status === "closed" && "text-on-surface-variant/60",
             day.status === "full" && "text-error",
             day.status === "available" && "text-primary/70",
@@ -492,6 +632,8 @@ function formatPrice(price: number | null): string | null {
 function buildDays(
   context: BookingContext,
   durationMinutes: number,
+  capacity: number,
+  staffFilter: ReadonlySet<string> | null,
 ): BookableDay[] {
   const out: BookableDay[] = [];
   let cursor = context.windowStart;
@@ -518,9 +660,10 @@ function buildDays(
         durationMinutes,
         date: cursor,
         intervals: context.bookedIntervals,
-        capacity: context.capacity,
+        capacity,
         isToday: cursor === context.nowDate,
         nowHHMM: context.nowTimeHHMM,
+        staffIdFilter: staffFilter,
       });
       status = avail.some((s) => s.isAvailable) ? "available" : "full";
     }
@@ -547,6 +690,8 @@ function computeSlotsForDay(
   day: BookableDay,
   context: BookingContext,
   durationMinutes: number,
+  capacity: number,
+  staffFilter: ReadonlySet<string> | null,
 ): SlotView[] {
   const hours = context.hours[day.dayOfWeek];
   if (!hours?.isOpen || !hours.openTime || !hours.closeTime) return [];
@@ -556,9 +701,10 @@ function computeSlotsForDay(
     durationMinutes,
     date: day.dateYmd,
     intervals: context.bookedIntervals,
-    capacity: context.capacity,
+    capacity,
     isToday: day.dateYmd === context.nowDate,
     nowHHMM: context.nowTimeHHMM,
+    staffIdFilter: staffFilter,
   });
   return avail.map((s) => ({
     time: s.time,
