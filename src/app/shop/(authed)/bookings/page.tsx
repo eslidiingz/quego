@@ -3,6 +3,7 @@ import { requireShopSession } from "@/lib/auth/shop-session-server";
 import {
   countBookingsByShop,
   getBookingContext,
+  getShopNoShowCounts,
   listBookingsByShop,
   type BookingsFilter,
 } from "@/lib/services/bookings";
@@ -40,10 +41,18 @@ export default async function ShopBookingsPage({
   const { view: rawView } = await searchParams;
   const view = parseView(rawView);
 
-  const [rows, counts, context] = await Promise.all([
-    listBookingsByShop(session.shopId, view),
+  // Rows must resolve first (the no-show lookup is keyed on their phones); the
+  // other three reads are mutually independent, so they fan out concurrently.
+  // getShopNoShowCounts is intentionally NOT date-scoped — it counts a phone's
+  // full no-show history at THIS shop, surfaced beside this view's rows.
+  const rows = await listBookingsByShop(session.shopId, view);
+  const [counts, context, noShowCounts] = await Promise.all([
     countBookingsByShop(session.shopId),
     getBookingContext(session.shopId),
+    getShopNoShowCounts(
+      session.shopId,
+      rows.map((b) => b.customerPhone).filter((p): p is string => Boolean(p)),
+    ),
   ]);
 
   return (
@@ -62,7 +71,15 @@ export default async function ShopBookingsPage({
       ) : (
         <div className="space-y-stack-md">
           {rows.map((booking) => (
-            <BookingRow key={booking.id} booking={booking} />
+            <BookingRow
+              key={booking.id}
+              booking={booking}
+              noShowCount={
+                booking.customerPhone
+                  ? (noShowCounts.get(booking.customerPhone) ?? 0)
+                  : 0
+              }
+            />
           ))}
         </div>
       )}

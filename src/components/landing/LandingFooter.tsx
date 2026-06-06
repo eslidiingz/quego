@@ -36,19 +36,19 @@ const COLS: FootCol[] = [
 export function LandingFooter() {
   const year = new Date().getFullYear();
   return (
-    <footer className="bg-on-background text-white/70 mt-auto px-4 md:px-12 pt-12 pb-9">
+    <footer className="bg-inverse-surface text-inverse-on-surface/70 dark:bg-surface-container dark:text-on-surface-variant mt-auto px-4 md:px-12 pt-12 pb-9">
       <div className="max-w-[1180px] mx-auto">
-        <div className="flex flex-wrap justify-between gap-8 pb-7 border-b border-white/10">
+        <div className="flex flex-wrap justify-between gap-8 pb-7 border-b border-inverse-on-surface/10 dark:border-outline-variant">
           <div className="max-w-[280px]">
-            <QuevaWordmark className="!text-white" />
-            <p className="text-body-sm text-white/60 mt-2.5">
+            <QuevaWordmark className="!text-inverse-on-surface dark:!text-on-surface" />
+            <p className="text-body-sm text-inverse-on-surface/60 dark:text-on-surface-variant mt-2.5">
               ระบบจองคิวสำหรับร้านบริการความงามและสุขภาพทั่วประเทศไทย
             </p>
           </div>
           <nav className="flex flex-wrap gap-x-14 gap-y-8">
             {COLS.map((col) => (
               <div key={col.title}>
-                <h3 className="font-display text-label-sm font-semibold uppercase tracking-wide text-white mb-3.5">
+                <h3 className="font-display text-label-sm font-semibold uppercase tracking-wide text-inverse-on-surface dark:text-on-surface mb-3.5">
                   {col.title}
                 </h3>
                 <ul className="space-y-2">
@@ -67,7 +67,7 @@ export function LandingFooter() {
             ))}
           </nav>
         </div>
-        <p className="text-label-md text-white/45 mt-5">
+        <p className="text-label-md text-inverse-on-surface/45 dark:text-on-surface-variant mt-5">
           © {year} queva · ไม่ต้องรอเก้อ แค่กดจอง
         </p>
       </div>

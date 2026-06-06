@@ -338,8 +338,8 @@ function ToggleButton({
     >
       <span
         className={cn(
-          "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform",
-          checked && "translate-x-5",
+          "absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform",
+          checked ? "bg-on-primary translate-x-5" : "bg-surface dark:bg-on-surface",
         )}
       />
     </button>

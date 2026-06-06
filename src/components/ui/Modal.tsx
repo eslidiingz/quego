@@ -62,7 +62,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-on-surface/40 backdrop-blur-sm"
+      className="queva-overlay-in fixed inset-0 z-50 flex items-center justify-center p-4 bg-on-surface/40 backdrop-blur-sm"
       onClick={onClose}
       role="presentation"
     >
@@ -71,7 +71,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby="modal-title"
         className={cn(
-          "w-full bg-surface-container-lowest rounded-2xl shadow-luxury border border-outline-variant flex flex-col max-h-[90vh]",
+          "queva-pop-in w-full bg-surface-container-lowest rounded-2xl shadow-luxury border border-outline-variant flex flex-col max-h-[90vh]",
           sizes[size],
           className,
         )}
@@ -85,7 +85,7 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label="ปิด"
-            className="inline-flex items-center justify-center size-10 rounded-full text-on-surface-variant hover:bg-surface-container-low transition-colors"
+            className="inline-flex items-center justify-center size-10 rounded-full text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200 ease-out"
           >
             <Icon name="close" />
           </button>

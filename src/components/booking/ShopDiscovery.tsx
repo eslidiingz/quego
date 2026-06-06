@@ -151,7 +151,10 @@ export function ShopDiscovery({
         {items.length === 0 ? (
           <NoResults query={initialQuery} location={location} />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+          <div
+            key={effectiveCategoryId ?? "all"}
+            className="queva-fade-in grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6"
+          >
             {items.map(({ shop, categoryIcon }) => (
               <PublicShopCard
                 key={shop.id}
@@ -268,7 +271,7 @@ function FilterChip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "shrink-0 inline-flex items-center gap-1.5 h-10 px-4 rounded-full border text-label-md font-semibold transition-colors active:scale-95",
+        "shrink-0 inline-flex items-center gap-1.5 h-10 px-4 rounded-full border text-label-md font-semibold transition-all duration-200 ease-out active:scale-[0.97]",
         active
           ? "bg-primary text-on-primary border-primary"
           : "bg-surface-container-lowest text-on-surface-variant border-outline-variant hover:border-primary hover:text-primary",

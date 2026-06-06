@@ -34,21 +34,36 @@ export function ConfirmDialog({
   onError,
 }: ConfirmDialogProps) {
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const openDialog = () => {
+    setError(null);
+    setOpen(true);
+  };
+
   const wrappedTrigger = cloneElement(trigger, {
-    onClick: () => setOpen(true),
+    onClick: openDialog,
     disabled: trigger.props?.disabled || pending,
   });
 
   const handleConfirm = () => {
+    setError(null);
     startTransition(async () => {
       try {
         await onConfirm();
         setOpen(false);
       } catch (err) {
+        // Never fail silently: domain errors throw the service's Thai message.
+        // A caller may still intercept via onError; otherwise show it inline so
+        // the shop owner always sees an explicit failure (no native alert).
         if (onError) onError(err);
-        else console.error(err);
+        else
+          setError(
+            err instanceof Error && err.message
+              ? err.message
+              : "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+          );
       }
     });
   };
@@ -64,6 +79,15 @@ export function ConfirmDialog({
       >
         {description ? (
           <div className="text-body-md text-on-surface-variant">{description}</div>
+        ) : null}
+        {error ? (
+          <p
+            role="alert"
+            className="mt-4 flex items-start gap-2 rounded-lg bg-error-container px-3 py-2 text-label-md text-on-error-container"
+          >
+            <Icon name="error" size={18} className="shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </p>
         ) : null}
         <div className="flex gap-3 mt-6">
           <Button

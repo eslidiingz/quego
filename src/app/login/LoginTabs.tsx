@@ -27,7 +27,7 @@ export function LoginTabs({ active }: { active: LoginTabKey }) {
             href={`/login?tab=${tab.key}`}
             scroll={false}
             className={cn(
-              "flex-1 px-4 py-2 rounded-full text-label-md text-center whitespace-nowrap transition-colors",
+              "flex-1 px-4 py-2 rounded-full text-label-md text-center whitespace-nowrap transition-all duration-200 ease-out",
               isActive
                 ? "bg-primary text-on-primary font-bold shadow-sm"
                 : "text-on-surface-variant hover:bg-surface-container-high",

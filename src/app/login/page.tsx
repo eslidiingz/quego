@@ -28,7 +28,6 @@ export default async function LoginPage({
     <>
       <FlashToast notice={notice} />
       <AuthHeroShell
-        icon="spa"
         title={
           <h1 className="font-display font-semibold text-[34px] leading-none tracking-tight text-on-primary">
             queva<span className="text-secondary">.</span>

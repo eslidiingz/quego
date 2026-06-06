@@ -162,7 +162,7 @@ export function LocationCombobox({
             onClick={clear}
             aria-label="ล้างพื้นที่"
             className={cn(
-              "absolute top-1/2 -translate-y-1/2 p-1 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors",
+              "absolute top-1/2 -translate-y-1/2 p-1 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200 ease-out",
               bare ? "right-0" : "right-3",
             )}
           >
@@ -175,7 +175,7 @@ export function LocationCombobox({
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-50 mt-2 w-full max-h-72 overflow-auto rounded-xl border border-outline-variant bg-surface-container-lowest shadow-lg py-1"
+          className="queva-pop-in absolute z-50 mt-2 w-full max-h-72 overflow-auto rounded-xl border border-outline-variant bg-surface-container-lowest shadow-lg py-1"
         >
           {results.map((opt, i) => {
             const active = i === activeIndex;

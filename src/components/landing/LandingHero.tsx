@@ -57,6 +57,16 @@ export function LandingHero({
     { num: "~25 นาที", label: "เวลารอที่ประหยัดได้ต่อครั้ง" },
   ];
 
+  // Glide to the results instead of letting the hash hard-jump: suppress Next's
+  // instant scroll-on-navigation (`scroll: false`) and smooth-scroll the
+  // always-mounted #shops section ourselves. Honours prefers-reduced-motion via
+  // the global `scroll-behavior` rule (which is gated on no-preference).
+  function scrollToShops() {
+    document
+      .getElementById("shops")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const params = new URLSearchParams();
@@ -68,7 +78,11 @@ export function LandingHero({
     const q = query.trim();
     if (q) params.set("q", q);
     const qs = params.toString();
-    router.push(qs ? `/?${qs}#shops` : "/#shops");
+    // Update the filter (suppressing Next's instant hash-jump), then glide to
+    // the now-stable #shops section. Scrolling AFTER push avoids the re-render
+    // cancelling an already-started smooth scroll.
+    router.push(qs ? `/?${qs}#shops` : "/#shops", { scroll: false });
+    requestAnimationFrame(scrollToShops);
   }
 
   function goToCategory(categoryId: string) {
@@ -79,7 +93,8 @@ export function LandingHero({
       if (location.subdistrict) params.set("subdistrict", location.subdistrict);
     }
     params.set("cat", categoryId);
-    router.push(`/?${params.toString()}#shops`);
+    router.push(`/?${params.toString()}#shops`, { scroll: false });
+    requestAnimationFrame(scrollToShops);
   }
 
   return (
@@ -87,11 +102,11 @@ export function LandingHero({
       {/* Decorative concentric rings, bottom-right */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-32 -bottom-40 size-[480px] rounded-full border border-white/10"
+        className="pointer-events-none absolute -right-32 -bottom-40 size-[480px] rounded-full border border-on-primary/10"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-12 -bottom-20 size-[300px] rounded-full border border-white/10"
+        className="pointer-events-none absolute -right-12 -bottom-20 size-[300px] rounded-full border border-on-primary/10"
       />
 
       <div className="relative z-10 max-w-[760px] mx-auto md:mx-0 md:ml-[max(0px,calc((100%-1180px)/2))]">
@@ -146,7 +161,7 @@ export function LandingHero({
 
           <button
             type="submit"
-            className="inline-flex items-center justify-center gap-2 shrink-0 rounded-full bg-secondary text-on-secondary font-medium text-label-lg px-7 py-3 shadow-coral-glow hover:bg-secondary-fixed-variant active:scale-[0.98] transition-all"
+            className="inline-flex items-center justify-center gap-2 shrink-0 rounded-full bg-secondary text-on-secondary font-medium text-label-lg px-7 py-3 shadow-coral-glow hover:bg-secondary-fixed-variant active:scale-[0.98] transition-[background-color,transform] duration-150 ease-out"
           >
             <Icon name="search" size={18} />
             ค้นหา
@@ -161,7 +176,7 @@ export function LandingHero({
                 key={c.id}
                 type="button"
                 onClick={() => goToCategory(c.id)}
-                className="inline-flex items-center gap-2 text-label-lg font-medium px-4 py-2 rounded-full border bg-white/10 text-on-primary border-white/20 hover:bg-white/20 transition-all active:scale-95"
+                className="inline-flex items-center gap-2 text-label-lg font-medium px-4 py-2 rounded-full border bg-on-primary/10 text-on-primary border-on-primary/20 hover:bg-on-primary/20 transition-[background-color,transform] duration-150 ease-out active:scale-[0.97]"
               >
                 <Icon name={c.icon ?? "category"} size={18} />
                 {c.name}

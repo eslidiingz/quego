@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { requireCustomerSession } from "@/lib/auth/customer-session-server";
 import { signOutCustomer } from "@/app/me/actions";
 import { SignOutButton } from "./SignOutButton";
@@ -22,7 +23,6 @@ export default async function MeLayout({
             href="/"
             className="flex items-center gap-2 text-primary hover:opacity-80 transition-opacity"
           >
-            <Icon name="spa" size={28} />
             <span className="font-display font-bold text-headline-md tracking-tight">
               queva
             </span>
@@ -45,6 +45,7 @@ export default async function MeLayout({
                 <span className="hidden sm:inline">โปรไฟล์</span>
               </Link>
             </nav>
+            <ThemeToggle />
             <SignOutButton onSignOut={signOutCustomer} />
           </div>
         </div>
