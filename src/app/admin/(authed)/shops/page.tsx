@@ -6,7 +6,7 @@ import {
 } from "@/lib/services/shops";
 import { FlashToast } from "@/components/ui/FlashToast";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ShopsList } from "./ShopsList";
+import { ShopsBrowser } from "./ShopsBrowser";
 import { StatusTabs, type TabKey } from "./StatusTabs";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +55,9 @@ export default async function AdminShopsPage({
 
       <StatusTabs active={tab} counts={counts} />
 
-      <ShopsList rows={rows} categories={categories} />
+      {/* key={tab} resets client filter state on status switch — App Router
+          soft-nav would otherwise keep the previous tab's search/filters. */}
+      <ShopsBrowser key={tab} rows={rows} categories={categories} />
     </div>
   );
 }

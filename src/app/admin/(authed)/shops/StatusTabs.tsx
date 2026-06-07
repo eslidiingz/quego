@@ -5,11 +5,11 @@ import type { ShopCountsByStatus, ShopStatus } from "@/lib/services/shops";
 type TabKey = ShopStatus | "all";
 
 const tabs: { key: TabKey; label: string }[] = [
+  { key: "all", label: "ทั้งหมด" },
   { key: "pending", label: "รออนุมัติ" },
   { key: "approved", label: "อนุมัติแล้ว" },
   { key: "rejected", label: "ปฏิเสธ" },
   { key: "suspended", label: "ระงับ" },
-  { key: "all", label: "ทั้งหมด" },
 ];
 
 /**
@@ -38,7 +38,7 @@ export function StatusTabs({
         return (
           <Link
             key={tab.key}
-            href={tab.key === "all" ? "/admin/shops" : `/admin/shops?status=${tab.key}`}
+            href={`/admin/shops?status=${tab.key}`}
             scroll={false}
             className={cn(
               "px-4 py-2 rounded-full text-label-md whitespace-nowrap transition-colors flex items-center gap-2",
