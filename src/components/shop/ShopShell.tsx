@@ -17,6 +17,7 @@ const navItems = [
   { href: "/shop/staff", label: "พนักงาน", icon: "group" },
   { href: "/shop/services", label: "บริการ", icon: "stacks" },
   { href: "/shop/profile", label: "ข้อมูลร้าน", icon: "storefront" },
+  { href: "/shop/share", label: "แชร์ร้าน", icon: "share" },
 ];
 
 /**
