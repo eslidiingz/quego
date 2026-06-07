@@ -6,6 +6,10 @@ import {
   changeCustomerPin,
   updateCustomerName,
 } from "@/lib/services/customers";
+import {
+  requestLineLinkCode,
+  unlinkCustomerLine,
+} from "@/lib/services/line-linking";
 import type {
   ChangePinFieldErrors,
   ChangePinState,
@@ -94,6 +98,43 @@ export async function changeCustomerPinAction(
     return { ok: false, message: result.message };
   }
 
+  revalidatePath("/me/profile");
+  return { ok: true };
+}
+
+// ----- LINE account linking -----------------------------------------------
+
+export type RequestLinkActionState =
+  | { ok: true; code: string; deepLink: string }
+  | { ok: false; message: string };
+
+/**
+ * Issue a one-time LINE link code for the logged-in customer. customerId comes
+ * from the verified session — never the client. Called imperatively (the card
+ * has no form inputs), so it takes no args and returns the code + deep link on
+ * success for the card to render.
+ */
+export async function requestLineLinkAction(): Promise<RequestLinkActionState> {
+  const session = await requireCustomerSession();
+  const result = await requestLineLinkCode(session.customerId);
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+  return { ok: true, code: result.code, deepLink: result.deepLink };
+}
+
+export type UnlinkActionResult = { ok: true } | { ok: false; message: string };
+
+/**
+ * Clear the logged-in customer's LINE binding. Called imperatively from the
+ * ConfirmDialog, so it returns a plain result the caller toasts on.
+ */
+export async function unlinkLineAction(): Promise<UnlinkActionResult> {
+  const session = await requireCustomerSession();
+  const result = await unlinkCustomerLine(session.customerId);
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
   revalidatePath("/me/profile");
   return { ok: true };
 }
