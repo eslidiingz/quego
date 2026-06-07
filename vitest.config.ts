@@ -4,12 +4,12 @@ import { defineConfig } from "vitest/config";
 /**
  * Vitest configuration.
  *
- * Scope: pure, browser-safe logic modules only (slot math, time helpers,
- * insights aggregation, form validation). These carry no `server-only` marker
- * and touch no DB, so a plain Node environment is enough — no jsdom needed.
+ * Scope: pure logic modules (slot math, time helpers, insights aggregation,
+ * form validation, LINE signature/link-code). Node environment — no DOM needed.
  *
  * The `@` alias mirrors tsconfig's `paths` so test files import the same way
- * the app does (`@/lib/...`).
+ * the app does (`@/lib/...`). The `server-only` stub lets us import server
+ * modules' pure exports (signature, classify, link-code) outside RSC context.
  */
 export default defineConfig({
   test: {
@@ -17,8 +17,15 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
   },
   resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
+    alias: [
+      {
+        find: /^@\//,
+        replacement: fileURLToPath(new URL("./src/", import.meta.url)),
+      },
+      {
+        find: /^server-only$/,
+        replacement: fileURLToPath(new URL("./test/empty.ts", import.meta.url)),
+      },
+    ],
   },
 });

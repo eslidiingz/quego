@@ -4,7 +4,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Tabs } from "@/components/ui/Tabs";
 import { requireCustomerSession } from "@/lib/auth/customer-session-server";
 import { getCustomerProfile } from "@/lib/services/customers";
+import { getLineLinkStatus } from "@/lib/services/line-linking";
 import { ProfileNameForm } from "./ProfileNameForm";
+import { LinkLineCard } from "./LinkLineCard";
 import { changeCustomerPinAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,7 @@ export default async function CustomerProfilePage() {
   if (!profile) {
     redirect("/login?notice=session-expired");
   }
+  const lineLink = await getLineLinkStatus(session.customerId);
 
   return (
     <div className="max-w-2xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
@@ -36,6 +39,11 @@ export default async function CustomerProfilePage() {
             content: (
               <ProfileNameForm name={profile.name} phone={profile.phone} />
             ),
+          },
+          {
+            id: "notifications",
+            label: "การแจ้งเตือน",
+            content: <LinkLineCard linked={lineLink.linked} />,
           },
           {
             id: "security",
