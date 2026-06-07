@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { requireCustomerSession } from "@/lib/auth/customer-session-server";
 import { listBookingsByCustomerPhone } from "@/lib/services/bookings";
 import { BookingCard } from "./BookingCard";
@@ -16,17 +17,11 @@ export default async function MyBookingsPage() {
 
   return (
     <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
-      <header className="space-y-2">
-        <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary-container/30 text-on-secondary-container text-label-sm uppercase tracking-widest">
-          การจองของฉัน
-        </span>
-        <h1 className="font-display text-headline-lg text-on-background">
-          คิวของฉัน
-        </h1>
-        <p className="text-body-md text-on-surface-variant">
-          ติดตามคิวที่คุณจองไว้ — ทั้งคิวล่วงหน้าและประวัติย้อนหลัง
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="การจองของฉัน"
+        title="คิวของฉัน"
+        description="ติดตามคิวที่คุณจองไว้ — ทั้งคิวล่วงหน้าและประวัติย้อนหลัง"
+      />
 
       {bookings.length === 0 ? (
         <EmptyState />

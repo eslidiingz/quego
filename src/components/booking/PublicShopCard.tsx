@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { formatBaht } from "@/lib/baht";
 import { Icon } from "@/components/ui/Icon";
 import { Chip } from "@/components/ui/Chip";
+import { ShopRatingBadge } from "@/components/reviews/ShopRatingBadge";
+import type { ShopRatingSummary } from "@/lib/services/reviews";
+import { ShopServiceChips } from "./ShopServiceChips";
 
 export type ShopOpenState = "open" | "closed" | "unknown";
 
@@ -22,10 +26,10 @@ export type PublicShopCardProps = {
   services?: ShopCardService[];
   /** Live open/closed state from today's business hours. */
   openState?: ShopOpenState;
+  /** Average rating + count; badge is hidden when count is 0 or omitted. */
+  rating?: ShopRatingSummary | null;
   className?: string;
 };
-
-const MAX_VISIBLE_SERVICES = 3;
 
 /**
  * Customer-facing shop card for the discovery grid. We deliberately surface
@@ -44,11 +48,10 @@ export function PublicShopCard({
   district,
   services = [],
   openState = "unknown",
+  rating,
   className,
 }: PublicShopCardProps) {
   const area = [district, province].filter(Boolean).join(", ");
-  const visible = services.slice(0, MAX_VISIBLE_SERVICES);
-  const extra = services.length - visible.length;
   const fromPrice = startingPrice(services);
 
   return (
@@ -67,6 +70,12 @@ export function PublicShopCard({
         {openState !== "unknown" ? (
           <OpenStateBadge state={openState} />
         ) : null}
+        {rating ? (
+          <ShopRatingBadge
+            rating={rating}
+            className="absolute top-2 right-2 sm:top-3 sm:right-3"
+          />
+        ) : null}
       </div>
 
       <div className="p-3 sm:p-4 flex flex-col gap-2 flex-1">
@@ -83,22 +92,8 @@ export function PublicShopCard({
         </div>
 
         <div className="mt-auto flex flex-col gap-2 pt-1">
-          {visible.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {visible.map((s, i) => (
-                <span
-                  key={`${s.name}-${i}`}
-                  className="max-w-[8rem] truncate rounded-full bg-surface-container px-2 py-0.5 text-label-sm text-on-surface-variant"
-                >
-                  {s.name}
-                </span>
-              ))}
-              {extra > 0 ? (
-                <span className="rounded-full bg-surface-container px-2 py-0.5 text-label-sm font-semibold text-on-surface-variant">
-                  +{extra}
-                </span>
-              ) : null}
-            </div>
+          {services.length > 0 ? (
+            <ShopServiceChips services={services} shopName={name} />
           ) : null}
 
           {fromPrice != null ? (
@@ -123,13 +118,6 @@ function startingPrice(services: ShopCardService[]): number | null {
     if (min == null || s.price < min) min = s.price;
   }
   return min;
-}
-
-function formatBaht(price: number): string {
-  return `฿${price.toLocaleString("th-TH", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
 }
 
 /**

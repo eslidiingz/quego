@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Chip } from "@/components/ui/Chip";
 import { Switch } from "@/components/ui/Switch";
 import type { ServicePresetListItem } from "@/lib/services/service-presets";
+import { formatBaht } from "@/lib/baht";
 import { PresetFormDialog, type PresetEditing } from "./PresetFormDialog";
 import { DeletePresetDialog } from "./DeletePresetDialog";
 import { setPresetActiveAction } from "./actions";
@@ -235,11 +236,4 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       </Button>
     </div>
   );
-}
-
-function formatBaht(price: number): string {
-  return `${price.toLocaleString("th-TH", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })} บาท`;
 }

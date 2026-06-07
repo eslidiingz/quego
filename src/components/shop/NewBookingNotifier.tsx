@@ -4,26 +4,29 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Toast } from "@/components/ui/Toast";
-import { NotificationPanel } from "./NotificationPanel";
+import { NotificationPanel, type BookingNotice } from "./NotificationPanel";
 import { pollNewBookings } from "@/app/shop/(authed)/notifications/actions";
 
-const POLL_INTERVAL_MS = 15_000;
+const POLL_INTERVAL_MS = 20_000;
 /** Keep the dropdown bounded — older alerts fall off the bottom. */
 const MAX_ITEMS = 20;
 
 type ToastState = { id: number; message: string } | null;
-/** One booking alert, derived from the poll action so the shape stays in sync. */
-type Alert = Awaited<ReturnType<typeof pollNewBookings>>["bookings"][number];
 
 /**
  * Live new-booking notifier for the shop area. Polls `pollNewBookings` every
- * ~15s with a server-supplied cursor, and on fresh confirmed bookings: bumps
+ * ~20s with a server-supplied cursor, and on fresh confirmed bookings: bumps
  * the header bell badge, shows a Toast, plays a short chime, and prepends the
  * booking to the bell dropdown so the shop can see *what* came in.
  *
- * SRP: owns all notification state and renders its own bell + dropdown + Toast.
- * It is dropped into `ShopShell`'s header slot, so the shell stays layout-only
- * and doesn't know this feature exists.
+ * Read model (mirrors the admin's `PendingShopsNotifier`): each notice carries a
+ * `read` flag. Opening the bell does NOT clear the badge — the count is the
+ * number of *unread* notices and only drops when the shop opens a notice
+ * (navigating to the bookings list) or taps "อ่านทั้งหมด".
+ *
+ * SRP: owns all notification + read state and renders its own bell + dropdown +
+ * Toast. It is dropped into `ShopShell`'s header slot, so the shell stays
+ * layout-only and doesn't know this feature exists.
  *
  * `initialSinceIso` is the server's "now" at page load — the baseline cursor,
  * so only bookings that arrive AFTER load are announced (no historical spam).
@@ -40,12 +43,22 @@ export function NewBookingNotifier({
 
   const router = useRouter();
 
-  const [unread, setUnread] = useState(0);
-  const [items, setItems] = useState<Alert[]>([]);
+  const [items, setItems] = useState<BookingNotice[]>([]);
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   const [soundBlocked, setSoundBlocked] = useState(false);
   const toastSeq = useRef(0);
+
+  // Badge count = unread notices. Opening the dropdown no longer resets it.
+  const unread = items.reduce((n, i) => (i.read ? n : n + 1), 0);
+
+  const markRead = (id: string) =>
+    setItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, read: true } : i)),
+    );
+
+  const markAllRead = () =>
+    setItems((prev) => prev.map((i) => (i.read ? i : { ...i, read: true })));
 
   async function playChime() {
     try {
@@ -82,10 +95,16 @@ export function NewBookingNotifier({
 
         if (fresh.length > 0) {
           // `fresh` is ascending by created_at — reverse so newest is on top.
+          // New notices start unread.
           setItems((prev) =>
-            [...fresh.slice().reverse(), ...prev].slice(0, MAX_ITEMS),
+            [
+              ...fresh
+                .slice()
+                .reverse()
+                .map((b) => ({ ...b, read: false })),
+              ...prev,
+            ].slice(0, MAX_ITEMS),
           );
-          setUnread((n) => n + fresh.length);
           toastSeq.current += 1;
           setToast({
             id: toastSeq.current,
@@ -160,11 +179,9 @@ export function NewBookingNotifier({
           unread > 0 ? `การแจ้งเตือน (${unread} รายการใหม่)` : "การแจ้งเตือน"
         }
         aria-expanded={open}
-        onClick={() => {
-          // Opening clears the "unread" badge but keeps the list visible.
-          setOpen((v) => !v);
-          setUnread(0);
-        }}
+        // Opening the dropdown does NOT mark anything read — the badge persists
+        // until a notice is opened or "อ่านทั้งหมด" is used.
+        onClick={() => setOpen((v) => !v)}
         className="relative inline-flex items-center justify-center size-10 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
       >
         <Icon name="notifications" />
@@ -177,7 +194,16 @@ export function NewBookingNotifier({
 
       {open ? (
         <div className="absolute right-0 top-full mt-2 z-50">
-          <NotificationPanel items={items} onViewAll={() => setOpen(false)} />
+          <NotificationPanel
+            items={items}
+            unreadCount={unread}
+            onItemClick={(id) => {
+              markRead(id);
+              setOpen(false);
+            }}
+            onMarkAllRead={markAllRead}
+            onViewAll={() => setOpen(false)}
+          />
         </div>
       ) : null}
 

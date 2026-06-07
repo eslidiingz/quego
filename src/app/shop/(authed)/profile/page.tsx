@@ -5,6 +5,7 @@ import { listBusinessHours } from "@/lib/services/business-hours";
 import { Chip } from "@/components/ui/Chip";
 import { ChangePinForm } from "@/components/ui/ChangePinForm";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ProfileTabs, type ProfileTab } from "./ProfileTabs";
 import { EditProfileForm } from "./EditProfileForm";
 import { BusinessHoursForm } from "./BusinessHoursForm";
 import { changeShopPinAction } from "./actions";
@@ -15,8 +16,28 @@ export const metadata = {
   title: "ข้อมูลร้าน · queva",
 };
 
-export default async function ShopProfilePage() {
+function parseTab(raw: string | undefined): ProfileTab {
+  if (raw === "hours" || raw === "security") return raw;
+  return "info";
+}
+
+const TAB_DESCRIPTIONS: Record<ProfileTab, string> = {
+  info: "แก้ไขรายละเอียดร้าน ประเภทธุรกิจ ที่อยู่ และข้อมูลผู้ติดต่อ",
+  hours: "ตั้งเวลาเปิด-ปิดของร้านในแต่ละวัน ลูกค้าจะเห็นเฉพาะวันที่เปิดทำการ",
+  security: "เปลี่ยนรหัส PIN ที่ใช้เข้าสู่ระบบ",
+};
+
+type SearchParams = Promise<{ tab?: string }>;
+
+export default async function ShopProfilePage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const session = await requireShopSession();
+  const { tab: rawTab } = await searchParams;
+  const tab = parseTab(rawTab);
+
   const [shop, categories, hours] = await Promise.all([
     getShopById(session.shopId),
     listActiveCategories(),
@@ -24,12 +45,11 @@ export default async function ShopProfilePage() {
   ]);
 
   if (!shop) {
-    // Shouldn't happen if session is valid, but keep a graceful path.
     redirect("/login?tab=shop&notice=session-expired");
   }
 
   return (
-    <div className="p-4 md:p-12 max-w-3xl mx-auto w-full space-y-stack-lg">
+    <div className="p-4 md:p-12 max-w-3xl mx-auto w-full space-y-stack-md">
       <PageHeader
         eyebrow="จัดการร้าน"
         title="ข้อมูลร้าน"
@@ -38,22 +58,20 @@ export default async function ShopProfilePage() {
             <Chip variant="premium" size="sm">เปิดให้บริการ</Chip>
           ) : null
         }
-        description="แก้ไขข้อมูลร้านและเวลาทำการของคุณ การเปลี่ยนแปลงจะมีผลทันทีในหน้าค้นหาของลูกค้า"
+        description={TAB_DESCRIPTIONS[tab]}
       />
 
-      <EditProfileForm shop={shop} categories={categories} />
+      <ProfileTabs active={tab} />
 
-      <div>
-        <h2 className="font-display text-headline-md text-on-surface mb-1">
-          เวลาทำการ
-        </h2>
-        <p className="text-body-md text-on-surface-variant mb-4">
-          ตั้งเวลาเปิด-ปิดของร้านในแต่ละวัน ลูกค้าจะเห็นเฉพาะวันที่เปิดทำการ
-        </p>
+      {tab === "info" && (
+        <EditProfileForm shop={shop} categories={categories} />
+      )}
+      {tab === "hours" && (
         <BusinessHoursForm hours={hours} shopId={session.shopId} />
-      </div>
-
-      <ChangePinForm action={changeShopPinAction} />
+      )}
+      {tab === "security" && (
+        <ChangePinForm action={changeShopPinAction} />
+      )}
     </div>
   );
 }

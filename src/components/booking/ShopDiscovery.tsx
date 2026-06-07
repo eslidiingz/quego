@@ -9,6 +9,7 @@ import {
   PublicShopCard,
   type ShopOpenState,
 } from "@/components/booking/PublicShopCard";
+import type { ShopRatingSummary } from "@/lib/services/reviews";
 
 export type DiscoveryService = { name: string; price: number | null };
 
@@ -23,6 +24,8 @@ export type DiscoveryShop = {
   /** Active services — searchable + shown as chips on the card. */
   services: DiscoveryService[];
   openState: ShopOpenState;
+  /** Average rating + count for the card badge. */
+  rating: ShopRatingSummary;
 };
 
 export type DiscoveryGroup = {
@@ -165,6 +168,7 @@ export function ShopDiscovery({
                 district={shop.district}
                 services={shop.services}
                 openState={shop.openState}
+                rating={shop.rating}
               />
             ))}
           </div>

@@ -2,11 +2,14 @@ import Link from "next/link";
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
+import { getBangkokNow, getBangkokToday } from "@/lib/time/bangkok";
+import { formatBaht } from "@/lib/baht";
 import type {
   BookingStatus,
   CustomerBookingItem,
 } from "@/lib/services/bookings";
 import { CancelBookingButton } from "./CancelBookingButton";
+import { WriteReviewButton } from "@/components/reviews/WriteReviewButton";
 
 const STATUS_MAP: Record<
   BookingStatus,
@@ -15,12 +18,22 @@ const STATUS_MAP: Record<
   confirmed: { label: "รอรับบริการ", variant: "confirmed" },
   completed: { label: "เสร็จสิ้น", variant: "success" },
   cancelled: { label: "ยกเลิก", variant: "danger" },
-  no_show: { label: "ไม่มาตามนัด", variant: "danger" },
 };
 
 export function BookingCard({ booking }: { booking: CustomerBookingItem }) {
   const status = STATUS_MAP[booking.status];
-  const muted = booking.status === "cancelled" || booking.status === "no_show";
+  const muted = booking.status === "cancelled";
+
+  // A slot is "past" once its date+time has elapsed in Bangkok time. Past
+  // bookings can no longer be cancelled by the customer, so we hide the button.
+  // String compare is safe: both date (YYYY-MM-DD) and time (HH:MM) are
+  // zero-padded and lexicographically ordered.
+  const today = getBangkokToday();
+  const nowHHMM = getBangkokNow().timeHHMM;
+  const isPast =
+    booking.bookingDate < today ||
+    (booking.bookingDate === today && booking.slotTime < nowHHMM);
+  const canCancel = booking.status === "confirmed" && !isPast;
 
   return (
     <article
@@ -36,9 +49,21 @@ export function BookingCard({ booking }: { booking: CustomerBookingItem }) {
             <h3 className="font-display text-headline-md text-on-surface">
               {booking.shopName}
             </h3>
-            <Chip variant={status.variant} size="sm">
-              {status.label}
-            </Chip>
+            {booking.review ? (
+              // A reviewed booking is necessarily completed; surface the more
+              // informative "รีวิวแล้ว" state in place of the "เสร็จสิ้น" chip.
+              <Chip
+                variant="success"
+                size="sm"
+                iconLeft={<Icon name="check_circle" size={14} />}
+              >
+                รีวิวแล้ว
+              </Chip>
+            ) : (
+              <Chip variant={status.variant} size="sm">
+                {status.label}
+              </Chip>
+            )}
           </div>
           {booking.serviceName ? (
             <p className="flex items-center gap-1.5 text-label-md text-on-surface-variant">
@@ -80,12 +105,17 @@ export function BookingCard({ booking }: { booking: CustomerBookingItem }) {
       </p>
 
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-        {booking.status === "confirmed" ? (
-          <CancelBookingButton bookingId={booking.id} />
+        {canCancel ? <CancelBookingButton bookingId={booking.id} /> : null}
+        {booking.status === "completed" ? (
+          <WriteReviewButton
+            bookingId={booking.id}
+            shopName={booking.shopName}
+            existing={booking.review}
+          />
         ) : null}
         <Link
           href={`/bookings/${booking.id}`}
-          className="border-2 border-outline-variant rounded-full px-4 py-2 text-on-surface-variant hover:bg-surface-container-low transition-colors text-label-md font-semibold flex items-center justify-center gap-2"
+          className="border-2 border-outline-variant rounded-full px-4 h-11 text-on-surface-variant hover:bg-surface-container-low transition-colors text-label-md font-semibold flex items-center justify-center gap-2"
         >
           ดูรายละเอียดการจอง
           <Icon name="chevron_right" size={18} />
@@ -135,13 +165,6 @@ function formatThaiDate(ymd: string): string {
   const dayLabel = THAI_DAY_LONG[dt.getUTCDay()];
   const monthLabel = THAI_MONTH_SHORT[m - 1];
   return `วัน${dayLabel}ที่ ${d} ${monthLabel} ${y + 543}`;
-}
-
-function formatBaht(price: number): string {
-  return `${price.toLocaleString("th-TH", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })} บาท`;
 }
 
 const THAI_DAY_LONG = [

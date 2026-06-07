@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Chip } from "@/components/ui/Chip";
-import { SiteAuthLink } from "@/components/layout/SiteAuthLink";
+import { SiteHeader } from "@/components/layout/SiteHeader";
+import { LandingFooter } from "@/components/landing/LandingFooter";
 import { getBookingById } from "@/lib/services/bookings";
+import { formatBaht } from "@/lib/baht";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +22,6 @@ const STATUS_LABEL: Record<
   confirmed: { label: "รอรับบริการ", variant: "confirmed" },
   completed: { label: "เสร็จสิ้น", variant: "success" },
   cancelled: { label: "ยกเลิก", variant: "danger" },
-  no_show: { label: "ไม่มาตามนัด", variant: "danger" },
 };
 
 export default async function BookingDetailPage({
@@ -188,7 +189,7 @@ export default async function BookingDetailPage({
         </div>
       </div>
 
-      <SiteFooter />
+      <LandingFooter />
     </main>
   );
 }
@@ -246,13 +247,6 @@ function maskPhone(raw: string): string {
   return "•••";
 }
 
-function formatBaht(price: number): string {
-  return `${price.toLocaleString("th-TH", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })} บาท`;
-}
-
 const THAI_DAY_LONG = [
   "อาทิตย์",
   "จันทร์",
@@ -278,27 +272,3 @@ const THAI_MONTH_LONG = [
   "ธันวาคม",
 ];
 
-function SiteHeader() {
-  return (
-    <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-outline-variant">
-      <div className="max-w-[1280px] mx-auto px-4 md:px-12 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="font-display font-bold text-headline-md text-primary tracking-tight">
-            queva
-          </span>
-        </Link>
-        <SiteAuthLink />
-      </div>
-    </header>
-  );
-}
-
-function SiteFooter() {
-  return (
-    <footer className="border-t border-outline-variant bg-surface-container-low mt-auto">
-      <div className="max-w-[1280px] mx-auto px-4 md:px-12 py-8 text-center md:text-left text-label-sm text-on-surface-variant">
-        © {new Date().getFullYear()} queva · ไม่ต้องรอเก้อ แค่กดจอง
-      </div>
-    </footer>
-  );
-}

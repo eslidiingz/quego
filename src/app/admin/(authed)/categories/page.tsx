@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { CategoriesTable, type CategoryRow } from "./CategoriesTable";
 
 export const dynamic = "force-dynamic";
@@ -28,18 +29,12 @@ export default async function CategoriesPage() {
   const rows: CategoryRow[] = data ?? [];
 
   return (
-    <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-lg">
-      <div>
-        <p className="text-label-md text-secondary uppercase tracking-widest mb-1">
-          จัดการ Taxonomy
-        </p>
-        <h1 className="font-display text-headline-lg text-on-background">
-          หมวดหมู่ร้าน
-        </h1>
-        <p className="text-on-surface-variant mt-2">
-          เพิ่ม แก้ไข หรือปิดการใช้งานหมวดหมู่ที่ใช้ในขั้นตอนสมัครร้านและตัวกรองค้นหา
-        </p>
-      </div>
+    <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-md">
+      <PageHeader
+        eyebrow="จัดการ Taxonomy"
+        title="หมวดหมู่ร้าน"
+        description="เพิ่ม แก้ไข หรือปิดการใช้งานหมวดหมู่ที่ใช้ในขั้นตอนสมัครร้านและตัวกรองค้นหา"
+      />
       <CategoriesTable rows={rows} />
     </div>
   );

@@ -20,7 +20,7 @@ const variants: Record<Variant, string> = {
   delayed: "bg-secondary-fixed text-on-secondary-fixed",
   vip: "bg-tertiary-fixed text-on-tertiary-fixed",
   premium: "bg-primary text-on-primary",
-  confirmed: "bg-secondary-container text-on-secondary-container",
+  confirmed: "bg-info-container text-on-info-container",
   success: "bg-success text-on-success",
   danger: "bg-error-container text-on-error-container",
   tertiary: "bg-tertiary-container text-on-tertiary-container",

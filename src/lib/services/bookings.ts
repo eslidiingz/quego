@@ -23,6 +23,7 @@ import {
   getBookableService,
   listActiveServicesByShop,
 } from "@/lib/services/services";
+import type { BookingReview } from "@/lib/services/reviews";
 
 // Re-export so server callers can import {BookingContext} from this module
 // in addition to the pure slot-math file (single source of truth).
@@ -43,11 +44,7 @@ export { generateSlots } from "@/lib/booking/slot-math";
 
 export const BOOKING_WINDOW_DAYS = 16;
 
-export type BookingStatus =
-  | "confirmed"
-  | "cancelled"
-  | "completed"
-  | "no_show";
+export type BookingStatus = "confirmed" | "cancelled" | "completed";
 
 export type CreateBookingInput = {
   shopId: string;
@@ -144,6 +141,8 @@ export type CustomerBookingItem = {
   staffName: string | null;
   staffRole: string | null;
   status: BookingStatus;
+  /** The customer's own review of this booking, if any (completed only). */
+  review: BookingReview | null;
 };
 
 // ----- Public read: context for the booking form --------------------------
@@ -691,13 +690,12 @@ type BookingRowDb = {
 };
 
 // Status priority for the live "today" queue: still-actionable bookings
-// (รอรับบริการ / confirmed) rise to the top, then no-shows, with เสร็จสิ้น
-// (completed) sunk to the very bottom. cancelled shares no-show's rank — it
-// only reaches this sort via the dashboard (includeCancelled), which re-sorts
-// in-page anyway, and is excluded from the /shop/bookings list entirely.
+// (รอรับบริการ / confirmed) rise to the top, then cancelled, with เสร็จสิ้น
+// (completed) sunk to the very bottom. cancelled only reaches this sort via the
+// dashboard (includeCancelled), which re-sorts in-page anyway, and is excluded
+// from the /shop/bookings list entirely.
 const TODAY_STATUS_RANK: Record<BookingStatus, number> = {
   confirmed: 0,
-  no_show: 1,
   cancelled: 1,
   completed: 2,
 };
@@ -849,7 +847,7 @@ export async function updateBookingStatus(
  * (compound `eq(id) + eq(customer_phone)`) so a logged-in customer can
  * only cancel bookings tied to their own phone — including ones made
  * anonymously or by a shop on their behalf. Only confirmed bookings can
- * be cancelled; completed / no_show / already-cancelled return not_found.
+ * be cancelled; completed / already-cancelled return not_found.
  */
 export async function cancelOwnBooking(
   bookingId: string,
@@ -883,7 +881,7 @@ export async function cancelOwnBooking(
  * Shop-initiated cancel. Mirrors `cancelOwnBooking` but keyed by `shopId`
  * (which MUST come from the caller's verified session) instead of
  * `customer_phone`, so a shop can only cancel its own bookings. Only
- * confirmed bookings can be cancelled; completed / no_show / already-cancelled
+ * confirmed bookings can be cancelled; completed / already-cancelled
  * return not_found.
  */
 export async function cancelBookingByShop(
@@ -909,41 +907,6 @@ export async function cancelBookingByShop(
       ok: false,
       code: "not_found",
       message: "ไม่พบการจองนี้ หรือสถานะไม่อนุญาตให้ยกเลิก",
-    };
-  }
-  return { ok: true };
-}
-
-/**
- * Shop-initiated no-show. Mirrors `cancelBookingByShop` but transitions to
- * `no_show` instead of `cancelled`. Keyed by `shopId` (which MUST come from
- * the caller's verified session) so a shop can only mark its own bookings.
- * Only confirmed bookings can be marked no-show; completed / cancelled /
- * already-no_show return not_found.
- */
-export async function markBookingNoShow(
-  bookingId: string,
-  shopId: string,
-): Promise<UpdateBookingStatusResult> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("bookings")
-    .update({ status: "no_show" })
-    .eq("id", bookingId)
-    .eq("shop_id", shopId)
-    .eq("status", "confirmed")
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    console.error("markBookingNoShow error:", error);
-    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
-  }
-  if (!data) {
-    return {
-      ok: false,
-      code: "not_found",
-      message: "ไม่พบการจองนี้ หรือสถานะไม่อนุญาตให้ทำรายการ",
     };
   }
   return { ok: true };
@@ -979,59 +942,6 @@ export async function countBookingsByShop(
     if (row.booking_date === today) counts.today += 1;
     else if (row.booking_date > today) counts.upcoming += 1;
     else counts.past += 1;
-  }
-  return counts;
-}
-
-// ----- Read: per-customer no-show history (this shop only) ----------------
-
-/**
- * Count no-show bookings per customer phone, scoped to ONE shop. Lets the
- * shop's today/bookings views flag repeat no-shows beside each row.
- *
- * Strictly per-shop: every count is filtered by `shop_id` taken from the
- * caller's verified session, so this never leaks another shop's history.
- *
- * Takes the distinct phones already loaded by `listBookingsByShop` and runs
- * ONE grouped read (`.in("customer_phone", phones)`), then tallies in JS —
- * supabase-js has no first-class GROUP BY, and an N+1 (one query per phone)
- * would be wasteful. Returns a Map keyed by phone; a phone with no no-shows
- * is simply absent — callers default to 0.
- *
- * Bookings with a null `customer_phone` (anonymous / shop-made without a
- * number) can't be attributed to a customer, so they're never counted.
- */
-export async function getShopNoShowCounts(
-  shopId: string,
-  phones: string[],
-): Promise<Map<string, number>> {
-  const counts = new Map<string, number>();
-
-  // Distinct, non-empty phones only — drop nulls/blanks before the round-trip.
-  const distinct = Array.from(
-    new Set(phones.filter((p) => p.trim().length > 0)),
-  );
-  if (distinct.length === 0) return counts;
-
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("bookings")
-    .select("customer_phone")
-    .eq("shop_id", shopId)
-    .eq("status", "no_show")
-    .in("customer_phone", distinct);
-
-  if (error || !data) {
-    // Non-fatal: a missing badge must never break the queue view. Log the
-    // real detail server-side and degrade to "no known no-shows".
-    console.error("getShopNoShowCounts error:", error);
-    return counts;
-  }
-
-  for (const row of data as { customer_phone: string | null }[]) {
-    const phone = row.customer_phone;
-    if (!phone) continue;
-    counts.set(phone, (counts.get(phone) ?? 0) + 1);
   }
   return counts;
 }
@@ -1102,6 +1012,21 @@ type CustomerBookingRow = {
   status: BookingStatus;
   shops: { name: string; address: string | null } | null;
   shop_staff: { name: string; role: string | null } | null;
+  // reviews embeds the booking's review. Because `reviews.booking_id` is UNIQUE,
+  // PostgREST infers a ONE-TO-ONE relationship and returns a single object (or
+  // null) — NOT an array. We type it as object-or-array and normalise on read so
+  // the mapping is robust either way. created_at/updated_at derive the `edited`
+  // flag (updated_at > created_at ⟺ edited once already).
+  reviews: EmbeddedReviewRow | EmbeddedReviewRow[] | null;
+};
+
+/** The review columns embedded into a booking row (see `CustomerBookingRow`). */
+type EmbeddedReviewRow = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 /**
@@ -1125,7 +1050,8 @@ export async function listBookingsByCustomerPhone(
       `id, shop_id, booking_date, slot_time, service_duration_minutes,
        service_name, service_price, status,
        shops ( name, address ),
-       shop_staff ( name, role )`,
+       shop_staff ( name, role ),
+       reviews ( id, rating, comment, created_at, updated_at )`,
     )
     .eq("customer_phone", phone)
     .order("booking_date", { ascending: false })
@@ -1134,20 +1060,37 @@ export async function listBookingsByCustomerPhone(
   if (error || !data) return [];
 
   const mapped: CustomerBookingItem[] = (data as unknown as CustomerBookingRow[]).map(
-    (r) => ({
-      id: r.id,
-      shopId: r.shop_id,
-      shopName: r.shops?.name ?? "—",
-      shopAddress: r.shops?.address ?? null,
-      bookingDate: r.booking_date,
-      slotTime: r.slot_time.slice(0, 5),
-      serviceDurationMinutes: r.service_duration_minutes,
-      serviceName: r.service_name,
-      servicePrice: priceFromDb(r.service_price),
-      staffName: r.shop_staff?.name ?? null,
-      staffRole: r.shop_staff?.role ?? null,
-      status: r.status,
-    }),
+    (r) => {
+      // PostgREST returns the embed as an object (one-to-one) or, defensively,
+      // an array — normalise to the single review row (or null).
+      const reviewRow = Array.isArray(r.reviews)
+        ? r.reviews[0] ?? null
+        : r.reviews;
+      return {
+        id: r.id,
+        shopId: r.shop_id,
+        shopName: r.shops?.name ?? "—",
+        shopAddress: r.shops?.address ?? null,
+        bookingDate: r.booking_date,
+        slotTime: r.slot_time.slice(0, 5),
+        serviceDurationMinutes: r.service_duration_minutes,
+        serviceName: r.service_name,
+        servicePrice: priceFromDb(r.service_price),
+        staffName: r.shop_staff?.name ?? null,
+        staffRole: r.shop_staff?.role ?? null,
+        status: r.status,
+        review: reviewRow
+          ? {
+              id: reviewRow.id,
+              rating: reviewRow.rating,
+              comment: reviewRow.comment,
+              edited:
+                new Date(reviewRow.updated_at).getTime() >
+                new Date(reviewRow.created_at).getTime(),
+            }
+          : null,
+      };
+    },
   );
 
   // Upcoming bookings (today or later) first in chronological order, then
@@ -1168,17 +1111,30 @@ export async function listBookingsByCustomerPhone(
 export type ShopQueueStatus = {
   /** Confirmed bookings remaining today (slot hasn't started yet). */
   waitingCount: number;
-  /** Sum of remaining service durations — rough customer-facing wait estimate. */
+  /**
+   * Busiest staff line's remaining service time, in minutes. Staff serve in
+   * parallel, so this is the MAX load across staff lines — not the sum across
+   * all bookings. Two 30-min bookings on two different staff clear in 30 min,
+   * not 60.
+   */
   estimatedWaitMinutes: number;
 };
 
 /**
  * Returns how many confirmed bookings are still ahead for today and an
- * estimated total wait time. Used on the public shop detail page so customers
- * can gauge busyness before deciding to book.
+ * estimated wait time. Used on the public shop detail page so customers can
+ * gauge busyness before deciding to book.
  *
  * "Remaining" = slot_time >= now (slots in the past are already being served
  * or done, so they don't add to the wait).
+ *
+ * Wait estimate models the shop's parallel capacity: each staff member is an
+ * independent service line, so a booking only delays others assigned to the
+ * SAME staff member. The estimate is therefore the busiest line's summed
+ * service time (a back-to-back-from-now lower bound on when the backlog
+ * clears), not the sum of every booking's duration. Legacy single-queue shops
+ * (no per-booking staff) share one sequential lane, which falls out naturally
+ * since their `staff_id` is null.
  */
 export async function getShopPublicQueueStatus(
   shopId: string,
@@ -1189,7 +1145,7 @@ export async function getShopPublicQueueStatus(
 
   const { data } = await supabase
     .from("bookings")
-    .select("service_duration_minutes")
+    .select("service_duration_minutes, staff_id")
     .eq("shop_id", shopId)
     .eq("booking_date", today)
     .eq("status", "confirmed")
@@ -1197,10 +1153,21 @@ export async function getShopPublicQueueStatus(
 
   if (!data || data.length === 0) return { waitingCount: 0, estimatedWaitMinutes: 0 };
 
-  const estimatedWaitMinutes = (data as { service_duration_minutes: number | null }[]).reduce(
-    (sum, b) => sum + (b.service_duration_minutes ?? 30),
-    0,
-  );
+  const rows = data as {
+    service_duration_minutes: number | null;
+    staff_id: string | null;
+  }[];
 
-  return { waitingCount: data.length, estimatedWaitMinutes };
+  // Accumulate remaining service time per staff line; null staff = the single
+  // shared lane of a legacy single-queue shop. The wait is the busiest line.
+  const SINGLE_QUEUE_LANE = "__single_queue__";
+  const loadByLine = new Map<string, number>();
+  for (const b of rows) {
+    const line = b.staff_id ?? SINGLE_QUEUE_LANE;
+    const duration = b.service_duration_minutes ?? 30;
+    loadByLine.set(line, (loadByLine.get(line) ?? 0) + duration);
+  }
+  const estimatedWaitMinutes = Math.max(...loadByLine.values());
+
+  return { waitingCount: rows.length, estimatedWaitMinutes };
 }

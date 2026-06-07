@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -11,11 +11,6 @@ import { Icon } from "@/components/ui/Icon";
 import { registerShop, type RegisterShopState } from "./actions";
 import type { CategoryOption } from "@/lib/services/shops";
 
-/**
- * Public shop-registration form. SRP: collects + submits — does not own
- * the persistence call (delegated to the server action) and does not own
- * the option list (received as a prop from the route — DIP).
- */
 export function ShopRegistrationForm({
   categories,
 }: {
@@ -27,9 +22,23 @@ export function ShopRegistrationForm({
   );
 
   const errors = state?.fieldErrors;
+  const values = state?.values;
+
+  // On a failed submit, scroll the first invalid field into view and focus it.
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (!state) return;
+    const form = formRef.current;
+    if (!form) return;
+    const firstInvalid = form.querySelector<HTMLElement>('[aria-invalid="true"]');
+    const target = firstInvalid ?? form.querySelector<HTMLElement>('[role="alert"]');
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    firstInvalid?.focus({ preventScroll: true });
+  }, [state]);
 
   return (
-    <form action={formAction} className="space-y-8" noValidate>
+    <form ref={formRef} action={formAction} className="space-y-8" noValidate>
       <Section
         icon="storefront"
         title="ข้อมูลร้าน"
@@ -41,16 +50,22 @@ export function ShopRegistrationForm({
           required
           placeholder="เช่น The Velvet Roast Coffee"
           maxLength={120}
+          defaultValue={values?.name ?? ""}
           errorText={errors?.name}
           disabled={pending}
         />
+        {/* key=ts forces a remount on every failed submit so defaultValue is
+            re-applied even when the same category is submitted twice in a row.
+            React 19 does not re-apply <select defaultValue> on re-render (unlike
+            <input>), so this is the only compiler-safe way to restore the value. */}
         <Select
+          key={state?.ts ?? 0}
           name="categoryId"
           label="ประเภทธุรกิจ"
           required
           errorText={errors?.categoryId}
           disabled={pending}
-          defaultValue=""
+          defaultValue={values?.categoryId ?? ""}
         >
           <option value="" disabled>
             เลือกประเภทธุรกิจ
@@ -66,6 +81,7 @@ export function ShopRegistrationForm({
           label="คำอธิบายสั้นๆ"
           placeholder="บอกเล่าจุดเด่นและประสบการณ์ที่ลูกค้าจะได้รับ..."
           rows={4}
+          defaultValue={values?.description ?? ""}
           errorText={errors?.description}
           disabled={pending}
           maxLength={500}
@@ -75,11 +91,15 @@ export function ShopRegistrationForm({
           label="ที่อยู่ร้าน"
           placeholder="ระบุที่อยู่หรือชื่ออาคาร / ห้าง"
           iconLeft={<Icon name="location_on" />}
+          defaultValue={values?.address ?? ""}
           errorText={errors?.address}
           disabled={pending}
         />
         <LocationSearchPicker
           required
+          defaultProvince={values?.province ?? ""}
+          defaultDistrict={values?.district ?? ""}
+          defaultSubdistrict={values?.subdistrict ?? ""}
           provinceError={errors?.province}
           districtError={errors?.district}
           subdistrictError={errors?.subdistrict}
@@ -91,6 +111,7 @@ export function ShopRegistrationForm({
           placeholder="0xxxxxxxxx"
           iconLeft={<Icon name="phone" />}
           autoComplete="off"
+          defaultValue={values?.contactPhone ?? ""}
           errorText={errors?.contactPhone}
           disabled={pending}
         />
@@ -108,6 +129,7 @@ export function ShopRegistrationForm({
           placeholder="ชื่อจริงของผู้ดำเนินกิจการ"
           iconLeft={<Icon name="person" />}
           autoComplete="name"
+          defaultValue={values?.ownerName ?? ""}
           errorText={errors?.ownerName}
           disabled={pending}
         />
@@ -119,6 +141,7 @@ export function ShopRegistrationForm({
           iconLeft={<Icon name="phone" />}
           autoComplete="tel"
           helperText="เบอร์นี้ใช้สำหรับเข้าสู่ระบบร้าน"
+          defaultValue={values?.ownerPhone ?? ""}
           errorText={errors?.ownerPhone}
           disabled={pending}
         />
@@ -129,6 +152,7 @@ export function ShopRegistrationForm({
           type="email"
           iconLeft={<Icon name="mail" />}
           autoComplete="email"
+          defaultValue={values?.ownerEmail ?? ""}
           errorText={errors?.ownerEmail}
           disabled={pending}
         />
@@ -164,11 +188,6 @@ export function ShopRegistrationForm({
   );
 }
 
-/**
- * Visual grouping for a form section. SRP: layout only — no business logic.
- * Kept local because it is not reused elsewhere; promote to /components/ui
- * the moment a second page needs the same pattern.
- */
 function Section({
   icon,
   title,

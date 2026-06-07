@@ -3,12 +3,12 @@ import { Icon } from "@/components/ui/Icon";
 import { requireShopSession } from "@/lib/auth/shop-session-server";
 import {
   getBookingContext,
-  getShopNoShowCounts,
   listBookingsByShop,
   type BookingListItem,
   type BookingStatus,
 } from "@/lib/services/bookings";
 import { cn } from "@/lib/cn";
+import { getBangkokNow } from "@/lib/time/bangkok";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { TodayBookingRow } from "./TodayBookingRow";
 import { NewBookingDialog } from "./bookings/NewBookingDialog";
@@ -23,14 +23,15 @@ const PREVIEW_LIMIT = 5;
 
 type FilterKey = "confirmed" | "completed" | "cancelled" | "all";
 
-// Ordering controls how mixed-status lists read: confirmed first (still
-// actionable), then completed (done), then cancelled/no_show (history).
-// Matches the left-to-right order of the summary tiles above the list.
+// Primary sort key: confirmed first (still actionable), then completed
+// (done), then cancelled (history) — matching the left-to-right order of the
+// summary tiles. Within each group, rows are then ordered by proximity to
+// "now" (see the comparator in ShopHomePage): the next queue to arrive rises
+// to the top, already-passed slots sink below.
 const STATUS_ORDER: Record<BookingStatus, number> = {
   confirmed: 0,
   completed: 1,
   cancelled: 2,
-  no_show: 2,
 };
 
 function parseFilter(raw: string | undefined): FilterKey {
@@ -47,7 +48,7 @@ function matchesFilter(b: BookingListItem, filter: FilterKey): boolean {
     case "completed":
       return b.status === "completed";
     case "cancelled":
-      return b.status === "cancelled" || b.status === "no_show";
+      return b.status === "cancelled";
     case "all":
       return true;
   }
@@ -68,40 +69,52 @@ export default async function ShopHomePage({
     Number.isFinite(Number(rawShow)) ? Number(rawShow) : PREVIEW_LIMIT,
   );
 
-  // Today's bookings must resolve first (the no-show lookup is keyed on their
-  // phones); context + count reads are independent, so they fan out concurrently.
-  // getShopNoShowCounts is intentionally NOT date-scoped — it counts a phone's
-  // full no-show history at THIS shop, surfaced beside today's rows.
-  const bookings = await listBookingsByShop(session.shopId, "today");
-  const [context, noShowCounts] = await Promise.all([
+  // Today's bookings + the new-booking dialog's context are independent reads,
+  // so they fan out concurrently.
+  const [bookings, context] = await Promise.all([
+    listBookingsByShop(session.shopId, "today"),
     getBookingContext(session.shopId),
-    getShopNoShowCounts(
-      session.shopId,
-      bookings.map((b) => b.customerPhone).filter((p): p is string => Boolean(p)),
-    ),
   ]);
 
   const counts = {
     confirmed: bookings.filter((b) => b.status === "confirmed").length,
     completed: bookings.filter((b) => b.status === "completed").length,
-    cancelled: bookings.filter(
-      (b) => b.status === "cancelled" || b.status === "no_show",
-    ).length,
+    cancelled: bookings.filter((b) => b.status === "cancelled").length,
   };
+
+  // "Now" in Bangkok, as "HH:MM" — same fixed-width shape as slotTime, so a
+  // plain string compare is already chronological.
+  const now = getBangkokNow().timeHHMM;
 
   const visible = bookings
     .filter((b) => matchesFilter(b, filter))
     .sort((a, b) => {
+      // 1. Actionable queue first (confirmed), then completed, then history.
       const order = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
-      return order !== 0 ? order : a.slotTime.localeCompare(b.slotTime);
+      if (order !== 0) return order;
+      // 2. Upcoming slots before already-passed ones, so the next queue to
+      //    arrive sits at the very top (a slot at exactly "now" counts as
+      //    upcoming).
+      const aPast = a.slotTime < now;
+      const bPast = b.slotTime < now;
+      if (aPast !== bPast) return aPast ? 1 : -1;
+      // 3. Upcoming: soonest first (ascending). Passed: most-recent first
+      //    (descending) so a just-missed queue stays nearest the top.
+      return aPast
+        ? b.slotTime.localeCompare(a.slotTime)
+        : a.slotTime.localeCompare(b.slotTime);
     });
 
   const preview = visible.slice(0, showCount);
   const overflow = Math.max(0, visible.length - showCount);
 
   return (
-    <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-lg">
-      <PageHeader eyebrow="ยินดีต้อนรับสู่ร้าน" title={session.shopName} />
+    <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-md">
+      <PageHeader
+        eyebrow="ยินดีต้อนรับสู่ร้าน"
+        title={session.shopName}
+        description="ภาพรวมคิวและการจองของร้านวันนี้"
+      />
 
       <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 space-y-stack-md">
         <header className="space-y-2">
@@ -158,25 +171,18 @@ export default async function ShopHomePage({
         ) : visible.length === 0 ? (
           <EmptyState kind="filter-empty" />
         ) : (
-          <ul className="space-y-1">
-            {preview.map((b, i) => (
-              <TodayBookingRow
-                key={b.id}
-                booking={b}
-                index={i}
-                noShowCount={
-                  b.customerPhone ? (noShowCounts.get(b.customerPhone) ?? 0) : 0
-                }
-              />
+          <ul className="space-y-2.5">
+            {preview.map((b) => (
+              <TodayBookingRow key={b.id} booking={b} />
             ))}
             {overflow > 0 ? (
               <li>
                 <Link
                   href={`/shop?${new URLSearchParams({ ...(filter !== "all" && { filter }), show: String(showCount + PREVIEW_LIMIT) })}`}
                   scroll={false}
-                  className="block text-center text-label-md text-primary hover:underline pt-2"
+                  className="mt-1 block rounded-xl border border-dashed border-outline-variant py-2.5 text-center text-label-md text-primary transition-colors hover:border-primary hover:bg-primary/5"
                 >
-                  +{overflow} รายการ
+                  ดูอีก {overflow} รายการ
                 </Link>
               </li>
             ) : null}

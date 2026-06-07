@@ -11,43 +11,32 @@ import type {
 import {
   cancelBookingByShopAction,
   markBookingCompleted,
-  markBookingNoShowAction,
 } from "./bookings/actions";
 
 /**
- * Compact row used by the shop dashboard's "การจองวันนี้" list. Confirmed
- * bookings expose two explicit, equally-discoverable actions: a filled
- * "เสร็จสิ้น" button (mark completed) and an outlined ✕ button (cancel the
- * queue). Other statuses render as a static row with just a status chip.
+ * Booking card used by the shop dashboard's "การจองวันนี้" list.
  *
- * SRP: presentation + action plumbing only. The actual status transitions
- * + ownership checks live in the server actions / service layer.
+ * Layout is a two-zone card so a narrow (375px) screen never crams the time,
+ * customer details, and actions onto one line:
+ *
+ *   ┌ content ─────────────────────────┐ ┌ actions ┐
+ *   │ [time]  name              status  │ │ เสร็จสิ้น │  ← stacks BELOW content on
+ *   │         service · duration        │ │  ยกเลิก  │    mobile, sits to the RIGHT
+ *   │         👤 staff                   │ └──────────┘    on sm+ (`sm:flex-row`).
+ *   └───────────────────────────────────┘
+ *
+ * Confirmed bookings expose two labelled actions (complete / cancel); other
+ * statuses render the content zone only, with a status chip.
+ *
+ * SRP: presentation + action plumbing only. Status transitions + ownership
+ * checks live in the server actions / service layer.
  */
-export function TodayBookingRow({
-  booking,
-  index,
-  noShowCount = 0,
-}: {
-  booking: BookingListItem;
-  index: number;
-  noShowCount?: number;
-}) {
-  // Zebra striping for readability: every other row gets a faint fill.
-  const striped = index % 2 === 1;
+export function TodayBookingRow({ booking }: { booking: BookingListItem }) {
+  const isConfirmed = booking.status === "confirmed";
+  const chip = STATUS_CHIP[booking.status];
 
-  if (booking.status !== "confirmed") {
-    return (
-      <li
-        className={cn(
-          "flex items-center gap-3 p-3 rounded-lg",
-          striped && "bg-surface-container-low/50",
-        )}
-      >
-        <RowInner booking={booking} noShowCount={noShowCount} />
-      </li>
-    );
-  }
-
+  // Reused in every confirm dialog body so the shop owner can double-check who
+  // they're acting on before the status changes.
   const customer = (
     <p>
       ลูกค้า{" "}
@@ -60,150 +49,126 @@ export function TodayBookingRow({
   return (
     <li
       className={cn(
-        "flex items-center gap-3 p-3 rounded-lg",
-        striped && "bg-surface-container-low/50",
+        "rounded-2xl border p-3.5 sm:p-4 transition-colors",
+        isConfirmed
+          ? "border-outline-variant bg-surface-container-low/30"
+          : "border-outline-variant/50",
       )}
     >
-      <RowInner booking={booking} withChip={false} noShowCount={noShowCount} />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        {/* ── Content zone ─────────────────────────────────────────── */}
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <div className="flex shrink-0 min-w-[3.5rem] flex-col items-center justify-center rounded-xl bg-primary/10 px-2.5 py-2 leading-none">
+            <span className="font-display text-headline-md font-bold text-primary">
+              {booking.slotTime}
+            </span>
+            <span className="mt-1 text-label-sm text-primary/60">น.</span>
+          </div>
 
-      <div className="flex items-center gap-2 shrink-0">
-        <ConfirmDialog
-          trigger={
-            <button
-              type="button"
-              aria-label={`ทำเครื่องหมายว่าเสร็จสิ้น ${booking.customerName}`}
-              className="inline-flex items-center justify-center size-9 rounded-full bg-success text-on-success hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 active:scale-[0.98] transition-all"
-            >
-              <Icon name="check" size={18} />
-            </button>
-          }
-          title="ทำเครื่องหมายว่าเสร็จสิ้น?"
-          description={
-            <div className="space-y-1">
-              {customer}
-              <p>
-                เมื่อยืนยันแล้ว สถานะของรายการนี้จะเปลี่ยนเป็น
-                &ldquo;เสร็จสิ้น&rdquo;
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <p className="truncate text-body-md font-bold text-on-surface">
+                {booking.customerName}
               </p>
+              {!isConfirmed ? (
+                <Chip variant={chip.variant} size="sm" className="shrink-0">
+                  {chip.label}
+                </Chip>
+              ) : null}
             </div>
-          }
-          confirmLabel="เสร็จสิ้น"
-          cancelLabel="ปิด"
-          onConfirm={() => markBookingCompleted(booking.id)}
-        />
 
-        <ConfirmDialog
-          trigger={
-            <button
-              type="button"
-              aria-label={`ทำเครื่องหมายว่าไม่มาตามนัด ${booking.customerName}`}
-              className="inline-flex items-center justify-center size-9 rounded-full border-2 border-outline-variant text-on-surface-variant hover:border-tertiary hover:text-tertiary hover:bg-tertiary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-tertiary focus-visible:ring-offset-2 active:scale-[0.98] transition-all"
-            >
-              <Icon name="event_busy" size={18} />
-            </button>
-          }
-          title="ทำเครื่องหมายว่าไม่มาตามนัด?"
-          description={
-            <div className="space-y-1">
-              {customer}
-              <p>
-                เมื่อยืนยันแล้ว คิวนี้จะถูกบันทึกว่าลูกค้าไม่มาตามนัด
-                และนับรวมในประวัติการไม่มาของลูกค้ารายนี้ที่ร้านของคุณ
-              </p>
-            </div>
-          }
-          confirmLabel="ไม่มาตามนัด"
-          cancelLabel="ปิด"
-          onConfirm={() => markBookingNoShowAction(booking.id)}
-        />
+            <p className="mt-1 truncate text-label-md text-on-surface-variant">
+              {booking.serviceName ?? "บริการ"} · {booking.serviceDurationMinutes}{" "}
+              นาที
+            </p>
 
-        <ConfirmDialog
-          trigger={
-            <button
-              type="button"
-              aria-label={`ยกเลิกการจองของ ${booking.customerName}`}
-              className="inline-flex items-center justify-center size-9 rounded-full border-2 border-outline-variant text-on-surface-variant hover:border-error hover:text-error hover:bg-error/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-2 active:scale-[0.98] transition-all"
-            >
-              <Icon name="close" size={18} />
-            </button>
-          }
-          title="ยกเลิกการจองหรือไม่?"
-          description={
-            <div className="space-y-1">
-              {customer}
-              <p>
-                เมื่อยืนยันแล้ว คิวนี้จะถูกปลดออกและเปิดให้ลูกค้าท่านอื่นจองแทนได้
-              </p>
-            </div>
-          }
-          confirmLabel="ยกเลิกการจอง"
-          cancelLabel="ไม่"
-          destructive
-          onConfirm={() => cancelBookingByShopAction(booking.id)}
-        />
+            {/* Staff chip (never overflows into the action zone). */}
+            {booking.staffName ? (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-primary-container/15 px-2 py-0.5 text-label-sm font-semibold text-primary">
+                  <Icon name="person" size={13} className="shrink-0" />
+                  <span className="truncate">{booking.staffName}</span>
+                </span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* ── Action zone (confirmed only) ─────────────────────────── */}
+        {isConfirmed ? (
+          <div className="grid grid-cols-2 gap-2 border-t border-outline-variant/60 pt-3 sm:flex sm:items-center sm:shrink-0 sm:border-t-0 sm:border-l sm:border-outline-variant/60 sm:pt-0 sm:pl-4">
+            <ConfirmDialog
+              trigger={
+                <button
+                  type="button"
+                  aria-label={`ทำเครื่องหมายว่าเสร็จสิ้น ${booking.customerName}`}
+                  className={cn(ACTION_BASE, COMPLETE_STYLE)}
+                >
+                  <Icon name="check" size={18} />
+                  <span>เสร็จสิ้น</span>
+                </button>
+              }
+              title="ทำเครื่องหมายว่าเสร็จสิ้น?"
+              description={
+                <div className="space-y-1">
+                  {customer}
+                  <p>
+                    เมื่อยืนยันแล้ว สถานะของรายการนี้จะเปลี่ยนเป็น
+                    &ldquo;เสร็จสิ้น&rdquo;
+                  </p>
+                </div>
+              }
+              confirmLabel="เสร็จสิ้น"
+              cancelLabel="ปิด"
+              onConfirm={() => markBookingCompleted(booking.id)}
+            />
+
+            <ConfirmDialog
+              trigger={
+                <button
+                  type="button"
+                  aria-label={`ยกเลิกการจองของ ${booking.customerName}`}
+                  className={cn(ACTION_BASE, CANCEL_STYLE)}
+                >
+                  <Icon name="close" size={18} />
+                  <span>ยกเลิก</span>
+                </button>
+              }
+              title="ยกเลิกการจองหรือไม่?"
+              description={
+                <div className="space-y-1">
+                  {customer}
+                  <p>
+                    เมื่อยืนยันแล้ว คิวนี้จะถูกปลดออกและเปิดให้ลูกค้าท่านอื่นจองแทนได้
+                  </p>
+                </div>
+              }
+              confirmLabel="ยกเลิกการจอง"
+              cancelLabel="ไม่"
+              destructive
+              onConfirm={() => cancelBookingByShopAction(booking.id)}
+            />
+          </div>
+        ) : null}
       </div>
     </li>
   );
 }
 
-function RowInner({
-  booking,
-  withChip = true,
-  noShowCount = 0,
-}: {
-  booking: BookingListItem;
-  withChip?: boolean;
-  noShowCount?: number;
-}) {
-  const chip = STATUS_CHIP[booking.status];
-  return (
-    <>
-      <div className="shrink-0 self-stretch flex items-center justify-center min-w-[3.75rem] px-2.5 rounded-xl bg-primary/10 text-primary font-display text-headline-md font-bold">
-        {booking.slotTime}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-body-md text-on-surface font-semibold truncate">
-          {booking.customerName}
-        </p>
-        {booking.status === "confirmed" &&
-        booking.customerPhone &&
-        noShowCount > 0 ? (
-          <Chip
-            variant="danger"
-            size="sm"
-            className="mt-0.5"
-            iconLeft={<Icon name="event_busy" size={12} />}
-          >
-            ไม่มาตามนัด {noShowCount} ครั้ง
-          </Chip>
-        ) : null}
-        <p className="text-label-md text-on-surface-variant truncate mt-0.5">
-          {booking.serviceName ?? "บริการ"} · {booking.serviceDurationMinutes} นาที
-        </p>
-        {booking.staffName ? (
-          <span className="inline-flex max-w-full items-center gap-1 mt-0.5 px-2 py-0.5 rounded-full bg-primary-container/15 text-primary text-label-sm font-semibold">
-            <Icon name="person" size={13} className="shrink-0" />
-            <span className="truncate">{booking.staffName}</span>
-          </span>
-        ) : null}
-      </div>
-      {withChip ? (
-        <Chip variant={chip.variant} size="sm">
-          {chip.label}
-        </Chip>
-      ) : null}
-    </>
-  );
-}
+const ACTION_BASE =
+  "inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-3 text-label-md font-semibold transition-all active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+
+const COMPLETE_STYLE =
+  "bg-success text-on-success hover:opacity-90 focus-visible:ring-success";
+
+const CANCEL_STYLE =
+  "border-2 border-outline-variant text-on-surface-variant hover:border-error hover:bg-error/5 hover:text-error focus-visible:ring-error";
 
 const STATUS_CHIP: Record<
   BookingStatus,
-  { label: string; variant: "confirmed" | "success" | "danger" | "tertiary" }
+  { label: string; variant: "confirmed" | "success" | "danger" }
 > = {
   confirmed: { label: "รอรับบริการ", variant: "confirmed" },
   completed: { label: "เสร็จสิ้น", variant: "success" },
   cancelled: { label: "ยกเลิก", variant: "danger" },
-  // Gold (tertiary), not red — distinguishes "didn't show" from shop "ยกเลิก",
-  // and matches the gold no-show action button.
-  no_show: { label: "ไม่มาตามนัด", variant: "tertiary" },
 };

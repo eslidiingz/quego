@@ -17,6 +17,10 @@ import {
   listActiveServicesForShops,
   type BookableService,
 } from "@/lib/services/services";
+import {
+  getRatingSummariesForShops,
+  type ShopRatingSummary,
+} from "@/lib/services/reviews";
 
 // ----- Types --------------------------------------------------------------
 
@@ -44,9 +48,18 @@ export type CreateShopInput = {
   ownerEmail?: string;
 };
 
+/** Which unique field clashed, so the form can flag the right input inline. */
+export type ShopDuplicateField = "ownerPhone" | "contactPhone" | "ownerEmail";
+
 export type CreateShopResult =
   | { ok: true; id: string }
-  | { ok: false; code: "category_not_found" | "duplicate" | "unknown"; message: string };
+  | {
+      ok: false;
+      code: "category_not_found" | "duplicate" | "unknown";
+      message: string;
+      /** Set only when `code === "duplicate"`. */
+      field?: ShopDuplicateField;
+    };
 
 export type ShopListItem = {
   id: string;
@@ -221,6 +234,8 @@ export type PublicShop = {
    *  price, and free-text service search on the discovery page. */
   services: BookableService[];
   openState: ShopOpenState;
+  /** Aggregate star rating from completed-booking reviews. */
+  rating: ShopRatingSummary;
 };
 
 export type CategoryWithShops = {
@@ -288,19 +303,23 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
   const now = getBangkokNow();
   const openByShop = new Map<string, ShopOpenState>();
   let servicesByShop = new Map<string, BookableService[]>();
+  let ratingByShop = new Map<string, ShopRatingSummary>();
   const shopIds = shopRows.map((s) => s.id);
   if (shopIds.length > 0) {
-    // Today's hours + every shop's active services in two parallel batched
-    // queries — the card needs both, and N+1 per shop would be wasteful.
-    const [hoursResult, services] = await Promise.all([
+    // Today's hours + every shop's active services + rating aggregates in
+    // three parallel batched queries — the card needs all three, and N+1
+    // per shop would be wasteful.
+    const [hoursResult, services, ratings] = await Promise.all([
       supabase
         .from("shop_business_hours")
         .select("shop_id, is_open, open_time, close_time")
         .in("shop_id", shopIds)
         .eq("day_of_week", now.dayOfWeek),
       listActiveServicesForShops(shopIds),
+      getRatingSummariesForShops(shopIds),
     ]);
     servicesByShop = services;
+    ratingByShop = ratings;
     for (const h of hoursResult.data ?? []) {
       openByShop.set(
         h.shop_id,
@@ -326,6 +345,7 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
       service_duration_minutes: s.service_duration_minutes,
       services: servicesByShop.get(s.id) ?? [],
       openState: openByShop.get(s.id) ?? "unknown",
+      rating: ratingByShop.get(s.id) ?? { average: 0, count: 0 },
     });
     shopsByCategory.set(s.category_id, list);
   }
@@ -388,28 +408,72 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
     };
   }
 
-  // owner_phone is the shop's login key (findApprovedShopByPhone), so it must
-  // be unique among live shops — two shops on one phone would make shop login
-  // ambiguous. Block re-use unless the prior shop was rejected (those owners
-  // may legitimately re-apply). App-level guard; the DB 23505 path below is the
-  // race backstop if a unique index is added later.
-  const { data: phoneOwner, error: phoneError } = await supabase
-    .from("shops")
-    .select("id")
-    .eq("owner_phone", input.ownerPhone)
-    .neq("status", "rejected")
-    .limit(1)
-    .maybeSingle();
+  // Email is identity-insensitive to case ("A@x.com" == "a@x.com"), so normalise
+  // before checking + storing; the unique index is on the stored (lowercased)
+  // value, keeping the app check and the DB backstop in agreement.
+  const ownerEmail = input.ownerEmail ? input.ownerEmail.toLowerCase() : undefined;
 
-  if (phoneError) {
-    return { ok: false, code: "unknown", message: phoneError.message };
-  }
-  if (phoneOwner) {
-    return {
-      ok: false,
-      code: "duplicate",
+  // Uniqueness guards among live (non-rejected) shops. owner_phone is the login
+  // key (findApprovedShopByPhone); contact_phone and owner_email must also be
+  // unique so a number/email can't be claimed by two shops. Each is checked
+  // within its OWN column only — a shop may legitimately reuse its owner_phone
+  // as its contact_phone, so we never cross-check columns. Rejected shops are
+  // excluded so a turned-down owner can re-apply. App-level guards; the partial
+  // unique indexes are the race backstop (23505 → mapped below).
+  const dupChecks: ReadonlyArray<{
+    column: "owner_phone" | "contact_phone" | "owner_email";
+    value: string;
+    field: ShopDuplicateField;
+    message: string;
+  }> = [
+    {
+      column: "owner_phone",
+      value: input.ownerPhone,
+      field: "ownerPhone",
       message: "เบอร์โทรนี้ถูกใช้สมัครร้านในระบบแล้ว",
-    };
+    },
+    ...(input.contactPhone
+      ? ([
+          {
+            column: "contact_phone" as const,
+            value: input.contactPhone,
+            field: "contactPhone" as const,
+            message: "เบอร์โทรร้านนี้ถูกใช้กับร้านอื่นในระบบแล้ว",
+          },
+        ] as const)
+      : []),
+    ...(ownerEmail
+      ? ([
+          {
+            column: "owner_email" as const,
+            value: ownerEmail,
+            field: "ownerEmail" as const,
+            message: "อีเมลนี้ถูกใช้กับร้านอื่นในระบบแล้ว",
+          },
+        ] as const)
+      : []),
+  ];
+
+  for (const check of dupChecks) {
+    const { data: clash, error: clashError } = await supabase
+      .from("shops")
+      .select("id")
+      .eq(check.column, check.value)
+      .neq("status", "rejected")
+      .limit(1)
+      .maybeSingle();
+
+    if (clashError) {
+      return { ok: false, code: "unknown", message: clashError.message };
+    }
+    if (clash) {
+      return {
+        ok: false,
+        code: "duplicate",
+        field: check.field,
+        message: check.message,
+      };
+    }
   }
 
   const { data, error } = await supabase
@@ -425,18 +489,28 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
       contact_phone: input.contactPhone || null,
       owner_name: input.ownerName,
       owner_phone: input.ownerPhone,
-      owner_email: input.ownerEmail || null,
+      owner_email: ownerEmail ?? null,
     })
     .select("id")
     .single();
 
   if (error) {
     if (error.code === "23505") {
-      return {
-        ok: false,
-        code: "duplicate",
-        message: "ข้อมูลนี้ถูกใช้ลงทะเบียนไว้แล้ว",
-      };
+      // Race backstop: map the violated index back to its field for an inline
+      // error, falling back to owner_phone (the only always-present unique col).
+      const detail = `${error.message} ${error.details ?? ""}`;
+      const field: ShopDuplicateField = detail.includes("contact_phone")
+        ? "contactPhone"
+        : detail.includes("owner_email")
+          ? "ownerEmail"
+          : "ownerPhone";
+      const message =
+        field === "contactPhone"
+          ? "เบอร์โทรร้านนี้ถูกใช้กับร้านอื่นในระบบแล้ว"
+          : field === "ownerEmail"
+            ? "อีเมลนี้ถูกใช้กับร้านอื่นในระบบแล้ว"
+            : "เบอร์โทรนี้ถูกใช้สมัครร้านในระบบแล้ว";
+      return { ok: false, code: "duplicate", field, message };
     }
     return { ok: false, code: "unknown", message: error.message };
   }
