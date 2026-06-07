@@ -14,6 +14,7 @@ import { signOutShop } from "@/app/shop/actions";
 const navItems = [
   { href: "/shop", label: "ภาพรวม", icon: "dashboard" },
   { href: "/shop/bookings", label: "รายการจอง", icon: "event_note" },
+  { href: "/shop/insights", label: "ข้อมูลเชิงลึก", icon: "insights" },
   { href: "/shop/staff", label: "พนักงาน", icon: "group" },
   { href: "/shop/services", label: "บริการ", icon: "stacks" },
   { href: "/shop/profile", label: "ข้อมูลร้าน", icon: "storefront" },

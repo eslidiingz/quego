@@ -94,3 +94,32 @@ export function getBangkokDateWindow(
   }
   return out;
 }
+
+/**
+ * Build a window of PAST Bangkok calendar dates ending YESTERDAY. Today is a
+ * partial day and is deliberately excluded so analytics (fill rate, etc.) over
+ * the window aren't skewed by an in-progress day. Returns `days` entries
+ * ordered oldest→newest: `[today-days, …, today-1]`.
+ *
+ * Mirror of `getBangkokDateWindow` but pointing backwards — used by the shop
+ * insights dashboard (OPP-19).
+ */
+export function getBangkokPastDates(
+  days: number,
+  at: Date = new Date(),
+): { dateYmd: string; dayOfWeek: BangkokNow["dayOfWeek"] }[] {
+  const today = getBangkokToday(at);
+  const [y, m, d] = today.split("-").map(Number);
+  const base = Date.UTC(y, m - 1, d);
+  const out: { dateYmd: string; dayOfWeek: BangkokNow["dayOfWeek"] }[] = [];
+  // i counts down from `days` to 1 → oldest first, excluding today (i = 0).
+  for (let i = days; i >= 1; i -= 1) {
+    const day = new Date(base - i * 24 * 60 * 60 * 1000);
+    const ymd = `${day.getUTCFullYear()}-${String(day.getUTCMonth() + 1).padStart(2, "0")}-${String(day.getUTCDate()).padStart(2, "0")}`;
+    out.push({
+      dateYmd: ymd,
+      dayOfWeek: day.getUTCDay() as BangkokNow["dayOfWeek"],
+    });
+  }
+  return out;
+}
