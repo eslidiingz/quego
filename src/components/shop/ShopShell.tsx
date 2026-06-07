@@ -140,8 +140,11 @@ export function ShopShell({
             {shopName}
           </h1>
           <div className="ml-auto flex items-center gap-2">
-            {headerSlot}
             <ThemeToggle />
+            {/* Notifier (the bell) is the right-most item so its `right-0`
+                dropdown anchors to the viewport edge and stays on-screen on
+                narrow widths — matching the admin shell. */}
+            {headerSlot}
           </div>
         </header>
         <div className="flex-1">{children}</div>

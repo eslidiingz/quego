@@ -77,6 +77,10 @@
   --color-on-success: #ffffff;
   --color-success-container: #c6f0de;
   --color-on-success-container: #00210d;
+  --color-info: #1e6fd9;
+  --color-on-info: #ffffff;
+  --color-info-container: #d6e6ff;
+  --color-on-info-container: #00316e;
 
   /* ---------- Typography ---------- */
   /* queva: Sora leads display (Latin/numerals) with Anuphan as the Thai
@@ -240,6 +244,10 @@
   --color-on-success: #003824;
   --color-success-container: #005138;
   --color-on-success-container: #c6f0de;
+  --color-info: #a8c8ff;
+  --color-on-info: #002e6a;
+  --color-info-container: #00468f;
+  --color-on-info-container: #d6e6ff;
 
   /* Shadows: teal-ink drop for real depth on dark; glows stay vivid. */
   --shadow-tinted: 0 8px 24px -8px color-mix(in oklab, #03100d 55%, transparent);

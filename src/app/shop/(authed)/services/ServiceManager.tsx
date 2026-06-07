@@ -18,6 +18,7 @@ import {
 } from "@/lib/validation/shop";
 import type { ShopServiceListItem } from "@/lib/services/services";
 import type { ServicePresetListItem } from "@/lib/services/service-presets";
+import { formatBaht } from "@/lib/baht";
 import {
   saveServiceAction,
   setServiceActiveAction,
@@ -636,11 +637,4 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       </Button>
     </div>
   );
-}
-
-function formatBaht(price: number): string {
-  return `${price.toLocaleString("th-TH", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })} บาท`;
 }

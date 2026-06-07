@@ -3,7 +3,6 @@ import { requireShopSession } from "@/lib/auth/shop-session-server";
 import {
   countBookingsByShop,
   getBookingContext,
-  getShopNoShowCounts,
   listBookingsByShop,
   type BookingsFilter,
 } from "@/lib/services/bookings";
@@ -41,22 +40,16 @@ export default async function ShopBookingsPage({
   const { view: rawView } = await searchParams;
   const view = parseView(rawView);
 
-  // Rows must resolve first (the no-show lookup is keyed on their phones); the
-  // other three reads are mutually independent, so they fan out concurrently.
-  // getShopNoShowCounts is intentionally NOT date-scoped — it counts a phone's
-  // full no-show history at THIS shop, surfaced beside this view's rows.
-  const rows = await listBookingsByShop(session.shopId, view);
-  const [counts, context, noShowCounts] = await Promise.all([
+  // Rows, tab counts, and the new-booking dialog context are independent reads,
+  // so they fan out concurrently.
+  const [rows, counts, context] = await Promise.all([
+    listBookingsByShop(session.shopId, view),
     countBookingsByShop(session.shopId),
     getBookingContext(session.shopId),
-    getShopNoShowCounts(
-      session.shopId,
-      rows.map((b) => b.customerPhone).filter((p): p is string => Boolean(p)),
-    ),
   ]);
 
   return (
-    <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-lg">
+    <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-md">
       <PageHeader
         eyebrow="การจองของลูกค้า"
         title="รายการจอง"
@@ -71,15 +64,7 @@ export default async function ShopBookingsPage({
       ) : (
         <div className="space-y-stack-md">
           {rows.map((booking) => (
-            <BookingRow
-              key={booking.id}
-              booking={booking}
-              noShowCount={
-                booking.customerPhone
-                  ? (noShowCounts.get(booking.customerPhone) ?? 0)
-                  : 0
-              }
-            />
+            <BookingRow key={booking.id} booking={booking} />
           ))}
         </div>
       )}

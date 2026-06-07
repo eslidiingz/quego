@@ -5,6 +5,7 @@ import {
   countPresetsByCategory,
 } from "@/lib/services/service-presets";
 import { Icon } from "@/components/ui/Icon";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { CategoryTabs, type PresetCategoryTab } from "./CategoryTabs";
 import { PresetsManager } from "./PresetsManager";
 
@@ -46,19 +47,12 @@ export default async function PresetsPage({
   const categories: PresetCategoryTab[] = data ?? [];
 
   return (
-    <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-lg">
-      <div>
-        <p className="text-label-md text-secondary uppercase tracking-widest mb-1">
-          จัดการ Taxonomy
-        </p>
-        <h1 className="font-display text-headline-lg text-on-background">
-          บริการ preset
-        </h1>
-        <p className="text-on-surface-variant mt-2">
-          ชุดบริการสำเร็จรูปของแต่ละหมวดหมู่ร้าน
-          ร้านในหมวดนั้นเลือกไปเพิ่มเป็นบริการของตัวเองได้ในคลิกเดียว
-        </p>
-      </div>
+    <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-md">
+      <PageHeader
+        eyebrow="จัดการ Taxonomy"
+        title="บริการ preset"
+        description="ชุดบริการสำเร็จรูปของแต่ละหมวดหมู่ร้าน ร้านในหมวดนั้นเลือกไปเพิ่มเป็นบริการของตัวเองได้ในคลิกเดียว"
+      />
 
       {categories.length === 0 ? (
         <NoCategories />

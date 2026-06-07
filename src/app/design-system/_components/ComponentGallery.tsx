@@ -13,6 +13,12 @@ import { Modal } from "@/components/ui/Modal";
 import { Toast, type ToastKind } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FormSection } from "@/components/ui/FormSection";
+import { PhoneInput } from "@/components/ui/PhoneInput";
+import { PinInput } from "@/components/ui/PinInput";
+import { LocationSearchPicker } from "@/components/ui/LocationSearchPicker";
+import { LocationCombobox, type LocationValue } from "@/components/ui/LocationCombobox";
+import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Subsection, DemoCard, DemoLabel } from "./kit";
 
@@ -25,6 +31,9 @@ import { Subsection, DemoCard, DemoLabel } from "./kit";
 export function ComponentGallery() {
   const [notif, setNotif] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [pin, setPin] = useState("");
+  const [loc, setLoc] = useState<LocationValue | null>(null);
   const [toast, setToast] = useState<{ id: number; kind: ToastKind; message: string } | null>(
     null,
   );
@@ -124,6 +133,28 @@ export function ComponentGallery() {
           />
         </DemoCard>
 
+        <DemoCard className="space-y-4">
+          <DemoLabel>PhoneInput — รับเฉพาะตัวเลข (จำกัด 10 หลัก, ตัดอักขระอื่นทิ้งทันที)</DemoLabel>
+          <PhoneInput
+            label="เบอร์โทร"
+            placeholder="08X-XXX-XXXX"
+            value={phone}
+            onChange={setPhone}
+            iconLeft={<Icon name="call" size={20} />}
+          />
+          <p className="text-label-sm text-on-surface-variant">
+            ค่าที่เก็บจริง (digits): <code>{phone || "—"}</code>
+          </p>
+        </DemoCard>
+
+        <DemoCard className="space-y-4">
+          <DemoLabel>PinInput — ช่องแยกตามหลัก (OTP), ตัวเลขล้วน, วาง/ลบ/ลูกศรได้</DemoLabel>
+          <PinInput label="รหัส PIN" value={pin} onChange={setPin} visible />
+          <p className="text-label-sm text-on-surface-variant">
+            ค่าปัจจุบัน: <code>{pin || "—"}</code>
+          </p>
+        </DemoCard>
+
         <DemoCard>
           <DemoLabel>FormSection — กรอบจัดกลุ่มฟิลด์</DemoLabel>
           <FormSection
@@ -134,6 +165,26 @@ export function ComponentGallery() {
             <Input label="ชื่อผู้ติดต่อ" placeholder="ชื่อ-นามสกุล" />
             <Input label="Line ID" placeholder="@yourshop" />
           </FormSection>
+        </DemoCard>
+      </Subsection>
+
+      {/* ---------- Location pickers ---------- */}
+      <Subsection title="Location pickers" className="space-y-5">
+        <DemoCard className="space-y-3">
+          <DemoLabel>
+            LocationSearchPicker — ตำบล → อำเภอ → จังหวัด (ใช้ในฟอร์มร้านทุกหน้า)
+          </DemoLabel>
+          <LocationSearchPicker />
+        </DemoCard>
+
+        <DemoCard className="space-y-3">
+          <DemoLabel>
+            LocationCombobox — ค้นหาพื้นที่ช่องเดียว (ใช้ใน hero / ตัวกรองหน้าค้นหา)
+          </DemoLabel>
+          <LocationCombobox value={loc} onChange={setLoc} />
+          <p className="text-label-sm text-on-surface-variant">
+            เลือก: <code>{loc ? [loc.subdistrict, loc.district, loc.province].filter(Boolean).join(", ") : "—"}</code>
+          </p>
         </DemoCard>
       </Subsection>
 
@@ -228,6 +279,23 @@ export function ComponentGallery() {
             }
             description="จัดการคิวลูกค้าและเรียกคิวถัดไปได้จากที่นี่"
           />
+        </DemoCard>
+      </Subsection>
+
+      {/* ---------- Brand & chrome ---------- */}
+      <Subsection title="Brand & chrome" className="space-y-5">
+        <DemoCard className="flex flex-wrap items-center gap-6">
+          <div>
+            <DemoLabel>QuevaWordmark — โลโก้ตัวอักษร (จุดท้ายสีคอรัล)</DemoLabel>
+            <div className="flex flex-wrap items-center gap-5">
+              <QuevaWordmark />
+              <QuevaWordmark className="text-[34px]" />
+            </div>
+          </div>
+        </DemoCard>
+        <DemoCard>
+          <DemoLabel>ThemeToggle — สลับสว่าง/มืด (กดเพื่อสลับทั้งหน้า)</DemoLabel>
+          <ThemeToggle />
         </DemoCard>
       </Subsection>
 

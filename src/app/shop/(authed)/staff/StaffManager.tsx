@@ -121,7 +121,7 @@ function StaffRow({
         member.isActive ? "" : "opacity-60"
       }`}
     >
-      <span className="flex items-center justify-center size-11 rounded-full bg-secondary-container text-on-secondary-container shrink-0 mt-0.5">
+      <span className="flex items-center justify-center size-11 rounded-full bg-primary-container text-on-primary-container shrink-0 mt-0.5">
         <Icon name="person" />
       </span>
 

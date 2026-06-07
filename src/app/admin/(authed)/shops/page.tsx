@@ -5,6 +5,7 @@ import {
   type ShopStatus,
 } from "@/lib/services/shops";
 import { FlashToast } from "@/components/ui/FlashToast";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopsList } from "./ShopsList";
 import { StatusTabs, type TabKey } from "./StatusTabs";
 
@@ -44,19 +45,13 @@ export default async function AdminShopsPage({
   ]);
 
   return (
-    <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-lg">
+    <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-md">
       <FlashToast notice={notice} />
-      <header>
-        <p className="text-label-md text-secondary uppercase tracking-widest mb-1">
-          จัดการสมาชิก
-        </p>
-        <h1 className="font-display text-headline-lg text-on-background">
-          จัดการร้านในระบบ
-        </h1>
-        <p className="text-on-surface-variant mt-2">
-          อนุมัติหรือปฏิเสธคำขอสมัครเป็นร้านในระบบ และดูสถานะของร้านที่ผ่านการตรวจสอบแล้ว
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="จัดการสมาชิก"
+        title="จัดการร้านในระบบ"
+        description="อนุมัติหรือปฏิเสธคำขอสมัครเป็นร้านในระบบ และดูสถานะของร้านที่ผ่านการตรวจสอบแล้ว"
+      />
 
       <StatusTabs active={tab} counts={counts} />
 

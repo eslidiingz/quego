@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { Chip } from "@/components/ui/Chip";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { countShopsByStatus } from "@/lib/services/shops";
 
@@ -29,15 +30,12 @@ export default async function AdminHomePage() {
   const pendingShops = shopCounts.pending;
 
   return (
-    <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-lg">
-      <div>
-        <p className="text-label-md text-secondary uppercase tracking-widest mb-1">
-          ยินดีต้อนรับ
-        </p>
-        <h1 className="font-display text-headline-lg text-on-background">
-          ภาพรวมระบบ
-        </h1>
-      </div>
+    <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-md">
+      <PageHeader
+        eyebrow="ยินดีต้อนรับ"
+        title="ภาพรวมระบบ"
+        description="สรุปจำนวนร้าน หมวดหมู่ และบริการ preset ในระบบ"
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <DashboardCard

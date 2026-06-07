@@ -1,32 +1,23 @@
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
+import { formatBaht } from "@/lib/baht";
 import type { BookingListItem, BookingStatus } from "@/lib/services/bookings";
 import { CancelBookingByShopButton } from "./CancelBookingByShopButton";
 import { CompleteBookingByShopButton } from "./CompleteBookingByShopButton";
-import { NoShowBookingByShopButton } from "./NoShowBookingByShopButton";
 
 const STATUS_MAP: Record<
   BookingStatus,
-  { label: string; variant: "confirmed" | "success" | "danger" | "tertiary" }
+  { label: string; variant: "confirmed" | "success" | "danger" }
 > = {
   confirmed: { label: "รอรับบริการ", variant: "confirmed" },
   completed: { label: "เสร็จสิ้น", variant: "success" },
   cancelled: { label: "ยกเลิก", variant: "danger" },
-  // Gold (tertiary), not red — distinguishes "didn't show" from shop "ยกเลิก",
-  // and matches the gold no-show action button.
-  no_show: { label: "ไม่มาตามนัด", variant: "tertiary" },
 };
 
-export function BookingRow({
-  booking,
-  noShowCount = 0,
-}: {
-  booking: BookingListItem;
-  noShowCount?: number;
-}) {
+export function BookingRow({ booking }: { booking: BookingListItem }) {
   const status = STATUS_MAP[booking.status];
-  const muted = booking.status === "cancelled" || booking.status === "no_show";
+  const muted = booking.status === "cancelled";
   const code = booking.id.slice(0, 8).toUpperCase();
 
   return (
@@ -46,17 +37,6 @@ export function BookingRow({
             <Chip variant={status.variant} size="sm">
               {status.label}
             </Chip>
-            {booking.status === "confirmed" &&
-            booking.customerPhone &&
-            noShowCount > 0 ? (
-              <Chip
-                variant="danger"
-                size="sm"
-                iconLeft={<Icon name="event_busy" size={13} />}
-              >
-                ไม่มาตามนัด {noShowCount} ครั้ง
-              </Chip>
-            ) : null}
           </div>
           {booking.serviceName ? (
             <p className="flex items-center gap-1.5 text-label-md text-on-surface-variant">
@@ -90,13 +70,8 @@ export function BookingRow({
           <PhoneRow phone={booking.customerPhone} />
         </div>
         {booking.status === "confirmed" ? (
-          <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-2 sm:shrink-0">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2 sm:shrink-0">
             <CompleteBookingByShopButton
-              bookingId={booking.id}
-              customerName={booking.customerName}
-              slotTime={booking.slotTime}
-            />
-            <NoShowBookingByShopButton
               bookingId={booking.id}
               customerName={booking.customerName}
               slotTime={booking.slotTime}
@@ -221,13 +196,6 @@ function formatPhone(raw: string): string {
     return `${raw.slice(0, 3)}-${raw.slice(3, 6)}-${raw.slice(6)}`;
   }
   return raw;
-}
-
-function formatBaht(price: number): string {
-  return `${price.toLocaleString("th-TH", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })} บาท`;
 }
 
 const THAI_DAY_LONG = [
