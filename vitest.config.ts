@@ -1,13 +1,15 @@
-import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
+import { defineConfig } from "vitest/config";
 
 /**
- * Unit-test config. Node environment (these are pure server-lib tests, no DOM).
- * Two resolve aliases:
- *   - "@/…" → src, matching the tsconfig path alias.
- *   - "server-only" → a no-op stub, because the real package throws when imported
- *     outside React Server Components (which is every Vitest run). This lets us
- *     import server modules' pure exports (signature, classify, link-code).
+ * Vitest configuration.
+ *
+ * Scope: pure logic modules (slot math, time helpers, insights aggregation,
+ * form validation, LINE signature/link-code). Node environment — no DOM needed.
+ *
+ * The `@` alias mirrors tsconfig's `paths` so test files import the same way
+ * the app does (`@/lib/...`). The `server-only` stub lets us import server
+ * modules' pure exports (signature, classify, link-code) outside RSC context.
  */
 export default defineConfig({
   test: {
