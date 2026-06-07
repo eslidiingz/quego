@@ -18,9 +18,13 @@ queva is a Thai booking + **virtual-queue concierge** for beauty/wellness ร้
 shared slot-math). The **gap** is the entire customer-facing realtime + LINE
 loop: "LINE notifications" is marketing copy with **no API**, there is **no live
 queue position, no waitlist, no reschedule, no two-way actions**, **VIP is a
-color token**, and there are **no reviews / no-show button / near-me**. The bet:
+color token**, and there is **no near-me**. The bet:
 own **beauty/wellness × live queue** — a niche QueQ (treats a barber like a bank)
 and GoWabi/Fresha (appointment-slot-centric) leave open.
+
+> **Explicitly out of scope (do not re-propose):** no-show tracking / "ไม่มาตามนัด"
+> strikes (built then deliberately retired 2026-06-07 — shops just cancel
+> no-shows at their discretion), and pause-intake "หยุดรับคิว" + geofence.
 
 ---
 
@@ -32,8 +36,6 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
 
 | ID | ฟีเจอร์ | Persona | Impact | Effort | หมวด |
 |----|---------|---------|--------|--------|------|
-| OPP-06 | ปุ่ม "ไม่มาตามนัด" + ประวัติการไม่มา | shop | high | S | ops-efficiency |
-| OPP-16 | หยุดรับคิวชั่วคราว (one-tap) | shop | med | S | ops-efficiency |
 | OPP-10 | Rich-menu / ลิงก์จองต่อร้าน + QR | shop | med | S | discovery |
 | OPP-18a | ค้นหา/กรอง/เรียงรายการร้าน (admin) | admin | med | M | ops-efficiency |
 | OPP-11a | ตัวเลือก "พนักงานคนไหนก็ได้ = เร็วกว่า" | customer | med | M | discovery |
@@ -77,14 +79,15 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
    Competitors lean on SMS/cards and surfaced **no LINE integration** — this is
    where we out-Thai everyone.
 3. **Tool-first, marketplace-second** (Fresha/Booksy playbook) — make the free
-   shop tool the best for daily ops (call-next, real VIP, no-show strikes, walk-in
+   shop tool the best for daily ops (call-next, real VIP, walk-in
    QR, now-serving display, CRM-lite), then grow discovery (reviews, near-me,
    soonest-slot) on real queue inventory. Deal-light counter to GoWabi; price
    against the ฿999–1,500/mo LINE-queue floor.
-4. **Queue as the no-show cure + retention engine without a payment rail** —
-   call-ahead loop + phone-keyed no-show strikes (OPP-06) + backfill waitlist
-   (OPP-05) + loyalty/referral ledger (OPP-15). Optional per-shop PromptPay-QR
-   deposit only if monetization comes — never card-on-file.
+4. **Queue as the no-show cure + retention engine without a payment rail** — the
+   call-ahead loop itself (live position + LINE "ใกล้ถึงคิว" + two-way "กำลังมา")
+   is the no-show cure, plus backfill waitlist (OPP-05) + loyalty/referral ledger
+   (OPP-15). Optional per-shop PromptPay-QR deposit only if monetization comes —
+   never card-on-file.
 
 ---
 
@@ -107,9 +110,8 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
 **Shop**
 - Can't send the customer anything — no reminders, no "you're next" — so it eats
   no-shows with no tool to reduce them (the pain the category monetizes against).
-- `no_show` is a real status with **no button**; staff mis-click "cancel", so no
-  per-customer no-show history is possible.
-- No waiting-room "now-serving" display, no one-tap "หยุดรับคิว" pause.
+  The fix we're betting on is the call-ahead loop (OPP-02/03), not strike-tracking.
+- No waiting-room "now-serving" display.
 - Walk-ins must be hand-typed into NewBookingDialog — no in-shop QR self-join, so
   the real floor isn't covered.
 - No staff scheduling/time-off, no booking/customer notes, no analytics
@@ -127,13 +129,13 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
 
 | Competitor | Does well | So-what for us |
 |---|---|---|
-| **QueQ** | Live "X queues ahead" synced to in-store display; "almost your turn" push; geofenced remote queueing | Out-specialize (per-staff, duration-aware); copy "จำนวนคิวก่อนหน้า" + two-stage LINE nudge; per-mode geofence toggle |
+| **QueQ** | Live "X queues ahead" synced to in-store display; "almost your turn" push; geofenced remote queueing | Out-specialize (per-staff, duration-aware); copy "จำนวนคิวก่อนหน้า" + two-stage LINE nudge |
 | **GoWabi** | Deals, 2.5% cashback wallet, tiers, referral, verified reviews, "Near Me", native apps | Don't fight on discounts; borrow phone-keyed loyalty/referral only; ship reviews + near-me; answer apps with PWA+LINE |
 | **TimeTailor** | PromptPay payouts, SMS/email reminders, deposit protection, POS, per-staff KPIs | Can't match payouts; **LINE > SMS**; our staff/capacity rivals their KPIs; **no LINE integration = our opening** |
-| **Fresha / Booksy** | Real-time waitlist auto-SMS deep-link on freed slot; card no-show protection; AI receptionist | Waitlist loop **is our queue DNA**; localize no-show defense to phone strikes + LINE; "AI receptionist" = LINE "how long's the wait?" bot |
+| **Fresha / Booksy** | Real-time waitlist auto-SMS deep-link on freed slot; card no-show protection; AI receptionist | Waitlist loop **is our queue DNA**; counter no-shows with the LINE call-ahead loop (not strikes/cards); "AI receptionist" = LINE "how long's the wait?" bot |
 | **LINE-native TH** (FoxConnect/iPlan/BeTask) | Whole flow inside LINE (LIFF, auto-identity), rich-menu จองคิว, booking→CRM, ฿999–1,500/mo | Biggest gap; wrap booking as LIFF; per-shop rich-menu; phone-identity → "booking + CRM"; price vs ฿999–1,500 |
 | **Square / SimplyBook.me** | Reply-to-manage SMS; self-serve reschedule in policy window; resource/buffer; intake forms | LINE messages as action surface (quick-reply) writing back via polling; extend `/bookings/[id]` to self-serve modify |
-| **Yelp Waitlist / OpenTable / TablesReady** | Soonest-fit by party size; busy-by-hour; backfill to VIPs first; running-late chat; QR check-in; pause waitlist | Service = "party size" → soonest-slot ranking; backfill waitlist + real VIP; in-shop QR; "หยุดรับคิว" pause |
+| **Yelp Waitlist / OpenTable / TablesReady** | Soonest-fit by party size; busy-by-hour; backfill to VIPs first; running-late chat; QR check-in; pause waitlist | Service = "party size" → soonest-slot ranking; backfill waitlist + real VIP; in-shop QR |
 
 ---
 
@@ -197,17 +199,6 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
 - **คู่แข่งอ้างอิง:** Booksy real-time waitlist auto-deep-link; OpenTable backfill
   to prioritized guests; a virtual queue **is** this primitive. Pairs with OPP-13
   (VIP first-refusal) + OPP-03.
-
-### [OPP-06] ปุ่ม "ไม่มาตามนัด" + ประวัติการไม่มา (no-show strikes) ⭐ quick win
-- **Persona:** shop · **Impact/Effort:** high · S · **หมวด:** ops-efficiency
-- **ปัญหา:** `no_show` is a real DB status with **no button** — staff mis-click
-  "cancel", so no repeat-offender history exists (the category's #1 pain).
-- **ข้อเสนอ:** Distinct "ไม่มาตามนัด" action on confirmed bookings + a no-show
-  count on the phone-identity record, shown to the shop in the queue/booking view.
-  Later, gate risky customers (deposit/shop-confirm). No payment rail needed.
-- **คู่แข่งอ้างอิง:** No-show defense is the universal monetized feature (Booksy
-  ~20% fewer cancels). Thai-native version = phone-keyed strikes + LINE reminders,
-  not stored cards. **Days, not weeks — the status lifecycle already exists.**
 
 ### [OPP-07] จอแสดงคิว "กำลังเรียก" สำหรับหน้าร้าน (ไม่ต้องใช้ฮาร์ดแวร์)
 - **Persona:** shop · **Impact/Effort:** med · M · **หมวด:** ops-efficiency
@@ -307,17 +298,6 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
   referral (3-day hold); BeTask bundles แต้ม at ฿999/mo. Both key cleanly to our
   phone identity.
 
-### [OPP-16] หยุดรับคิวชั่วคราว + ตั้งค่ารัศมี geofence ต่อร้าน/ต่อโหมด ⭐ quick win (pause half)
-- **Persona:** shop · **Impact/Effort:** med · S · **หมวด:** ops-efficiency
-- **ปัญหา:** No one-tap way to pause intake for breaks/rushes (only close the day
-  or edit hours); no anti-flood control for a future live walk-in queue.
-- **ข้อเสนอ:** One-tap "หยุดรับคิว" pausing new bookings/joins without losing
-  config (small boolean on the shop + a guard in `createBooking`), plus a
-  per-shop, per-mode geofence toggle (live walk-in = radius-gated; advance booking
-  = radius-free).
-- **คู่แข่งอ้างอิง:** TablesReady pause-the-waitlist; QueQ shop-configurable join
-  radius. The **pause half is the quick win**; geofence pairs with OPP-08.
-
 ### [OPP-17] Rate-limit + ยืนยันเบอร์ (OTP) สำหรับ login PIN
 - **Persona:** platform · **Impact/Effort:** high · M · **หมวด:** trust
 - **ปัญหา:** Phone is the identity key but **unverified**, and the 6-digit PIN
@@ -347,7 +327,7 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
 - **ปัญหา:** Shops get only a live list — no fill rate, peak-time, or staff
   utilization to run the business or fill dead hours.
 - **ข้อเสนอ:** Lightweight analytics page: busy-by-hour (booking density), fill
-  rate, no-show rate (from OPP-06), per-staff utilization. Busy-by-hour later
+  rate, cancellation rate, per-staff utilization. Busy-by-hour later
   powers a customer "good time to book" nudge. Aggregate queries over existing
   bookings; no new infra.
 - **คู่แข่งอ้างอิง:** Vagaro/Treatwell/Fresha ship utilization/revenue analytics;
