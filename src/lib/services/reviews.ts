@@ -12,7 +12,8 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
  *
  * Eligibility rule: a review is allowed ONLY for a logged-in customer whose
  * booking the shop marked `completed`, and there is at most ONE review per
- * booking (enforced by the `UNIQUE(booking_id)` constraint).
+ * booking (enforced by the `UNIQUE(booking_id)` constraint). Reviews are
+ * FINAL once submitted — there is no edit path.
  */
 
 // ----- Types --------------------------------------------------------------
@@ -28,9 +29,6 @@ export type BookingReview = {
   id: string;
   rating: number; // 1-5 integer
   comment: string | null;
-  /** True once the review has been edited (updated_at > created_at). A review
-   *  may be edited only ONCE — when true the edit affordance is spent. */
-  edited: boolean;
 };
 
 /** A review as shown on the public shop detail page (name already masked). */
@@ -47,14 +45,6 @@ export type CreateReviewResult =
   | {
       ok: false;
       code: "not_eligible" | "already_reviewed" | "invalid" | "unknown";
-      message: string;
-    };
-
-export type UpdateReviewResult =
-  | { ok: true }
-  | {
-      ok: false;
-      code: "not_found" | "invalid" | "edit_limit" | "unknown";
       message: string;
     };
 
@@ -126,7 +116,7 @@ function maskReviewerName(name: string | null): string {
   return `${parts[0]} ${parts[1].charAt(0)}.`;
 }
 
-// ----- Write: create + edit -----------------------------------------------
+// ----- Write: create (reviews are final, no edit) -------------------------
 
 /**
  * Create a review for a completed booking. Eligibility and ownership are
@@ -201,83 +191,6 @@ export async function createReview(
   }
 
   return { ok: true, reviewId: inserted!.id as string };
-}
-
-/**
- * Edit an existing review. Ownership is enforced by a compound filter on
- * `id` + `customer_phone` (the latter from the verified session), so a
- * customer can only edit their own review. `updated_at` is set explicitly:
- * its column default only applies on INSERT, and there is no trigger to
- * refresh it on UPDATE.
- *
- * A review may be edited only ONCE. We detect "already edited" by comparing
- * `updated_at` against `created_at` (both default to the same `now()` on
- * INSERT, so they are equal until the first edit bumps `updated_at`). This is
- * a read-then-write rather than an atomic CAS: the worst case under a same-user
- * race is two edits instead of one — a cosmetic limit, not a security boundary
- * — so a non-atomic check is acceptable here. The client also disables the
- * edit button once `edited` is true; this is the server-side backstop.
- */
-export async function updateReview(
-  reviewId: string,
-  customerPhone: string,
-  rating: number,
-  comment: string | null,
-): Promise<UpdateReviewResult> {
-  const validation = validateReviewInput(rating, comment);
-  if (!validation.ok) {
-    return { ok: false, code: "invalid", message: validation.message };
-  }
-
-  const supabase = getSupabaseAdmin();
-
-  // Ownership + edit-once gate: the review must belong to this customer, and
-  // it must not have been edited before.
-  const { data: existing, error: lookupError } = await supabase
-    .from("reviews")
-    .select("id, created_at, updated_at")
-    .eq("id", reviewId)
-    .eq("customer_phone", customerPhone)
-    .maybeSingle<{ id: string; created_at: string; updated_at: string }>();
-
-  if (lookupError) {
-    console.error("updateReview lookup error:", lookupError);
-    return { ok: false, code: "unknown", message: UNKNOWN_MESSAGE };
-  }
-  if (!existing) {
-    return { ok: false, code: "not_found", message: "ไม่พบรีวิวของคุณ" };
-  }
-  if (
-    new Date(existing.updated_at).getTime() >
-    new Date(existing.created_at).getTime()
-  ) {
-    return {
-      ok: false,
-      code: "edit_limit",
-      message: "แก้ไขรีวิวได้เพียงครั้งเดียวเท่านั้น",
-    };
-  }
-
-  const { data, error } = await supabase
-    .from("reviews")
-    .update({
-      rating,
-      comment: validation.comment,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", reviewId)
-    .eq("customer_phone", customerPhone)
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    console.error("updateReview error:", error);
-    return { ok: false, code: "unknown", message: UNKNOWN_MESSAGE };
-  }
-  if (!data) {
-    return { ok: false, code: "not_found", message: "ไม่พบรีวิวของคุณ" };
-  }
-  return { ok: true };
 }
 
 // ----- Read: public shop detail page --------------------------------------
