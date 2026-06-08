@@ -140,3 +140,52 @@ export async function pushNewBookingToShop(
     console.error("pushNewBookingToShop error:", err);
   }
 }
+
+// ----- Outbound: customer-cancelled notification --------------------------
+
+/**
+ * Build the Thai "customer cancelled" message body for the shop. Reuses
+ * NewBookingNotice — the facts are identical (who / what / when), only the
+ * heading differs. The shop only ever receives a cancel notice for a
+ * CUSTOMER-initiated cancel (a shop cancelling its own booking notifies the
+ * customer, never itself), so the source is implicit in the recipient and the
+ * heading states it directly — no separate "ยกเลิกโดย…" line is needed.
+ */
+export function formatBookingCancelledMessage(notice: NewBookingNotice): string {
+  return buildBookingMessage({
+    heading: "❌ ลูกค้ายกเลิกการจอง",
+    identityLine: `ลูกค้า: ${notice.customerName}`,
+    serviceName: notice.serviceName,
+    bookingDate: notice.bookingDate,
+    slotTime: notice.slotTime,
+  });
+}
+
+/**
+ * Push a customer-cancellation notice to the shop's bound LINE account, if any.
+ * Fail-silent by contract (mirrors pushNewBookingToShop): a missing binding is
+ * a no-op and any error is logged, never thrown — cancelling a booking must
+ * never fail because of a notification.
+ */
+export async function pushBookingCancelledToShop(
+  shopId: string,
+  notice: NewBookingNotice,
+): Promise<void> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("shops")
+      .select("line_user_id")
+      .eq("id", shopId)
+      .maybeSingle();
+    if (error || !data?.line_user_id) return;
+
+    await pushLineMessage(
+      data.line_user_id as string,
+      [{ type: "text", text: formatBookingCancelledMessage(notice) }],
+      { kind: "booking_cancelled" },
+    );
+  } catch (err) {
+    console.error("pushBookingCancelledToShop error:", err);
+  }
+}
