@@ -13,6 +13,9 @@ import { recordLineMessage } from "@/lib/services/line-log";
 
 const LINE_MESSAGE_API = "https://api.line.me/v2/bot/message";
 
+/** Upper bound on a single LINE HTTP call so a hung endpoint can't stall us. */
+const LINE_FETCH_TIMEOUT_MS = 5000;
+
 export type LineTextMessage = { type: "text"; text: string };
 export type LineFlexMessage = {
   type: "flex";
@@ -88,6 +91,9 @@ async function send(
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(payload),
+      // Bound the call so a hung LINE endpoint can't stall the caller; the
+      // catch below maps the abort to `network` and records the drop.
+      signal: AbortSignal.timeout(LINE_FETCH_TIMEOUT_MS),
     });
   } catch (err) {
     console.error(`LINE ${endpoint} network error:`, err);

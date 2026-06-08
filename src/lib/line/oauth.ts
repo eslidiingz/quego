@@ -4,25 +4,44 @@ import { SignJWT, jwtVerify } from "jose";
 import { getLineLoginChannelId, getLineLoginChannelSecret } from "./config";
 
 /**
- * LINE Login (OAuth 2.1) for the SHOP connect flow. SRP: speak the LINE Login
- * HTTP + mint/verify the CSRF state token — nothing about shops, cookies, or
- * routing (the route handlers own those). The userId it resolves is bound to a
- * shop by linkShopLine().
+ * LINE Login (OAuth 2.1) connect flow, shared by both personas (shop owner and
+ * customer). SRP: speak the LINE Login HTTP + mint/verify the CSRF state token —
+ * nothing about who is connecting, cookies, or routing (the route handlers own
+ * those). The userId it resolves is bound to a shop by linkShopLine() or to a
+ * customer by linkCustomerLine().
  *
- * Why OAuth here (vs. the customer code-link flow): the shop owner taps a button
- * and authorizes in LINE, no code to copy. `bot_prompt=aggressive` makes LINE
- * offer "add the OA as friend" during login — required, because the Messaging
- * API can only push to a friend. The login userId equals the Messaging userId
- * only when the Login channel and Messaging channel share one LINE provider
- * (console setup, deferred to go-live).
+ * Why OAuth (vs. a copy-the-code deep link): the user taps a button and
+ * authorizes in LINE, no code to copy. `bot_prompt=aggressive` makes LINE offer
+ * "add the OA as friend" during login — required, because the Messaging API can
+ * only push to a friend. The login userId equals the Messaging userId only when
+ * the Login channel and Messaging channel share one LINE provider (console
+ * setup, deferred to go-live).
+ *
+ * Both personas run the same handshake; only the subject they bind to, the CSRF
+ * cookie name, the callback path, and the JWT audience differ. Keying those four
+ * by persona keeps the flow DRY and makes adding a third persona a one-line
+ * change (OCP).
  */
 
-export const LINE_OAUTH_STATE_COOKIE = "lq_shop_line_oauth_state";
-export const LINE_OAUTH_STATE_TTL_SECONDS = 60 * 5; // 5 minutes
-/** Path the LINE Login channel must whitelist as a Callback URL. */
-export const LINE_OAUTH_CALLBACK_PATH = "/api/shop/line/callback";
+export type LinePersona = "shop" | "customer";
 
-const STATE_AUD = "shop-line-oauth-state";
+export const LINE_OAUTH_STATE_TTL_SECONDS = 60 * 5; // 5 minutes
+
+export const LINE_OAUTH_STATE_COOKIE: Record<LinePersona, string> = {
+  shop: "lq_shop_line_oauth_state",
+  customer: "lq_customer_line_oauth_state",
+};
+
+/** Path the LINE Login channel must whitelist as a Callback URL, per persona. */
+export const LINE_OAUTH_CALLBACK_PATH: Record<LinePersona, string> = {
+  shop: "/api/shop/line/callback",
+  customer: "/api/customer/line/callback",
+};
+
+const STATE_AUD: Record<LinePersona, string> = {
+  shop: "shop-line-oauth-state",
+  customer: "customer-line-oauth-state",
+};
 const LINE_AUTHORIZE_URL = "https://access.line.me/oauth2/v2.1/authorize";
 const LINE_TOKEN_URL = "https://api.line.me/oauth2/v2.1/token";
 const LINE_PROFILE_URL = "https://api.line.me/v2/profile";
@@ -72,15 +91,21 @@ export function buildLineAuthorizeUrl({
 
 // ----- State token (signed JWT; doubles as the CSRF `state` param) ---------
 
-export type LineOAuthState = { shopId: string; nonce: string };
+export type LineOAuthState = { subjectId: string; nonce: string };
 
 /**
- * Mint a signed state token carrying the connecting shop's id. The token IS the
- * `state` query param; the route handler also stores it in an httpOnly cookie
- * and the callback requires param === cookie (CSRF) before trusting shopId.
+ * Mint a signed state token carrying the connecting subject's id (a shopId or a
+ * customerId, per persona). The token IS the `state` query param; the route
+ * handler also stores it in an httpOnly cookie and the callback requires
+ * param === cookie (CSRF) before trusting subjectId. The persona's audience
+ * pins the token to its own flow so a shop token can't be replayed as a
+ * customer one.
  */
-export async function signLineOAuthStateToken(shopId: string): Promise<string> {
-  return new SignJWT({ shopId, nonce: randomUUID(), aud: STATE_AUD })
+export async function signLineOAuthStateToken(
+  persona: LinePersona,
+  subjectId: string,
+): Promise<string> {
+  return new SignJWT({ subjectId, nonce: randomUUID(), aud: STATE_AUD[persona] })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${LINE_OAUTH_STATE_TTL_SECONDS}s`)
@@ -88,15 +113,19 @@ export async function signLineOAuthStateToken(shopId: string): Promise<string> {
 }
 
 export async function verifyLineOAuthStateToken(
+  persona: LinePersona,
   token: string,
 ): Promise<LineOAuthState | null> {
   try {
     const { payload } = await jwtVerify(token, getStateSecret(), {
       algorithms: ["HS256"],
-      audience: STATE_AUD,
+      audience: STATE_AUD[persona],
     });
-    if (typeof payload.shopId === "string" && typeof payload.nonce === "string") {
-      return { shopId: payload.shopId, nonce: payload.nonce };
+    if (
+      typeof payload.subjectId === "string" &&
+      typeof payload.nonce === "string"
+    ) {
+      return { subjectId: payload.subjectId, nonce: payload.nonce };
     }
     return null;
   } catch {

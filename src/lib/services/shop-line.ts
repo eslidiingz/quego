@@ -1,6 +1,7 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { pushLineMessage } from "@/lib/line/client";
+import { buildBookingMessage } from "@/lib/line/format";
 
 /**
  * Shop ↔ LINE binding + outbound notifications. SRP: the shops.line_user_id
@@ -97,25 +98,19 @@ export type NewBookingNotice = {
   slotTime: string; // "HH:MM"
 };
 
-/** "YYYY-MM-DD" → "DD/MM/YYYY" — locale-independent so the test is stable. */
-function formatBookingDate(ymd: string): string {
-  const [y, m, d] = ymd.split("-");
-  return `${d}/${m}/${y}`;
-}
-
 /**
- * Build the Thai new-booking message body. Pure + exported so it is unit-tested
- * without a live channel. The service line is omitted when no service is set.
+ * Build the Thai new-booking message body. Thin persona wrapper over the shared
+ * builder (lib/line/format.ts) — owns only the shop-facing heading + identity
+ * line. Exported so it stays unit-tested without a live channel.
  */
 export function formatNewBookingMessage(notice: NewBookingNotice): string {
-  const lines = ["🔔 มีการจองใหม่", `ลูกค้า: ${notice.customerName}`];
-  if (notice.serviceName) {
-    lines.push(`บริการ: ${notice.serviceName}`);
-  }
-  lines.push(
-    `วันเวลา: ${formatBookingDate(notice.bookingDate)} ${notice.slotTime} น.`,
-  );
-  return lines.join("\n");
+  return buildBookingMessage({
+    heading: "🔔 มีการจองใหม่",
+    identityLine: `ลูกค้า: ${notice.customerName}`,
+    serviceName: notice.serviceName,
+    bookingDate: notice.bookingDate,
+    slotTime: notice.slotTime,
+  });
 }
 
 /**

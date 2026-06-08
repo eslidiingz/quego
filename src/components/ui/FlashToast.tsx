@@ -55,6 +55,16 @@ function mapNotice(
         kind: "success",
         message: "เชื่อมต่อ LINE สำเร็จ ร้านของคุณจะได้รับแจ้งเตือนการจองผ่าน LINE",
       };
+    case "line-connected-customer":
+      return {
+        kind: "success",
+        message: "เชื่อมต่อ LINE สำเร็จ คุณจะได้รับแจ้งเตือนสถานะคิวผ่าน LINE",
+      };
+    case "line-already-linked-customer":
+      return {
+        kind: "error",
+        message: "บัญชี LINE นี้ถูกเชื่อมกับผู้ใช้อื่นแล้ว",
+      };
     case "line-denied":
       return { kind: "info", message: "ยกเลิกการเชื่อมต่อ LINE แล้ว" };
     case "line-already-linked":

@@ -7,8 +7,6 @@ import type {
   LineWebhookEvent,
 } from "./types";
 import { replyLineMessage } from "./client";
-import { parseLinkCommand } from "./link-code";
-import { redeemLineLinkCode } from "@/lib/services/line-linking";
 import { recordLineMessage } from "@/lib/services/line-log";
 
 /**
@@ -17,20 +15,19 @@ import { recordLineMessage } from "@/lib/services/line-log";
  * postback buttons and OPP-17 OTP slot in as new branches here without touching
  * the client, signature, or route. Each event is isolated so one bad event
  * can't sink the batch (LINE delivers events in batches).
+ *
+ * Account linking is NOT done from this chat: both personas connect via the LINE
+ * Login OAuth flow in the app (see lib/line/oauth.ts), so the message handler
+ * only welcomes/guides — there is no code to redeem here.
  */
 
 const WELCOME_TEXT =
-  "ยินดีต้อนรับสู่ queva 🙏 หากต้องการรับแจ้งเตือนคิวผ่าน LINE " +
-  "เปิดแอป queva ไปที่ โปรไฟล์ › การแจ้งเตือน แล้วกด “เชื่อม LINE”";
+  "ยินดีต้อนรับสู่ queva 🙏 หากต้องการรับแจ้งเตือนผ่าน LINE " +
+  "เปิดแอป queva ไปที่ โปรไฟล์ › การแจ้งเตือน แล้วกด “เชื่อมต่อ LINE”";
 
 const LINK_HINT_TEXT =
-  "หากต้องการเชื่อมบัญชี เปิดแอป queva ที่หน้า โปรไฟล์ › การแจ้งเตือน " +
-  "แล้วกด “เชื่อม LINE” เพื่อรับรหัส";
-
-const LINK_SUCCESS_TEXT =
-  "เชื่อมบัญชีสำเร็จ ✅ คุณจะได้รับแจ้งเตือนคิวผ่าน LINE นี้";
-
-const NO_USER_TEXT = "ไม่สามารถเชื่อมบัญชีได้ กรุณาลองใหม่จากแอป queva";
+  "การเชื่อมบัญชีทำได้จากในแอป queva ที่หน้า โปรไฟล์ › การแจ้งเตือน " +
+  "แล้วกด “เชื่อมต่อ LINE”";
 
 export async function dispatchLineEvents(
   events: LineWebhookEvent[],
@@ -107,36 +104,14 @@ async function handleMessage(event: LineMessageEvent): Promise<void> {
 
   if (event.message.type !== "text") return;
 
-  const code = parseLinkCommand(text);
-
-  // No code in the text. Only nudge if it looks like a link attempt — don't be
-  // chatty (or spend reply effort) on every unrelated message.
-  if (!code) {
-    if (/เชื่อม|link/i.test(text)) {
-      await replyLineMessage(
-        event.replyToken,
-        [{ type: "text", text: LINK_HINT_TEXT }],
-        { kind: "link_hint", recipient: userId },
-      );
-    }
-    return;
-  }
-
-  if (!userId) {
+  // Linking happens via OAuth in the app, not here. Only nudge if the message
+  // looks like a link attempt — don't be chatty (or spend reply effort) on
+  // every unrelated message.
+  if (/เชื่อม|link/i.test(text)) {
     await replyLineMessage(
       event.replyToken,
-      [{ type: "text", text: NO_USER_TEXT }],
-      { kind: "link_error" },
+      [{ type: "text", text: LINK_HINT_TEXT }],
+      { kind: "link_hint", recipient: userId },
     );
-    return;
   }
-
-  const result = await redeemLineLinkCode(code, userId);
-  const replyText = result.ok ? LINK_SUCCESS_TEXT : result.message;
-
-  await replyLineMessage(
-    event.replyToken,
-    [{ type: "text", text: replyText }],
-    { kind: result.ok ? "link_confirm" : "link_error", recipient: userId },
-  );
 }
