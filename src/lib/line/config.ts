@@ -33,3 +33,18 @@ export function getLineChannelAccessToken(): string {
 export function getLineOaBasicId(): string {
   return required("NEXT_PUBLIC_LINE_OA_BASIC_ID");
 }
+
+/**
+ * LINE Login channel id (client_id) — identifies the shop-connect OAuth flow on
+ * the authorize endpoint. This is a SEPARATE channel from the Messaging API one
+ * above; it must sit under the same LINE provider and be linked to the Messaging
+ * channel so the userId it returns is push-addressable. Server-only.
+ */
+export function getLineLoginChannelId(): string {
+  return required("LINE_LOGIN_CHANNEL_ID");
+}
+
+/** LINE Login channel secret — authorizes the OAuth token exchange. Server-only. */
+export function getLineLoginChannelSecret(): string {
+  return required("LINE_LOGIN_CHANNEL_SECRET");
+}
