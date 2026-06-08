@@ -172,3 +172,55 @@ export async function pushBookingConfirmationToCustomer(
     console.error("pushBookingConfirmationToCustomer error:", err);
   }
 }
+
+// ----- Outbound: shop-cancelled notification ------------------------------
+
+/**
+ * Build the Thai "shop cancelled your booking" message body for the customer.
+ * Reuses BookingConfirmationNotice — same facts (which shop / what / when),
+ * only the heading differs. The customer only ever receives a cancel notice for
+ * a SHOP-initiated cancel (the customer cancelling their own booking notifies
+ * the shop, never themselves), so the source is implicit in the recipient and
+ * stated in the heading — no separate "ยกเลิกโดย…" line is needed.
+ */
+export function formatBookingCancellationMessage(
+  notice: BookingConfirmationNotice,
+): string {
+  return buildBookingMessage({
+    heading: "❌ ร้านยกเลิกการจอง",
+    identityLine: `ร้าน: ${notice.shopName}`,
+    serviceName: notice.serviceName,
+    bookingDate: notice.bookingDate,
+    slotTime: notice.slotTime,
+  });
+}
+
+/**
+ * Push a shop-cancellation notice to the customer's bound LINE account, if any.
+ * The recipient is resolved by phone (the booking identity key); a customer
+ * with no record or no binding is a silent no-op. Fail-silent by contract
+ * (mirrors pushBookingConfirmationToCustomer): any error is logged, never
+ * thrown — cancelling a booking must never fail because of a notification.
+ */
+export async function pushBookingCancellationToCustomer(
+  phone: string,
+  notice: BookingConfirmationNotice,
+): Promise<void> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("customers")
+      .select("line_user_id")
+      .eq("phone", phone)
+      .maybeSingle();
+    if (error || !data?.line_user_id) return;
+
+    await pushLineMessage(
+      data.line_user_id as string,
+      [{ type: "text", text: formatBookingCancellationMessage(notice) }],
+      { kind: "booking_cancellation" },
+    );
+  } catch (err) {
+    console.error("pushBookingCancellationToCustomer error:", err);
+  }
+}

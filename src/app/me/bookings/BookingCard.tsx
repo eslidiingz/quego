@@ -6,6 +6,7 @@ import { getBangkokNow, getBangkokToday } from "@/lib/time/bangkok";
 import { formatBaht } from "@/lib/baht";
 import type {
   BookingStatus,
+  CancelledBy,
   CustomerBookingItem,
 } from "@/lib/services/bookings";
 import { CancelBookingButton } from "./CancelBookingButton";
@@ -19,6 +20,17 @@ const STATUS_MAP: Record<
   completed: { label: "เสร็จสิ้น", variant: "success" },
   cancelled: { label: "ยกเลิก", variant: "danger" },
 };
+
+/**
+ * Cancelled-status label from the customer's point of view: "คุณยกเลิก" when
+ * they cancelled it themselves, "ร้านยกเลิก" when the shop did. Legacy rows
+ * with an unknown source (cancelled_by = null) fall back to the plain "ยกเลิก".
+ */
+function cancelChipLabel(by: CancelledBy | null): string {
+  if (by === "customer") return "คุณยกเลิก";
+  if (by === "shop") return "ร้านยกเลิก";
+  return "ยกเลิก";
+}
 
 export function BookingCard({ booking }: { booking: CustomerBookingItem }) {
   const status = STATUS_MAP[booking.status];
@@ -61,7 +73,9 @@ export function BookingCard({ booking }: { booking: CustomerBookingItem }) {
               </Chip>
             ) : (
               <Chip variant={status.variant} size="sm">
-                {status.label}
+                {booking.status === "cancelled"
+                  ? cancelChipLabel(booking.cancelledBy)
+                  : status.label}
               </Chip>
             )}
           </div>

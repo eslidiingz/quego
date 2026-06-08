@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import type {
   BookingListItem,
   BookingStatus,
+  CancelledBy,
 } from "@/lib/services/bookings";
 import {
   cancelBookingByShopAction,
@@ -34,6 +35,12 @@ import {
 export function TodayBookingRow({ booking }: { booking: BookingListItem }) {
   const isConfirmed = booking.status === "confirmed";
   const chip = STATUS_CHIP[booking.status];
+  // A cancelled booking surfaces WHO cancelled it (customer vs shop) so the
+  // owner can read the dashboard at a glance; other statuses use the plain label.
+  const chipLabel =
+    booking.status === "cancelled"
+      ? cancelChipLabel(booking.cancelledBy)
+      : chip.label;
 
   // Reused in every confirm dialog body so the shop owner can double-check who
   // they're acting on before the status changes.
@@ -72,7 +79,7 @@ export function TodayBookingRow({ booking }: { booking: BookingListItem }) {
               </p>
               {!isConfirmed ? (
                 <Chip variant={chip.variant} size="sm" className="shrink-0">
-                  {chip.label}
+                  {chipLabel}
                 </Chip>
               ) : null}
             </div>
@@ -172,3 +179,13 @@ const STATUS_CHIP: Record<
   completed: { label: "เสร็จสิ้น", variant: "success" },
   cancelled: { label: "ยกเลิก", variant: "danger" },
 };
+
+/**
+ * Cancelled-status chip label, specialised by who cancelled. Legacy rows with
+ * an unknown source (cancelled_by = null) fall back to the plain "ยกเลิก".
+ */
+function cancelChipLabel(by: CancelledBy | null): string {
+  if (by === "customer") return "ลูกค้ายกเลิก";
+  if (by === "shop") return "ร้านยกเลิก";
+  return "ยกเลิก";
+}

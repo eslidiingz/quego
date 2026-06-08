@@ -25,8 +25,14 @@ import {
   listActiveServicesByShop,
 } from "@/lib/services/services";
 import type { BookingReview } from "@/lib/services/reviews";
-import { pushNewBookingToShop } from "@/lib/services/shop-line";
-import { pushBookingConfirmationToCustomer } from "@/lib/services/line-linking";
+import {
+  pushNewBookingToShop,
+  pushBookingCancelledToShop,
+} from "@/lib/services/shop-line";
+import {
+  pushBookingConfirmationToCustomer,
+  pushBookingCancellationToCustomer,
+} from "@/lib/services/line-linking";
 
 // Re-export so server callers can import {BookingContext} from this module
 // in addition to the pure slot-math file (single source of truth).
@@ -48,6 +54,9 @@ export { generateSlots } from "@/lib/booking/slot-math";
 export const BOOKING_WINDOW_DAYS = 16;
 
 export type BookingStatus = "confirmed" | "cancelled" | "completed";
+
+/** Who initiated a cancellation. Mirrors bookings.cancelled_by (nullable). */
+export type CancelledBy = "customer" | "shop";
 
 export type CreateBookingInput = {
   shopId: string;
@@ -123,6 +132,8 @@ export type BookingListItem = {
   staffName: string | null;
   staffRole: string | null;
   status: BookingStatus;
+  /** Who cancelled — only meaningful when status === "cancelled"; else null. */
+  cancelledBy: CancelledBy | null;
   createdAt: string;
 };
 
@@ -144,6 +155,8 @@ export type CustomerBookingItem = {
   staffName: string | null;
   staffRole: string | null;
   status: BookingStatus;
+  /** Who cancelled — only meaningful when status === "cancelled"; else null. */
+  cancelledBy: CancelledBy | null;
   /** The customer's own review of this booking, if any (completed only). */
   review: BookingReview | null;
 };
@@ -718,6 +731,7 @@ type BookingRowDb = {
   service_name: string | null;
   service_price: number | string | null;
   status: BookingStatus;
+  cancelled_by: CancelledBy | null;
   created_at: string;
   shop_staff: {
     name: string;
@@ -749,6 +763,7 @@ function mapRow(r: BookingRowDb): BookingListItem {
     staffName: r.shop_staff?.name ?? null,
     staffRole: r.shop_staff?.role ?? null,
     status: r.status,
+    cancelledBy: r.cancelled_by,
     createdAt: r.created_at,
   };
 }
@@ -783,7 +798,7 @@ export async function listBookingsByShop(
     .select(
       `id, customer_name, customer_phone, booking_date,
        slot_time, service_duration_minutes, service_name, service_price,
-       status, created_at,
+       status, cancelled_by, created_at,
        shop_staff ( name, role )`,
     )
     .eq("shop_id", shopId);
@@ -892,11 +907,11 @@ export async function cancelOwnBooking(
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("bookings")
-    .update({ status: "cancelled" })
+    .update({ status: "cancelled", cancelled_by: "customer" })
     .eq("id", bookingId)
     .eq("customer_phone", customerPhone)
     .eq("status", "confirmed")
-    .select("id")
+    .select("shop_id, customer_name, service_name, booking_date, slot_time")
     .maybeSingle();
 
   if (error) {
@@ -910,6 +925,28 @@ export async function cancelOwnBooking(
       message: "ไม่พบการจองนี้ หรือสถานะไม่อนุญาตให้ยกเลิก",
     };
   }
+
+  // Tell the shop (if LINE-connected) that the customer cancelled. Scheduled
+  // off the response path with `after` and fail-silent inside the service, so
+  // a notification can never fail or slow the cancel. The shop only ever
+  // receives cancel notices for customer-initiated cancels, so the source is
+  // implicit in the recipient — no "ยกเลิกโดย…" line needed.
+  const cancelled = data as {
+    shop_id: string;
+    customer_name: string;
+    service_name: string | null;
+    booking_date: string;
+    slot_time: string;
+  };
+  after(() =>
+    pushBookingCancelledToShop(cancelled.shop_id, {
+      customerName: cancelled.customer_name,
+      serviceName: cancelled.service_name,
+      bookingDate: cancelled.booking_date,
+      slotTime: cancelled.slot_time.slice(0, 5),
+    }),
+  );
+
   return { ok: true };
 }
 
@@ -927,11 +964,13 @@ export async function cancelBookingByShop(
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("bookings")
-    .update({ status: "cancelled" })
+    .update({ status: "cancelled", cancelled_by: "shop" })
     .eq("id", bookingId)
     .eq("shop_id", shopId)
     .eq("status", "confirmed")
-    .select("id")
+    .select(
+      "customer_phone, service_name, booking_date, slot_time, shops ( name )",
+    )
     .maybeSingle();
 
   if (error) {
@@ -945,6 +984,34 @@ export async function cancelBookingByShop(
       message: "ไม่พบการจองนี้ หรือสถานะไม่อนุญาตให้ยกเลิก",
     };
   }
+
+  // Tell the customer (if LINE-connected) that the shop cancelled. Keyed by
+  // phone (the booking identity key), so anonymous bookings are a no-op.
+  // Scheduled off the response path with `after`, fail-silent inside the
+  // service. The customer only ever receives cancel notices for shop-initiated
+  // cancels, so the source is implicit in the recipient.
+  const cancelled = data as {
+    customer_phone: string | null;
+    service_name: string | null;
+    booking_date: string;
+    slot_time: string;
+    shops: { name: string } | { name: string }[] | null;
+  };
+  const customerPhone = cancelled.customer_phone;
+  if (customerPhone) {
+    const shop = Array.isArray(cancelled.shops)
+      ? cancelled.shops[0] ?? null
+      : cancelled.shops;
+    after(() =>
+      pushBookingCancellationToCustomer(customerPhone, {
+        shopName: shop?.name ?? "",
+        serviceName: cancelled.service_name,
+        bookingDate: cancelled.booking_date,
+        slotTime: cancelled.slot_time.slice(0, 5),
+      }),
+    );
+  }
+
   return { ok: true };
 }
 
@@ -1046,6 +1113,7 @@ type CustomerBookingRow = {
   service_name: string | null;
   service_price: number | string | null;
   status: BookingStatus;
+  cancelled_by: CancelledBy | null;
   shops: { name: string; address: string | null } | null;
   shop_staff: { name: string; role: string | null } | null;
   // reviews embeds the booking's review. Because `reviews.booking_id` is UNIQUE,
@@ -1083,7 +1151,7 @@ export async function listBookingsByCustomerPhone(
     .from("bookings")
     .select(
       `id, shop_id, booking_date, slot_time, service_duration_minutes,
-       service_name, service_price, status,
+       service_name, service_price, status, cancelled_by,
        shops ( name, address ),
        shop_staff ( name, role ),
        reviews ( id, rating, comment )`,
@@ -1114,6 +1182,7 @@ export async function listBookingsByCustomerPhone(
         staffName: r.shop_staff?.name ?? null,
         staffRole: r.shop_staff?.role ?? null,
         status: r.status,
+        cancelledBy: r.cancelled_by,
         review: reviewRow
           ? {
               id: reviewRow.id,
