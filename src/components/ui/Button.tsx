@@ -24,10 +24,43 @@ const sizes: Record<Size, string> = {
   xl: "h-14 px-8 text-body-md font-semibold",
 };
 
+type Rounded = "md" | "lg" | "xl" | "full";
+
+/**
+ * The button's class composition, factored out so non-`<button>` elements that
+ * must look like a button — e.g. an `<a>` that follows a server redirect — can
+ * share one source of truth instead of hand-copying the tokens (and drifting).
+ */
+export function buttonClassName({
+  variant = "primary",
+  size = "md",
+  rounded = "full",
+  fullWidth,
+  className,
+}: {
+  variant?: Variant;
+  size?: Size;
+  rounded?: Rounded;
+  fullWidth?: boolean;
+  className?: string;
+} = {}): string {
+  return cn(
+    "inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 ease-out disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+    sizes[size],
+    variants[variant],
+    rounded === "md" && "rounded-md",
+    rounded === "lg" && "rounded-lg",
+    rounded === "xl" && "rounded-xl",
+    rounded === "full" && "rounded-full",
+    fullWidth && "w-full",
+    className,
+  );
+}
+
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
   size?: Size;
-  rounded?: "md" | "lg" | "xl" | "full";
+  rounded?: Rounded;
   iconLeft?: React.ReactNode;
   iconRight?: React.ReactNode;
   fullWidth?: boolean;
@@ -51,17 +84,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
-        className={cn(
-          "inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 ease-out disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-          sizes[size],
-          variants[variant],
-          rounded === "md" && "rounded-md",
-          rounded === "lg" && "rounded-lg",
-          rounded === "xl" && "rounded-xl",
-          rounded === "full" && "rounded-full",
-          fullWidth && "w-full",
-          className,
-        )}
+        className={buttonClassName({ variant, size, rounded, fullWidth, className })}
         {...rest}
       >
         {iconLeft}

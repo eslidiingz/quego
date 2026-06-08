@@ -50,6 +50,28 @@ function mapNotice(
         kind: "error",
         message: "ร้านนี้ไม่สามารถเข้าใช้งานได้ในขณะนี้",
       };
+    case "line-connected":
+      return {
+        kind: "success",
+        message: "เชื่อมต่อ LINE สำเร็จ ร้านของคุณจะได้รับแจ้งเตือนการจองผ่าน LINE",
+      };
+    case "line-denied":
+      return { kind: "info", message: "ยกเลิกการเชื่อมต่อ LINE แล้ว" };
+    case "line-already-linked":
+      return {
+        kind: "error",
+        message: "บัญชี LINE นี้ถูกเชื่อมกับร้านอื่นแล้ว",
+      };
+    case "line-unconfigured":
+      return {
+        kind: "error",
+        message: "ระบบยังไม่พร้อมเชื่อมต่อ LINE กรุณาลองใหม่ภายหลัง",
+      };
+    case "line-error":
+      return {
+        kind: "error",
+        message: "เชื่อมต่อ LINE ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+      };
     default:
       return null;
   }

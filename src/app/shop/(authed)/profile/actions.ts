@@ -6,6 +6,7 @@ import {
   changeShopPin,
   updateOwnShopProfile,
 } from "@/lib/services/shops";
+import { unlinkShopLine } from "@/lib/services/shop-line";
 import type {
   ChangePinFieldErrors,
   ChangePinState,
@@ -217,6 +218,25 @@ export async function changeShopPinAction(
     return { ok: false, message: result.message };
   }
 
+  revalidatePath("/shop/profile");
+  return { ok: true };
+}
+
+// ----- Notifications: disconnect LINE ------------------------------------
+
+export type UnlinkShopLineState = { ok: true } | { ok: false; message: string };
+
+/**
+ * Clear the shop's LINE binding. shopId comes from the verified session. The
+ * connect side is an OAuth route handler, not an action — only the disconnect
+ * is a mutation we can drive from a button/ConfirmDialog.
+ */
+export async function unlinkShopLineAction(): Promise<UnlinkShopLineState> {
+  const session = await requireShopSession();
+  const result = await unlinkShopLine(session.shopId);
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
   revalidatePath("/shop/profile");
   return { ok: true };
 }

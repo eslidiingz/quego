@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
   DAYS_OF_WEEK,
@@ -24,6 +25,7 @@ import {
   listActiveServicesByShop,
 } from "@/lib/services/services";
 import type { BookingReview } from "@/lib/services/reviews";
+import { pushNewBookingToShop } from "@/lib/services/shop-line";
 
 // Re-export so server callers can import {BookingContext} from this module
 // in addition to the pure slot-math file (single source of truth).
@@ -469,6 +471,20 @@ export async function createBooking(
     message: "ช่วงเวลานี้ถูกจองโดยลูกค้าอีกคนแล้ว กรุณาเลือกใหม่",
   };
 
+  // Notify the shop on LINE if connected. Scheduled with next/server `after`
+  // so the LINE round-trip runs AFTER the response is flushed — off the
+  // booking's latency path — and fail-silent inside the service so it can
+  // never fail the booking. Shared by both insert paths below.
+  const scheduleShopLineNotice = () =>
+    after(() =>
+      pushNewBookingToShop(input.shopId, {
+        customerName: name,
+        serviceName,
+        bookingDate: input.date,
+        slotTime: input.slotTime,
+      }),
+    );
+
   // The booking occupies [start, start+duration). With variable per-service
   // durations a clash is an interval OVERLAP (not an exact slot_time match),
   // so the DB backstop is a GiST exclusion constraint — a conflicting insert
@@ -498,7 +514,9 @@ export async function createBooking(
       console.error("createBooking insert error (no-staff path):", insertError);
       return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
     }
-    return { ok: true, bookingId: inserted!.id as string };
+    const bookingId = inserted!.id as string;
+    scheduleShopLineNotice();
+    return { ok: true, bookingId };
   }
 
   // Staffed path: find an active staff member whose existing bookings don't
@@ -576,7 +594,11 @@ export async function createBooking(
       .select("id")
       .single();
 
-    if (!insertError) return { ok: true, bookingId: inserted!.id as string };
+    if (!insertError) {
+      const bookingId = inserted!.id as string;
+      scheduleShopLineNotice();
+      return { ok: true, bookingId };
+    }
     // 23P01 = this staff was just taken by a concurrent booking; try the next
     // free one. Any other error is fatal.
     if (!isConflict(insertError.code)) {
