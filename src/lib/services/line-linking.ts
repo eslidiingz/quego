@@ -1,201 +1,68 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { getLineOaBasicId } from "@/lib/line/config";
-import { generateLinkCode, LINK_COMMAND_TEXT } from "@/lib/line/link-code";
+import { pushLineMessage } from "@/lib/line/client";
+import { buildBookingMessage } from "@/lib/line/format";
 
 /**
- * Account-link service: bind a LINE userId to a logged-in customer via a
- * short-lived, single-use code the customer sends into the OA chat. SRP: the DB
- * binding + code lifecycle. Speaks no HTTP (the webhook + client do that) and
- * keeps the LINE concern out of customers.ts. Phone stays the identity key;
- * line_user_id is an optional channel handle (see the migration).
+ * Customer ↔ LINE binding. SRP: the customers.line_user_id lifecycle
+ * (bind / clear / status) plus the reverse lookup used to route outbound
+ * notifications to a customer. Mirrors shop-line.ts (the shop side) — both
+ * personas now connect through the same LINE Login OAuth handshake
+ * (lib/line/oauth.ts), and this module only persists and reads the userId that
+ * handshake resolves. Phone stays the identity key; line_user_id is an optional
+ * channel handle (see the migration).
  *
- * Mirrors customers.ts: discriminated-union results with Thai messages, never
- * throws for domain errors, and a generic message on unexpected DB errors (the
- * real detail is console.error'd server-side, never leaked to the caller).
+ * Conventions mirror customers.ts: discriminated-union results with Thai
+ * messages, never throws for domain errors, and a generic message on unexpected
+ * DB errors (the real detail is console.error'd server-side, never leaked).
  */
 
-const LINK_CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes — mirrors login-intent.
-const MAX_CODE_INSERT_RETRIES = 3;
+// ----- Bind (from the OAuth callback) -------------------------------------
 
-// ----- Request a code -----------------------------------------------------
-
-export type RequestLinkResult =
-  | { ok: true; code: string; deepLink: string }
-  | { ok: false; code: "unknown"; message: string };
+export type LinkCustomerLineResult =
+  | { ok: true }
+  | { ok: false; code: "already_linked" | "unknown"; message: string };
 
 /**
- * Issue a fresh one-time link code for a logged-in customer and build the LINE
- * deep link that pre-fills the OA chat with it. customerId MUST come from the
- * verified session.
+ * Bind a LINE userId to a customer. customerId MUST come from the verified
+ * session/state (the OAuth callback). The partial-unique index on
+ * customers.line_user_id is the 23505 backstop if the same LINE account is
+ * already bound to a different customer.
  */
-export async function requestLineLinkCode(
+export async function linkCustomerLine(
   customerId: string,
-): Promise<RequestLinkResult> {
-  const supabase = getSupabaseAdmin();
-  const expiresAt = new Date(Date.now() + LINK_CODE_TTL_MS).toISOString();
-
-  try {
-    // Resolve the OA id once up front — a missing config is a setup error, not a
-    // per-attempt one. The deep link is built per code below.
-    getLineOaBasicId();
-  } catch (err) {
-    console.error("requestLineLinkCode config error:", err);
-    return {
-      ok: false,
-      code: "unknown",
-      message: "ระบบยังไม่พร้อมเชื่อม LINE กรุณาลองใหม่ภายหลัง",
-    };
-  }
-
-  for (let attempt = 0; attempt < MAX_CODE_INSERT_RETRIES; attempt += 1) {
-    const code = generateLinkCode();
-    const { error } = await supabase.from("line_link_codes").insert({
-      code,
-      customer_id: customerId,
-      expires_at: expiresAt,
-    });
-
-    if (!error) {
-      return { ok: true, code, deepLink: buildLinkDeepLink(code) };
-    }
-
-    // 23505 on the code unique → astronomically rare collision; retry with a
-    // fresh code. Any other error is real.
-    if (error.code !== "23505") {
-      console.error("requestLineLinkCode insert error:", error);
-      return {
-        ok: false,
-        code: "unknown",
-        message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
-      };
-    }
-  }
-
-  console.error("requestLineLinkCode: exhausted code-collision retries");
-  return {
-    ok: false,
-    code: "unknown",
-    message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
-  };
-}
-
-/**
- * Build the LINE deep link that opens the OA chat pre-filled with the link
- * command + code, e.g.
- *   https://line.me/R/oaMessage/%40queva/?เชื่อมบัญชี%20LINK-AB23CD45
- */
-function buildLinkDeepLink(code: string): string {
-  const oaId = getLineOaBasicId(); // e.g. "@queva"
-  const text = `${LINK_COMMAND_TEXT} ${code}`;
-  return `https://line.me/R/oaMessage/${encodeURIComponent(oaId)}/?${encodeURIComponent(text)}`;
-}
-
-// ----- Redeem a code (from the webhook) -----------------------------------
-
-export type RedeemLinkResult =
-  | { ok: true; customerId: string }
-  | {
-      ok: false;
-      code: "not_found" | "expired" | "consumed" | "already_linked" | "unknown";
-      message: string;
-    };
-
-/**
- * Redeem a link code sent from a LINE chat, binding line_user_id to the code's
- * customer. Idempotent under LINE webhook redelivery: re-binding the same
- * userId→customer is a no-op update; the partial-unique index is the backstop
- * if a different customer already claimed this userId (23505 → already_linked).
- */
-export async function redeemLineLinkCode(
-  code: string,
   lineUserId: string,
-): Promise<RedeemLinkResult> {
+): Promise<LinkCustomerLineResult> {
   const supabase = getSupabaseAdmin();
-
-  const { data: row, error } = await supabase
-    .from("line_link_codes")
-    .select("id, customer_id, expires_at, consumed_at")
-    .eq("code", code)
-    .maybeSingle();
-
-  if (error) {
-    console.error("redeemLineLinkCode read error:", error);
-    return {
-      ok: false,
-      code: "unknown",
-      message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
-    };
-  }
-  if (!row) {
-    return {
-      ok: false,
-      code: "not_found",
-      message: "ไม่พบรหัสนี้ กรุณาขอรหัสใหม่จากหน้าโปรไฟล์",
-    };
-  }
-  if (row.consumed_at) {
-    return {
-      ok: false,
-      code: "consumed",
-      message: "รหัสนี้ถูกใช้ไปแล้ว กรุณาขอรหัสใหม่",
-    };
-  }
-  if (new Date(row.expires_at as string).getTime() < Date.now()) {
-    return {
-      ok: false,
-      code: "expired",
-      message: "รหัสหมดอายุแล้ว กรุณาขอรหัสใหม่จากหน้าโปรไฟล์",
-    };
-  }
-
-  const customerId = row.customer_id as string;
-
-  // Bind the userId to the customer. Overwrites a prior (different) handle for
-  // this customer — re-linking is allowed.
-  const { error: bindError } = await supabase
+  const { error } = await supabase
     .from("customers")
     .update({ line_user_id: lineUserId })
     .eq("id", customerId);
 
-  if (bindError) {
-    if (bindError.code === "23505") {
+  if (error) {
+    if (error.code === "23505") {
       return {
         ok: false,
         code: "already_linked",
         message: "บัญชี LINE นี้ถูกเชื่อมกับผู้ใช้อื่นแล้ว",
       };
     }
-    console.error("redeemLineLinkCode bind error:", bindError);
+    console.error("linkCustomerLine error:", error);
     return {
       ok: false,
       code: "unknown",
       message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
     };
   }
-
-  // Mark consumed (CAS on consumed_at IS NULL so a redelivery can't double-fire
-  // downstream side effects; the bind above is already idempotent).
-  const { error: consumeError } = await supabase
-    .from("line_link_codes")
-    .update({ consumed_at: new Date().toISOString() })
-    .eq("id", row.id as string)
-    .is("consumed_at", null);
-  if (consumeError) {
-    // The bind succeeded — don't fail the user-visible link. The code stays
-    // unconsumed but still expires on its own.
-    console.error("redeemLineLinkCode consume error:", consumeError);
-  }
-
-  return { ok: true, customerId };
+  return { ok: true };
 }
 
 // ----- Reverse lookup + status + unlink -----------------------------------
 
 /**
- * Find the customer bound to a LINE userId. The outbound-routing seam: the
- * deferred OPP-02 notification sequence / OPP-17 OTP resolve a recipient through
- * here before calling pushLineMessage.
+ * Find the customer bound to a LINE userId. The outbound-routing seam: a
+ * customer-facing notification sequence resolves a recipient through here before
+ * calling pushLineMessage.
  */
 export async function findCustomerByLineUserId(
   lineUserId: string,
@@ -248,4 +115,60 @@ export async function unlinkCustomerLine(
     };
   }
   return { ok: true };
+}
+
+// ----- Outbound: booking-confirmation notification ------------------------
+
+export type BookingConfirmationNotice = {
+  shopName: string;
+  serviceName: string | null;
+  bookingDate: string; // "YYYY-MM-DD"
+  slotTime: string; // "HH:MM"
+};
+
+/**
+ * Build the Thai booking-confirmation message body. Thin persona wrapper over
+ * the shared builder (lib/line/format.ts) — owns only the customer-facing
+ * heading + identity line. Mirrors shop-line.ts's formatNewBookingMessage.
+ */
+export function formatBookingConfirmationMessage(
+  notice: BookingConfirmationNotice,
+): string {
+  return buildBookingMessage({
+    heading: "✅ ยืนยันการจอง",
+    identityLine: `ร้าน: ${notice.shopName}`,
+    serviceName: notice.serviceName,
+    bookingDate: notice.bookingDate,
+    slotTime: notice.slotTime,
+  });
+}
+
+/**
+ * Push a booking-confirmation to the customer's bound LINE account, if any.
+ * The recipient is resolved by phone (the booking identity key); a customer
+ * with no record or no binding is a silent no-op. Fail-silent by contract:
+ * any error is logged, never thrown — booking creation must never fail because
+ * of a notification. Mirrors shop-line.ts's pushNewBookingToShop.
+ */
+export async function pushBookingConfirmationToCustomer(
+  phone: string,
+  notice: BookingConfirmationNotice,
+): Promise<void> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("customers")
+      .select("line_user_id")
+      .eq("phone", phone)
+      .maybeSingle();
+    if (error || !data?.line_user_id) return;
+
+    await pushLineMessage(
+      data.line_user_id as string,
+      [{ type: "text", text: formatBookingConfirmationMessage(notice) }],
+      { kind: "booking_confirmation" },
+    );
+  } catch (err) {
+    console.error("pushBookingConfirmationToCustomer error:", err);
+  }
 }

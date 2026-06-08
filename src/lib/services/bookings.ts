@@ -26,6 +26,7 @@ import {
 } from "@/lib/services/services";
 import type { BookingReview } from "@/lib/services/reviews";
 import { pushNewBookingToShop } from "@/lib/services/shop-line";
+import { pushBookingConfirmationToCustomer } from "@/lib/services/line-linking";
 
 // Re-export so server callers can import {BookingContext} from this module
 // in addition to the pure slot-math file (single source of truth).
@@ -356,7 +357,7 @@ export async function createBooking(
 
   const { data: shopData } = await supabase
     .from("shops")
-    .select("id, status")
+    .select("id, status, name")
     .eq("id", input.shopId)
     .maybeSingle();
 
@@ -471,11 +472,13 @@ export async function createBooking(
     message: "ช่วงเวลานี้ถูกจองโดยลูกค้าอีกคนแล้ว กรุณาเลือกใหม่",
   };
 
-  // Notify the shop on LINE if connected. Scheduled with next/server `after`
-  // so the LINE round-trip runs AFTER the response is flushed — off the
-  // booking's latency path — and fail-silent inside the service so it can
-  // never fail the booking. Shared by both insert paths below.
-  const scheduleShopLineNotice = () =>
+  // Notify the shop AND (if they have LINE connected) the customer. Scheduled
+  // with next/server `after` so the LINE round-trips run AFTER the response is
+  // flushed — off the booking's latency path — and fail-silent inside each
+  // service so they can never fail the booking. The customer push is keyed by
+  // phone (the booking identity key) and is a no-op for anonymous bookings.
+  // Shared by both insert paths below.
+  const scheduleLineNotices = () => {
     after(() =>
       pushNewBookingToShop(input.shopId, {
         customerName: name,
@@ -484,6 +487,17 @@ export async function createBooking(
         slotTime: input.slotTime,
       }),
     );
+    if (phoneProvided) {
+      after(() =>
+        pushBookingConfirmationToCustomer(phone, {
+          shopName: shopData.name as string,
+          serviceName,
+          bookingDate: input.date,
+          slotTime: input.slotTime,
+        }),
+      );
+    }
+  };
 
   // The booking occupies [start, start+duration). With variable per-service
   // durations a clash is an interval OVERLAP (not an exact slot_time match),
@@ -515,7 +529,7 @@ export async function createBooking(
       return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
     }
     const bookingId = inserted!.id as string;
-    scheduleShopLineNotice();
+    scheduleLineNotices();
     return { ok: true, bookingId };
   }
 
@@ -596,7 +610,7 @@ export async function createBooking(
 
     if (!insertError) {
       const bookingId = inserted!.id as string;
-      scheduleShopLineNotice();
+      scheduleLineNotices();
       return { ok: true, bookingId };
     }
     // 23P01 = this staff was just taken by a concurrent booking; try the next

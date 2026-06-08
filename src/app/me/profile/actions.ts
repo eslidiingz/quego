@@ -6,10 +6,7 @@ import {
   changeCustomerPin,
   updateCustomerName,
 } from "@/lib/services/customers";
-import {
-  requestLineLinkCode,
-  unlinkCustomerLine,
-} from "@/lib/services/line-linking";
+import { unlinkCustomerLine } from "@/lib/services/line-linking";
 import type {
   ChangePinFieldErrors,
   ChangePinState,
@@ -103,25 +100,9 @@ export async function changeCustomerPinAction(
 }
 
 // ----- LINE account linking -----------------------------------------------
-
-export type RequestLinkActionState =
-  | { ok: true; code: string; deepLink: string }
-  | { ok: false; message: string };
-
-/**
- * Issue a one-time LINE link code for the logged-in customer. customerId comes
- * from the verified session — never the client. Called imperatively (the card
- * has no form inputs), so it takes no args and returns the code + deep link on
- * success for the card to render.
- */
-export async function requestLineLinkAction(): Promise<RequestLinkActionState> {
-  const session = await requireCustomerSession();
-  const result = await requestLineLinkCode(session.customerId);
-  if (!result.ok) {
-    return { ok: false, message: result.message };
-  }
-  return { ok: true, code: result.code, deepLink: result.deepLink };
-}
+// Connect is a full-page OAuth handshake handled by the /api/customer/line/*
+// route handlers (mirrors the shop side), so there is no connect action here —
+// only the disconnect below.
 
 export type UnlinkActionResult = { ok: true } | { ok: false; message: string };
 
