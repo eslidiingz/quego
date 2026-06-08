@@ -7,9 +7,10 @@ import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Textarea";
 import { Toast } from "@/components/ui/Toast";
 import { RequiredMark } from "@/components/ui/RequiredMark";
-import { createMyReview, updateMyReview } from "@/app/me/actions";
+import { createMyReview } from "@/app/me/actions";
 import type { BookingReview } from "@/lib/services/reviews";
 import { StarRatingInput } from "./StarRatingInput";
+import { StarRatingDisplay } from "./StarRatingDisplay";
 
 const COMMENT_MAX = 1000;
 
@@ -21,32 +22,52 @@ export type WriteReviewButtonProps = {
 };
 
 /**
- * Entry point for writing / editing a review, shown in a completed booking's
- * footer. Single responsibility: own the review-modal flow (open, validate on
- * submit, call the action, surface the result). The trigger label flips between
- * "เขียนรีวิว" / "แก้ไขรีวิว" based on whether a review exists.
+ * Review entry point in a completed booking's footer. Reviews are FINAL once
+ * submitted, so this has two mutually-exclusive states:
+ *   • not reviewed yet → a "เขียนรีวิว" button that opens the create modal.
+ *   • already reviewed → a read-only star summary, with no edit affordance.
+ *
+ * The create flow lives in its own component so this wrapper can early-return
+ * the read-only branch without conditionally calling hooks.
  */
 export function WriteReviewButton({
   bookingId,
   shopName,
   existing,
 }: WriteReviewButtonProps) {
-  const isEdit = existing !== null;
-  // A review may be edited only once; once spent, the trigger is disabled.
-  const isEdited = existing?.edited === true;
+  if (existing) {
+    return (
+      <span className="inline-flex items-center gap-2 h-11 text-label-md font-semibold text-on-surface-variant">
+        <Icon name="reviews" size={18} className="text-tertiary" />
+        รีวิวของคุณ
+        <StarRatingDisplay value={existing.rating} size={18} />
+      </span>
+    );
+  }
+
+  return <CreateReviewFlow bookingId={bookingId} shopName={shopName} />;
+}
+
+/** The "เขียนรีวิว" button + modal. Validates on submit only, then creates. */
+function CreateReviewFlow({
+  bookingId,
+  shopName,
+}: {
+  bookingId: string;
+  shopName: string;
+}) {
   const [open, setOpen] = useState(false);
-  const [rating, setRating] = useState(existing?.rating ?? 0);
-  const [comment, setComment] = useState(existing?.comment ?? "");
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
   const [ratingError, setRatingError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function openModal() {
-    // Reset to the latest known state each time the modal opens so a previous
-    // aborted edit doesn't linger.
-    setRating(existing?.rating ?? 0);
-    setComment(existing?.comment ?? "");
+    // Reset each open so an aborted attempt doesn't linger.
+    setRating(0);
+    setComment("");
     setRatingError(null);
     setSubmitError(null);
     setOpen(true);
@@ -68,11 +89,7 @@ export function WriteReviewButton({
 
     startTransition(async () => {
       try {
-        if (isEdit) {
-          await updateMyReview(existing.id, rating, comment.trim());
-        } else {
-          await createMyReview(bookingId, rating, comment.trim());
-        }
+        await createMyReview(bookingId, rating, comment.trim());
         setOpen(false);
         setShowSuccess(true);
       } catch (err) {
@@ -87,24 +104,20 @@ export function WriteReviewButton({
 
   return (
     <>
-      {/* The edit is spent once used — hide the trigger entirely. The Modal/Toast
-          below still render so the post-edit success toast can appear. */}
-      {!isEdited ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="md"
-          onClick={openModal}
-          iconLeft={<Icon name={isEdit ? "edit" : "rate_review"} size={18} />}
-        >
-          {isEdit ? "แก้ไขรีวิว" : "เขียนรีวิว"}
-        </Button>
-      ) : null}
+      <Button
+        type="button"
+        variant="outline"
+        size="md"
+        onClick={openModal}
+        iconLeft={<Icon name="rate_review" size={18} />}
+      >
+        เขียนรีวิว
+      </Button>
 
       <Modal
         open={open}
         onClose={closeModal}
-        title={isEdit ? "แก้ไขรีวิว" : "เขียนรีวิว"}
+        title="เขียนรีวิว"
         footer={
           <>
             <Button

@@ -1051,8 +1051,8 @@ type CustomerBookingRow = {
   // reviews embeds the booking's review. Because `reviews.booking_id` is UNIQUE,
   // PostgREST infers a ONE-TO-ONE relationship and returns a single object (or
   // null) — NOT an array. We type it as object-or-array and normalise on read so
-  // the mapping is robust either way. created_at/updated_at derive the `edited`
-  // flag (updated_at > created_at ⟺ edited once already).
+  // the mapping is robust either way. Reviews are final once submitted, so we
+  // only need the display columns — no created_at/updated_at edit-state probe.
   reviews: EmbeddedReviewRow | EmbeddedReviewRow[] | null;
 };
 
@@ -1061,8 +1061,6 @@ type EmbeddedReviewRow = {
   id: string;
   rating: number;
   comment: string | null;
-  created_at: string;
-  updated_at: string;
 };
 
 /**
@@ -1079,6 +1077,7 @@ export async function listBookingsByCustomerPhone(
 ): Promise<CustomerBookingItem[]> {
   const supabase = getSupabaseAdmin();
   const today = getBangkokToday();
+  const nowHHMM = getBangkokNow().timeHHMM;
 
   const { data, error } = await supabase
     .from("bookings")
@@ -1087,7 +1086,7 @@ export async function listBookingsByCustomerPhone(
        service_name, service_price, status,
        shops ( name, address ),
        shop_staff ( name, role ),
-       reviews ( id, rating, comment, created_at, updated_at )`,
+       reviews ( id, rating, comment )`,
     )
     .eq("customer_phone", phone)
     .order("booking_date", { ascending: false })
@@ -1120,22 +1119,25 @@ export async function listBookingsByCustomerPhone(
               id: reviewRow.id,
               rating: reviewRow.rating,
               comment: reviewRow.comment,
-              edited:
-                new Date(reviewRow.updated_at).getTime() >
-                new Date(reviewRow.created_at).getTime(),
             }
           : null,
       };
     },
   );
 
-  // Upcoming bookings (today or later) first in chronological order, then
-  // past bookings reverse-chronological. The DB query above ordered the
-  // whole list reverse-chrono — we split + reverse the upcoming half.
+  // Upcoming bookings (whose slot hasn't started yet) first, nearest-time
+  // first, then past bookings reverse-chronological. A slot earlier *today*
+  // that has already passed counts as past, so the genuinely next booking
+  // leads the list — not a slot whose time is already gone. The DB query
+  // ordered the whole list reverse-chrono, so reversing the upcoming half
+  // yields ascending (nearest) order.
   const upcoming: CustomerBookingItem[] = [];
   const past: CustomerBookingItem[] = [];
   for (const b of mapped) {
-    if (b.bookingDate >= today) upcoming.push(b);
+    const isFuture =
+      b.bookingDate > today ||
+      (b.bookingDate === today && b.slotTime >= nowHHMM);
+    if (isFuture) upcoming.push(b);
     else past.push(b);
   }
   upcoming.reverse();

@@ -7,7 +7,7 @@ import {
   requireCustomerSession,
 } from "@/lib/auth/customer-session-server";
 import { cancelOwnBooking } from "@/lib/services/bookings";
-import { createReview, updateReview } from "@/lib/services/reviews";
+import { createReview } from "@/lib/services/reviews";
 
 export async function signOutCustomer() {
   await destroyCustomerSession();
@@ -30,19 +30,6 @@ export async function createMyReview(
 ): Promise<void> {
   const session = await requireCustomerSession();
   const result = await createReview(bookingId, session.phone, rating, comment);
-  if (!result.ok) {
-    throw new Error(result.message);
-  }
-  revalidatePath("/me/bookings");
-}
-
-export async function updateMyReview(
-  reviewId: string,
-  rating: number,
-  comment: string,
-): Promise<void> {
-  const session = await requireCustomerSession();
-  const result = await updateReview(reviewId, session.phone, rating, comment);
   if (!result.ok) {
     throw new Error(result.message);
   }
