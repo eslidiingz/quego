@@ -4,7 +4,8 @@ import { Icon } from "@/components/ui/Icon";
 import { Chip } from "@/components/ui/Chip";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { LandingFooter } from "@/components/landing/LandingFooter";
-import { getBookingById } from "@/lib/services/bookings";
+import { getBookingById, getBookingQueueStatus } from "@/lib/services/bookings";
+import { LiveBookingQueue } from "@/components/booking/LiveBookingQueue";
 import { formatBaht } from "@/lib/baht";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,10 @@ export default async function BookingDetailPage({
   params: RouteParams;
 }) {
   const { id } = await params;
-  const booking = await getBookingById(id);
+  const [booking, queue] = await Promise.all([
+    getBookingById(id),
+    getBookingQueueStatus(id),
+  ]);
   if (!booking) notFound();
 
   const status = STATUS_LABEL[booking.status] ?? STATUS_LABEL.confirmed;
@@ -58,6 +62,10 @@ export default async function BookingDetailPage({
             </Chip>
           </div>
         </section>
+
+        {queue.active ? (
+          <LiveBookingQueue bookingId={id} initial={queue} />
+        ) : null}
 
         <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 space-y-4">
           <h2 className="font-display text-headline-md text-on-surface">
