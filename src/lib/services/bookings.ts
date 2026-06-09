@@ -968,9 +968,7 @@ export async function cancelBookingByShop(
     .eq("id", bookingId)
     .eq("shop_id", shopId)
     .eq("status", "confirmed")
-    .select(
-      "customer_phone, service_name, booking_date, slot_time, shops ( name )",
-    )
+    .select("customer_phone, service_name, booking_date, slot_time")
     .maybeSingle();
 
   if (error) {
@@ -988,23 +986,20 @@ export async function cancelBookingByShop(
   // Tell the customer (if LINE-connected) that the shop cancelled. Keyed by
   // phone (the booking identity key), so anonymous bookings are a no-op.
   // Scheduled off the response path with `after`, fail-silent inside the
-  // service. The customer only ever receives cancel notices for shop-initiated
+  // service. The shop name is resolved inside the push by `shopId` (not embedded
+  // on the UPDATE…RETURNING above), so an empty join can't leak a blank shop
+  // name. The customer only ever receives cancel notices for shop-initiated
   // cancels, so the source is implicit in the recipient.
   const cancelled = data as {
     customer_phone: string | null;
     service_name: string | null;
     booking_date: string;
     slot_time: string;
-    shops: { name: string } | { name: string }[] | null;
   };
   const customerPhone = cancelled.customer_phone;
   if (customerPhone) {
-    const shop = Array.isArray(cancelled.shops)
-      ? cancelled.shops[0] ?? null
-      : cancelled.shops;
     after(() =>
-      pushBookingCancellationToCustomer(customerPhone, {
-        shopName: shop?.name ?? "",
+      pushBookingCancellationToCustomer(customerPhone, shopId, {
         serviceName: cancelled.service_name,
         bookingDate: cancelled.booking_date,
         slotTime: cancelled.slot_time.slice(0, 5),
@@ -1099,6 +1094,60 @@ export async function listNewBookingsForShop(
     slotTime: r.slot_time.slice(0, 5),
     bookingDate: r.booking_date,
     createdAt: r.created_at,
+  }));
+}
+
+export type CancellationAlert = {
+  id: string;
+  customerName: string;
+  slotTime: string; // HH:MM
+  bookingDate: string; // YYYY-MM-DD
+  cancelledAt: string; // UTC ISO — when the customer cancelled (= updated_at)
+};
+
+/**
+ * List bookings for one shop that a CUSTOMER cancelled strictly after
+ * `sinceIso`. Backs the cancellation half of the shop's live notifier, polled
+ * on the SAME cursor as `listNewBookingsForShop` so both event kinds advance
+ * against one server clock.
+ *
+ * The cursor is `updated_at`: the `bookings_set_updated_at` BEFORE-UPDATE
+ * trigger stamps it to `now()` on every UPDATE, so for a cancelled row it is the
+ * cancel time — and 'cancelled' is terminal, so the row is never touched again
+ * (no later bump can resurface a stale notice). Only `cancelled_by = 'customer'`
+ * counts: a shop cancelling its own booking must not ping itself (it pings the
+ * customer instead). Capped at 20 like its sibling to bound a pathological burst.
+ */
+export async function listNewCancellationsForShop(
+  shopId: string,
+  sinceIso: string,
+): Promise<CancellationAlert[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("id, customer_name, booking_date, slot_time, updated_at")
+    .eq("shop_id", shopId)
+    .eq("status", "cancelled")
+    .eq("cancelled_by", "customer")
+    .gt("updated_at", sinceIso)
+    .order("updated_at", { ascending: true })
+    .limit(20);
+
+  if (error || !data) return [];
+  return (
+    data as {
+      id: string;
+      customer_name: string;
+      booking_date: string;
+      slot_time: string;
+      updated_at: string;
+    }[]
+  ).map((r) => ({
+    id: r.id,
+    customerName: r.customer_name,
+    slotTime: r.slot_time.slice(0, 5),
+    bookingDate: r.booking_date,
+    cancelledAt: r.updated_at,
   }));
 }
 

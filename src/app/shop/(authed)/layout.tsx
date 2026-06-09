@@ -1,7 +1,7 @@
 import { requireShopSession } from "@/lib/auth/shop-session-server";
 import { ShopShell } from "@/components/shop/ShopShell";
 import { ImpersonationBanner } from "@/components/shop/ImpersonationBanner";
-import { NewBookingNotifier } from "@/components/shop/NewBookingNotifier";
+import { ShopNotifier } from "@/components/shop/ShopNotifier";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +12,9 @@ export default async function ShopAuthedLayout({
 }) {
   const session = await requireShopSession();
   const isImpersonating = Boolean(session.impersonatedBy);
-  // Baseline cursor for the live notifier — only bookings created after this
-  // page load are announced. UTC, to match `bookings.created_at`.
+  // Baseline cursor for the live notifier — only events (new bookings and
+  // customer cancellations) that occur after this page load are announced.
+  // UTC, to match `bookings.created_at` / `bookings.updated_at`.
   const initialSinceIso = new Date().toISOString();
 
   return (
@@ -25,7 +26,7 @@ export default async function ShopAuthedLayout({
         shopName={session.shopName}
         shopPhone={session.phone}
         isImpersonating={isImpersonating}
-        headerSlot={<NewBookingNotifier initialSinceIso={initialSinceIso} />}
+        headerSlot={<ShopNotifier initialSinceIso={initialSinceIso} />}
       >
         {children}
       </ShopShell>

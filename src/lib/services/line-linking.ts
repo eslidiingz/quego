@@ -176,6 +176,19 @@ export async function pushBookingConfirmationToCustomer(
 // ----- Outbound: shop-cancelled notification ------------------------------
 
 /**
+ * The facts a shop-cancellation push needs, MINUS the shop name. Unlike the
+ * confirmation path — where the caller already holds a trustworthy shop name —
+ * the cancel caller would have to embed it via a fragile UPDATE…RETURNING join,
+ * which can come back empty. So the name is resolved inside the push (by
+ * `shopId`) instead, and this slim type is all `cancelBookingByShop` supplies.
+ */
+export type BookingCancellationNotice = {
+  serviceName: string | null;
+  bookingDate: string; // "YYYY-MM-DD"
+  slotTime: string; // "HH:MM"
+};
+
+/**
  * Build the Thai "shop cancelled your booking" message body for the customer.
  * Reuses BookingConfirmationNotice — same facts (which shop / what / when),
  * only the heading differs. The customer only ever receives a cancel notice for
@@ -201,23 +214,44 @@ export function formatBookingCancellationMessage(
  * with no record or no binding is a silent no-op. Fail-silent by contract
  * (mirrors pushBookingConfirmationToCustomer): any error is logged, never
  * thrown — cancelling a booking must never fail because of a notification.
+ *
+ * The shop name is resolved HERE by `shopId`, not threaded in by the caller:
+ * the caller (`cancelBookingByShop`) would otherwise have to embed it on an
+ * UPDATE…RETURNING join that can return empty, leaking a blank "ร้าน:" into the
+ * message. We look it up only once a bound recipient is confirmed (so the
+ * common no-LINE case still costs a single query) and skip the push entirely if
+ * the name can't be resolved — better no notice than a nameless one.
  */
 export async function pushBookingCancellationToCustomer(
   phone: string,
-  notice: BookingConfirmationNotice,
+  shopId: string,
+  notice: BookingCancellationNotice,
 ): Promise<void> {
   try {
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
+    const { data: customer, error } = await supabase
       .from("customers")
       .select("line_user_id")
       .eq("phone", phone)
       .maybeSingle();
-    if (error || !data?.line_user_id) return;
+    if (error || !customer?.line_user_id) return;
+
+    const { data: shop } = await supabase
+      .from("shops")
+      .select("name")
+      .eq("id", shopId)
+      .maybeSingle();
+    const shopName = shop?.name as string | undefined;
+    if (!shopName) return; // never send "ร้าน:" with no shop
 
     await pushLineMessage(
-      data.line_user_id as string,
-      [{ type: "text", text: formatBookingCancellationMessage(notice) }],
+      customer.line_user_id as string,
+      [
+        {
+          type: "text",
+          text: formatBookingCancellationMessage({ shopName, ...notice }),
+        },
+      ],
       { kind: "booking_cancellation" },
     );
   } catch (err) {

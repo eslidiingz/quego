@@ -2,26 +2,55 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import { getBangkokToday } from "@/lib/time/bangkok";
-import type { NewBookingAlert } from "@/lib/services/bookings";
+import type { ShopNotice } from "@/app/shop/(authed)/notifications/actions";
 
-/** A booking alert plus its per-item read state (owned by the notifier). */
-export type BookingNotice = NewBookingAlert & { read: boolean };
+/** A shop notice plus its per-item read state (owned by the notifier). */
+export type ShopNoticeItem = ShopNotice & { read: boolean };
 
-/** Deep-link to the bookings page (the shop's full list of incoming bookings). */
+/**
+ * Deep-link to the bookings page (the shop's full list of bookings). Both a new
+ * booking and a customer cancellation are visible there, so one target serves both.
+ */
 export function noticeHref(): string {
   return "/shop/bookings";
 }
 
+/** Per-kind presentation: icon + tinted avatar + the verb shown before the time. */
+const KIND_STYLES: Record<
+  ShopNotice["kind"],
+  { icon: string; avatar: string; verb: string }
+> = {
+  new_booking: {
+    icon: "event_available",
+    avatar: "bg-primary-container/15 text-primary",
+    verb: "จองคิว",
+  },
+  cancellation: {
+    icon: "event_busy",
+    avatar: "bg-error-container/30 text-error",
+    verb: "ยกเลิกคิว",
+  },
+};
+
 /**
- * Presentational dropdown for the shop's new-booking bell. Pure: it just
+ * Stable per-notice key. The same booking id can appear as both a new booking
+ * AND (later) a cancellation, so `kind` must be part of the key/dedupe identity.
+ */
+export function noticeKey(notice: { kind: ShopNotice["kind"]; id: string }): string {
+  return `${notice.kind}:${notice.id}`;
+}
+
+/**
+ * Presentational dropdown for the shop's notification bell. Pure: it just
  * renders the supplied notices and dispatches intent via callbacks — all
- * polling/read state lives in `NewBookingNotifier`. Split out so the visual
- * can be exercised in isolation and so the notifier stays focused on
- * data + behaviour.
+ * polling/read state lives in `ShopNotifier`. Split out so the visual can be
+ * exercised in isolation and so the notifier stays focused on data + behaviour.
  *
- * Read model (mirrors the admin's `PendingShopsPanel`): opening the bell does
- * NOT mark anything read. A notice clears only when the shop opens it (navigates
- * to the bookings list) or uses "อ่านทั้งหมด".
+ * Renders a mixed feed: new bookings and customer-initiated cancellations,
+ * distinguished per item by `kind` (see KIND_STYLES). Read model (mirrors the
+ * admin's `PendingShopsPanel`): opening the bell does NOT mark anything read. A
+ * notice clears only when the shop opens it (navigates to the bookings list) or
+ * uses "อ่านทั้งหมด".
  */
 export function NotificationPanel({
   items,
@@ -30,11 +59,11 @@ export function NotificationPanel({
   onMarkAllRead,
   onViewAll,
 }: {
-  items: BookingNotice[];
+  items: ShopNoticeItem[];
   /** Count of unread notices — drives the "อ่านทั้งหมด" affordance. */
   unreadCount: number;
   /** Fired when a notice is opened (mark it read + close). Navigation is the Link. */
-  onItemClick: (id: string) => void;
+  onItemClick: (key: string) => void;
   /** Mark every notice read without navigating. */
   onMarkAllRead: () => void;
   /** Fired when the footer "view all" link is followed (e.g. to close). */
@@ -48,7 +77,7 @@ export function NotificationPanel({
             การแจ้งเตือน
           </p>
           <p className="text-label-sm text-on-surface-variant">
-            การจองใหม่ที่เข้ามาระหว่างคุณออนไลน์
+            การจองและการยกเลิกระหว่างคุณออนไลน์
           </p>
         </div>
         {unreadCount > 0 ? (
@@ -70,36 +99,45 @@ export function NotificationPanel({
         </div>
       ) : (
         <ul className="max-h-80 overflow-y-auto divide-y divide-outline-variant/40">
-          {items.map((b) => (
-            <li key={b.id}>
-              <Link
-                href={noticeHref()}
-                onClick={() => onItemClick(b.id)}
-                className={cn(
-                  "flex items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-container-high",
-                  !b.read && "bg-primary-container/10",
-                )}
-              >
-                <span className="w-9 h-9 rounded-full bg-primary-container/15 text-primary flex items-center justify-center shrink-0">
-                  <Icon name="event_available" size={20} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-label-md text-on-surface font-semibold truncate">
-                    {b.customerName}
-                  </p>
-                  <p className="text-label-sm text-on-surface-variant truncate">
-                    จองคิว · {formatWhen(b.bookingDate, b.slotTime)}
-                  </p>
-                </div>
-                {!b.read ? (
+          {items.map((n) => {
+            const style = KIND_STYLES[n.kind];
+            const key = noticeKey(n);
+            return (
+              <li key={key}>
+                <Link
+                  href={noticeHref()}
+                  onClick={() => onItemClick(key)}
+                  className={cn(
+                    "flex items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-container-high",
+                    !n.read && "bg-primary-container/10",
+                  )}
+                >
                   <span
-                    aria-label="ยังไม่ได้อ่าน"
-                    className="mt-1 size-2 rounded-full bg-primary shrink-0"
-                  />
-                ) : null}
-              </Link>
-            </li>
-          ))}
+                    className={cn(
+                      "w-9 h-9 rounded-full flex items-center justify-center shrink-0",
+                      style.avatar,
+                    )}
+                  >
+                    <Icon name={style.icon} size={20} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-label-md text-on-surface font-semibold truncate">
+                      {n.customerName}
+                    </p>
+                    <p className="text-label-sm text-on-surface-variant truncate">
+                      {style.verb} · {formatWhen(n.bookingDate, n.slotTime)}
+                    </p>
+                  </div>
+                  {!n.read ? (
+                    <span
+                      aria-label="ยังไม่ได้อ่าน"
+                      className="mt-1 size-2 rounded-full bg-primary shrink-0"
+                    />
+                  ) : null}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
 
