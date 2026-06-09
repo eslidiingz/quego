@@ -2,6 +2,7 @@ import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { pushLineMessage } from "@/lib/line/client";
 import { buildBookingMessage } from "@/lib/line/format";
+import { buildBookingConfirmationFlex } from "@/lib/line/booking-flex";
 
 /**
  * Customer ↔ LINE binding. SRP: the customers.line_user_id lifecycle
@@ -152,7 +153,7 @@ export function formatBookingConfirmationMessage(
  */
 export async function pushBookingConfirmationToCustomer(
   phone: string,
-  notice: BookingConfirmationNotice,
+  notice: BookingConfirmationNotice & { bookingId: string },
 ): Promise<void> {
   try {
     const supabase = getSupabaseAdmin();
@@ -163,9 +164,13 @@ export async function pushBookingConfirmationToCustomer(
       .maybeSingle();
     if (error || !data?.line_user_id) return;
 
+    // OPP-03: a flex bubble carrying the confirmation facts PLUS the interactive
+    // กำลังมา / ขอเลื่อน / ยกเลิก buttons. The plain text still rides along as
+    // altText (notification preview + non-flex clients). buildBookingConfirmationFlex
+    // reuses formatBookingConfirmationMessage for that altText.
     await pushLineMessage(
       data.line_user_id as string,
-      [{ type: "text", text: formatBookingConfirmationMessage(notice) }],
+      [buildBookingConfirmationFlex(notice)],
       { kind: "booking_confirmation" },
     );
   } catch (err) {

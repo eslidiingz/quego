@@ -8,9 +8,13 @@ import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import {
   evaluateSlots,
+  eachDateInWindow,
+  findSoonestSlot,
+  nextYmd,
   type BookingContext,
   type BookingService,
   type StaffOption,
+  type SoonestSlot,
 } from "@/lib/booking/slot-math";
 import { getBangkokNow, getBangkokToday } from "@/lib/time/bangkok";
 import { createBookingAction, type CreateBookingState } from "./actions";
@@ -153,14 +157,77 @@ export function BookingForm({
     };
   }, []);
 
+  // The bare date list for the window — date + day-of-week only, independent of
+  // any staff choice. Both the date chips and the soonest-slot scan walk it, so
+  // it's memoised once and reused rather than rebuilt per staff option.
+  const windowDays = useMemo(
+    () => eachDateInWindow(context.windowStart, context.windowEnd),
+    [context.windowStart, context.windowEnd],
+  );
+
   const days = useMemo(
     () =>
       duration == null
         ? []
-        : buildDays(context, duration, now, locallyTaken, effectiveCapacity, staffFilter),
-    [context, duration, now, locallyTaken, effectiveCapacity, staffFilter],
+        : buildDays(context, windowDays, duration, now, locallyTaken, effectiveCapacity, staffFilter),
+    [context, windowDays, duration, now, locallyTaken, effectiveCapacity, staffFilter],
   );
   const selectedDay = days.find((d) => d.dateYmd === selectedDate) ?? null;
+
+  // OPP-11a — soonest free opening per staff choice, so the picker can show
+  // that "ใครก็ได้" (capacity = #capable staff) frees up earlier than pinning
+  // one person (capacity = 1). Keyed by staff id, with `null` = "ใครก็ได้".
+  // Built off the staff-independent `windowDays`, so selecting a staff doesn't
+  // recompute every option's soonest.
+  const soonestByStaff = useMemo(() => {
+    if (!showStaffStep || duration == null) return null;
+    const common = {
+      days: windowDays,
+      hours: context.hours,
+      durationMinutes: duration,
+      intervals: context.bookedIntervals,
+      nowDate: now.date,
+      nowHHMM: now.timeHHMM,
+      takenKeys: locallyTaken,
+    };
+    const byStaff = new Map<string | null, SoonestSlot | null>();
+    byStaff.set(
+      null,
+      findSoonestSlot({
+        ...common,
+        capacity: Math.max(capableStaff.length, 1),
+        staffIdFilter: new Set(capableStaff.map((s) => s.id)),
+      }),
+    );
+    for (const member of capableStaff) {
+      byStaff.set(
+        member.id,
+        findSoonestSlot({ ...common, capacity: 1, staffIdFilter: new Set([member.id]) }),
+      );
+    }
+    return byStaff;
+  }, [
+    showStaffStep,
+    duration,
+    windowDays,
+    context.hours,
+    context.bookedIntervals,
+    now.date,
+    now.timeHHMM,
+    locallyTaken,
+    capableStaff,
+  ]);
+
+  // "ใครก็ได้" genuinely saves time when its soonest beats every individual's
+  // (or some individual has no opening at all). Only then do we flag it faster —
+  // when every staff is equally free right now, the hint would be misleading.
+  const anyStaffSoonest = soonestByStaff?.get(null) ?? null;
+  const anyStaffIsFaster =
+    anyStaffSoonest != null &&
+    capableStaff.some((m) => {
+      const s = soonestByStaff?.get(m.id) ?? null;
+      return s == null || soonestKey(s) > soonestKey(anyStaffSoonest);
+    });
 
   const slots = useMemo(() => {
     if (duration == null || !selectedDay || selectedDay.status === "closed")
@@ -285,7 +352,7 @@ export function BookingForm({
           <Section
             step={staffStepNum}
             title="เลือกผู้ให้บริการ"
-            description="เลือกช่างที่ต้องการ หรือให้ร้านจัดให้"
+            description="เลือกช่างที่ต้องการ หรือให้ร้านจัดให้ — คิวว่างเร็วสุดของแต่ละตัวเลือกแสดงไว้ด้านล่าง"
           >
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
               <StaffCard
@@ -294,6 +361,9 @@ export function BookingForm({
                 icon="groups"
                 selected={selectedStaffId === null}
                 onClick={() => handleSelectStaff(null)}
+                soonest={anyStaffSoonest}
+                today={now.date}
+                fastest={anyStaffIsFaster}
               />
               {capableStaff.map((member) => (
                 <StaffCard
@@ -303,6 +373,8 @@ export function BookingForm({
                   icon="person"
                   selected={selectedStaffId === member.id}
                   onClick={() => handleSelectStaff(member.id)}
+                  soonest={soonestByStaff?.get(member.id) ?? null}
+                  today={now.date}
                 />
               ))}
             </div>
@@ -526,12 +598,21 @@ function StaffCard({
   icon,
   selected,
   onClick,
+  soonest,
+  today,
+  fastest = false,
 }: {
   name: string;
   subtitle?: string;
   icon: string;
   selected: boolean;
   onClick: () => void;
+  /** Earliest free opening for this option; null when fully booked. */
+  soonest: SoonestSlot | null;
+  /** Today's Bangkok date, for the "วันนี้/พรุ่งนี้" relative label. */
+  today: string;
+  /** True only on "ใครก็ได้" when it genuinely opens up sooner than any one staff. */
+  fastest?: boolean;
 }) {
   return (
     <button
@@ -543,7 +624,9 @@ function StaffCard({
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         selected
           ? "bg-primary text-on-primary border-primary shadow-tinted"
-          : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
+          : fastest
+            ? "bg-surface-container-low text-on-surface border-primary/40 hover:bg-surface-container-high"
+            : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
       )}
     >
       <span
@@ -567,6 +650,30 @@ function StaffCard({
           {subtitle}
         </span>
       ) : null}
+      <span
+        className={cn(
+          "mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-label-sm font-semibold max-w-full",
+          selected
+            ? "bg-on-primary/15 text-on-primary"
+            : soonest == null
+              ? "bg-surface-container-high text-on-surface-variant"
+              : fastest
+                ? "bg-primary/12 text-primary"
+                : "bg-secondary-container/60 text-on-secondary-container",
+        )}
+      >
+        <Icon
+          name={soonest == null ? "event_busy" : fastest ? "bolt" : "schedule"}
+          size={14}
+        />
+        <span className="truncate">
+          {soonest == null
+            ? "ไม่มีคิวว่าง"
+            : fastest
+              ? `เร็วกว่า · ${formatSoonest(soonest, today)}`
+              : formatSoonest(soonest, today)}
+        </span>
+      </span>
     </button>
   );
 }
@@ -718,24 +825,15 @@ function takenKey(date: string, slotTime: string): string {
 
 function buildDays(
   context: BookingContext,
+  windowDays: ReturnType<typeof eachDateInWindow>,
   durationMinutes: number,
   now: ClockNow,
   locallyTaken: ReadonlySet<string>,
   capacity: number,
   staffFilter: ReadonlySet<string> | null,
 ): BookableDay[] {
-  const out: BookableDay[] = [];
-  let cursor = context.windowStart;
-  while (cursor <= context.windowEnd) {
-    const [y, m, d] = cursor.split("-").map(Number);
-    const dayOfWeek = new Date(Date.UTC(y, m - 1, d)).getUTCDay() as
-      | 0
-      | 1
-      | 2
-      | 3
-      | 4
-      | 5
-      | 6;
+  return windowDays.map(({ dateYmd, dayOfWeek }) => {
+    const [, m, d] = dateYmd.split("-").map(Number);
     const hours = context.hours[dayOfWeek];
     const isOpen = Boolean(hours?.isOpen && hours.openTime && hours.closeTime);
 
@@ -747,35 +845,38 @@ function buildDays(
         openTime: hours!.openTime!,
         closeTime: hours!.closeTime!,
         durationMinutes,
-        date: cursor,
+        date: dateYmd,
         intervals: context.bookedIntervals,
         capacity,
-        isToday: cursor === now.date,
+        isToday: dateYmd === now.date,
         nowHHMM: now.timeHHMM,
         staffIdFilter: staffFilter,
       });
       const hasAvailable = avail.some(
-        (s) => s.isAvailable && !locallyTaken.has(takenKey(cursor, s.time)),
+        (s) => s.isAvailable && !locallyTaken.has(takenKey(dateYmd, s.time)),
       );
       status = hasAvailable ? "available" : "full";
     }
 
-    out.push({
-      dateYmd: cursor,
-      dayOfWeek,
-      dayOfMonth: d,
-      month0: m - 1,
-      status,
-    });
-    cursor = addDays(cursor, 1);
-  }
-  return out;
+    return { dateYmd, dayOfWeek, dayOfMonth: d, month0: m - 1, status };
+  });
 }
 
-function addDays(ymd: string, delta: number): string {
-  const [y, m, d] = ymd.split("-").map(Number);
-  const next = new Date(Date.UTC(y, m - 1, d + delta));
-  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+/** Sortable key for a soonest-slot — "YYYY-MM-DD HH:MM" sorts chronologically. */
+function soonestKey(s: SoonestSlot): string {
+  return `${s.date} ${s.time}`;
+}
+
+/** "วันนี้ 14:00" / "พรุ่งนี้ 10:00" / "15 มิ.ย. 09:00" — relative to `today`. */
+function formatSoonest(s: SoonestSlot, today: string): string {
+  const [, m, d] = s.date.split("-").map(Number);
+  const label =
+    s.date === today
+      ? "วันนี้"
+      : s.date === nextYmd(today)
+        ? "พรุ่งนี้"
+        : `${d} ${THAI_MONTH_SHORT[m - 1]}`;
+  return `${label} ${s.time}`;
 }
 
 function computeSlotsForDay(

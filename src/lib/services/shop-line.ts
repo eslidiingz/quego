@@ -189,3 +189,105 @@ export async function pushBookingCancelledToShop(
     console.error("pushBookingCancelledToShop error:", err);
   }
 }
+
+// ----- Outbound: customer "กำลังมา" arrival ack (OPP-03) -------------------
+
+/**
+ * Build the Thai "customer is on the way" message for the shop. Reuses
+ * NewBookingNotice (same who / what / when facts), only the heading differs.
+ */
+export function formatCustomerArrivalMessage(notice: NewBookingNotice): string {
+  return buildBookingMessage({
+    heading: "🚶 ลูกค้ากำลังมา",
+    identityLine: `ลูกค้า: ${notice.customerName}`,
+    serviceName: notice.serviceName,
+    bookingDate: notice.bookingDate,
+    slotTime: notice.slotTime,
+  });
+}
+
+/**
+ * Push a "customer tapped กำลังมา" notice to the shop's bound LINE account, if
+ * any. Fail-silent by contract — mirrors pushNewBookingToShop.
+ */
+export async function pushCustomerArrivalToShop(
+  shopId: string,
+  notice: NewBookingNotice,
+): Promise<void> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("shops")
+      .select("line_user_id")
+      .eq("id", shopId)
+      .maybeSingle();
+    if (error || !data?.line_user_id) return;
+
+    await pushLineMessage(
+      data.line_user_id as string,
+      [{ type: "text", text: formatCustomerArrivalMessage(notice) }],
+      { kind: "customer_arrival" },
+    );
+  } catch (err) {
+    console.error("pushCustomerArrivalToShop error:", err);
+  }
+}
+
+// ----- Outbound: customer reschedule notice (OPP-04) ----------------------
+
+export type RescheduleNotice = {
+  customerName: string;
+  serviceName: string | null;
+  fromDate: string; // "YYYY-MM-DD"
+  fromSlotTime: string; // "HH:MM"
+  toDate: string;
+  toSlotTime: string;
+};
+
+/** "DD/MM/YYYY" — mirrors lib/line/format.ts formatBookingDate. */
+function formatNoticeDate(ymd: string): string {
+  const [y, m, d] = ymd.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+/**
+ * Build the Thai "customer rescheduled" message for the shop. Has two datetime
+ * lines (from → to), so it composes the body directly rather than via the
+ * single-datetime shared builder.
+ */
+export function formatBookingRescheduledMessage(notice: RescheduleNotice): string {
+  const lines = ["🕓 ลูกค้าเลื่อนเวลา", `ลูกค้า: ${notice.customerName}`];
+  if (notice.serviceName) lines.push(`บริการ: ${notice.serviceName}`);
+  lines.push(
+    `จาก: ${formatNoticeDate(notice.fromDate)} ${notice.fromSlotTime} น.`,
+    `เป็น: ${formatNoticeDate(notice.toDate)} ${notice.toSlotTime} น.`,
+  );
+  return lines.join("\n");
+}
+
+/**
+ * Push a reschedule notice to the shop's bound LINE account, if any.
+ * Fail-silent by contract — mirrors pushNewBookingToShop.
+ */
+export async function pushBookingRescheduledToShop(
+  shopId: string,
+  notice: RescheduleNotice,
+): Promise<void> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("shops")
+      .select("line_user_id")
+      .eq("id", shopId)
+      .maybeSingle();
+    if (error || !data?.line_user_id) return;
+
+    await pushLineMessage(
+      data.line_user_id as string,
+      [{ type: "text", text: formatBookingRescheduledMessage(notice) }],
+      { kind: "booking_rescheduled" },
+    );
+  } catch (err) {
+    console.error("pushBookingRescheduledToShop error:", err);
+  }
+}

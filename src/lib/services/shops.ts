@@ -79,6 +79,12 @@ export type ShopListItem = {
   service_duration_minutes: number;
   created_at: string;
   reviewed_at: string | null;
+  /**
+   * OPP-04: hours before a slot a customer may still reschedule/cancel (0 = no
+   * restriction). Optional because only `getShopById` (the profile page) selects
+   * it; the admin list projections leave it undefined.
+   */
+  reschedule_cancel_cutoff_hours?: number;
 };
 
 export type ShopCountsByStatus = Record<ShopStatus, number>;
@@ -537,6 +543,7 @@ type ShopRow = {
   service_duration_minutes: number;
   created_at: string;
   reviewed_at: string | null;
+  reschedule_cancel_cutoff_hours: number;
   shop_categories: { name: string } | null;
 };
 
@@ -556,6 +563,7 @@ export async function listShops(filter?: {
         owner_name, owner_phone, owner_email,
         contact_phone, description, address, province, district, subdistrict,
         rejection_reason, service_duration_minutes, created_at, reviewed_at,
+        reschedule_cancel_cutoff_hours,
         shop_categories ( name )
       `,
     )
@@ -586,6 +594,7 @@ export async function listShops(filter?: {
     service_duration_minutes: r.service_duration_minutes,
     created_at: r.created_at,
     reviewed_at: r.reviewed_at,
+    reschedule_cancel_cutoff_hours: r.reschedule_cancel_cutoff_hours,
   }));
 }
 
@@ -853,6 +862,7 @@ export async function getShopById(id: string): Promise<ShopListItem | null> {
         owner_name, owner_phone, owner_email,
         contact_phone, description, address, province, district, subdistrict,
         rejection_reason, service_duration_minutes, created_at, reviewed_at,
+        reschedule_cancel_cutoff_hours,
         shop_categories ( name )
       `,
     )
@@ -879,6 +889,7 @@ export async function getShopById(id: string): Promise<ShopListItem | null> {
     service_duration_minutes: r.service_duration_minutes,
     created_at: r.created_at,
     reviewed_at: r.reviewed_at,
+    reschedule_cancel_cutoff_hours: r.reschedule_cancel_cutoff_hours,
   };
 }
 
@@ -912,7 +923,10 @@ export async function getShopCategoryRef(
 
 // ----- Shop-owner self-edit -----------------------------------------------
 
-export type UpdateOwnShopInput = Omit<UpdateShopInput, "ownerPhone">;
+export type UpdateOwnShopInput = Omit<UpdateShopInput, "ownerPhone"> & {
+  /** OPP-04: hours before a slot a customer may still reschedule/cancel (0–168). */
+  rescheduleCancelCutoffHours: number;
+};
 
 /**
  * Shop-owner update of their own profile. Deliberately narrower than the
@@ -958,6 +972,7 @@ export async function updateOwnShopProfile(
       contact_phone: input.contactPhone || null,
       owner_name: input.ownerName,
       owner_email: input.ownerEmail || null,
+      reschedule_cancel_cutoff_hours: input.rescheduleCancelCutoffHours,
     })
     .eq("id", shopId);
 

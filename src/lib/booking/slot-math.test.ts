@@ -6,7 +6,11 @@ import {
   intervalsOverlap,
   busyLineCount,
   evaluateSlots,
+  eachDateInWindow,
+  findSoonestSlot,
+  nextYmd,
   type BookedInterval,
+  type BusinessHour,
 } from "./slot-math";
 
 describe("hhmmToMinutes", () => {
@@ -510,5 +514,134 @@ describe("evaluateSlots", () => {
       nowHHMM: "00:00",
     });
     expect(result).toEqual([]);
+  });
+});
+
+describe("nextYmd", () => {
+  it("advances within a month", () => {
+    expect(nextYmd("2026-06-10")).toBe("2026-06-11");
+  });
+
+  it("rolls over a month boundary", () => {
+    expect(nextYmd("2026-06-30")).toBe("2026-07-01");
+  });
+
+  it("rolls over a year boundary", () => {
+    expect(nextYmd("2026-12-31")).toBe("2027-01-01");
+  });
+});
+
+describe("eachDateInWindow", () => {
+  it("includes both inclusive endpoints", () => {
+    const days = eachDateInWindow("2026-06-10", "2026-06-12");
+    expect(days.map((d) => d.dateYmd)).toEqual([
+      "2026-06-10",
+      "2026-06-11",
+      "2026-06-12",
+    ]);
+  });
+
+  it("returns a single day when start equals end", () => {
+    const days = eachDateInWindow("2026-06-10", "2026-06-10");
+    expect(days.map((d) => d.dateYmd)).toEqual(["2026-06-10"]);
+  });
+
+  it("increments the day-of-week across the window (0..6)", () => {
+    const days = eachDateInWindow("2026-06-10", "2026-06-11");
+    expect(days[0].dayOfWeek).toBeGreaterThanOrEqual(0);
+    expect(days[0].dayOfWeek).toBeLessThanOrEqual(6);
+    expect(days[1].dayOfWeek).toBe(((days[0].dayOfWeek + 1) % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6);
+  });
+});
+
+describe("findSoonestSlot", () => {
+  const openHours = (): BusinessHour[] =>
+    Array.from({ length: 7 }, (_, dow) => ({
+      dayOfWeek: dow as BusinessHour["dayOfWeek"],
+      isOpen: true,
+      openTime: "09:00",
+      closeTime: "12:00", // slots at 30m: 09:00 09:30 10:00 10:30 11:00 11:30
+    }));
+  const window = eachDateInWindow("2026-06-10", "2026-06-12");
+  const base = {
+    days: window,
+    durationMinutes: 30,
+    intervals: [] as BookedInterval[],
+    capacity: 1,
+    nowDate: "2026-06-09", // before the window → nothing is "today" or past
+    nowHHMM: "00:00",
+  };
+
+  it("returns the first open slot when nothing is booked", () => {
+    expect(findSoonestSlot({ ...base, hours: openHours() })).toEqual({
+      date: "2026-06-10",
+      time: "09:00",
+    });
+  });
+
+  it("skips a fully-booked first day to the next open day", () => {
+    const intervals: BookedInterval[] = [540, 570, 600, 630, 660, 690].map(
+      (startMin) => ({ date: "2026-06-10", startMin, durationMin: 30, staffId: null }),
+    );
+    expect(findSoonestSlot({ ...base, hours: openHours(), intervals })).toEqual({
+      date: "2026-06-11",
+      time: "09:00",
+    });
+  });
+
+  it("treats parallel capacity as more availability — any-staff opens up sooner", () => {
+    const intervals: BookedInterval[] = [
+      { date: "2026-06-10", startMin: 540, durationMin: 30, staffId: "s1" },
+    ];
+    // Pinned to the booked staff (capacity 1) → 09:00 taken, soonest 09:30.
+    expect(
+      findSoonestSlot({
+        ...base,
+        hours: openHours(),
+        intervals,
+        capacity: 1,
+        staffIdFilter: new Set(["s1"]),
+      }),
+    ).toEqual({ date: "2026-06-10", time: "09:30" });
+    // "ใครก็ได้": two parallel lines → 09:00 still has a free line.
+    expect(
+      findSoonestSlot({
+        ...base,
+        hours: openHours(),
+        intervals,
+        capacity: 2,
+        staffIdFilter: new Set(["s1", "s2"]),
+      }),
+    ).toEqual({ date: "2026-06-10", time: "09:00" });
+  });
+
+  it("excludes past slots on today", () => {
+    expect(
+      findSoonestSlot({ ...base, hours: openHours(), nowDate: "2026-06-10", nowHHMM: "09:15" }),
+    ).toEqual({ date: "2026-06-10", time: "09:30" });
+  });
+
+  it("excludes slots listed in takenKeys", () => {
+    expect(
+      findSoonestSlot({
+        ...base,
+        hours: openHours(),
+        takenKeys: new Set(["2026-06-10 09:00"]),
+      }),
+    ).toEqual({ date: "2026-06-10", time: "09:30" });
+  });
+
+  it("returns null when every day is closed", () => {
+    const closed = openHours().map((h) => ({
+      ...h,
+      isOpen: false,
+      openTime: null,
+      closeTime: null,
+    }));
+    expect(findSoonestSlot({ ...base, hours: closed })).toBeNull();
+  });
+
+  it("returns null when the window is empty", () => {
+    expect(findSoonestSlot({ ...base, hours: openHours(), days: [] })).toBeNull();
   });
 });
