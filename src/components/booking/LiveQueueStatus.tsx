@@ -7,7 +7,7 @@ import { formatWaitLabel } from "@/lib/booking/queue-format";
 
 /**
  * Customer-facing live-queue cadence (~10s) — kept tighter than the staff
- * notifiers (NewBookingNotifier / PendingShopsNotifier, ~20s) so the queue
+ * notifiers (ShopNotifier / PendingShopsNotifier, ~20s) so the queue
  * figures a waiting customer is watching feel responsive.
  */
 const POLL_INTERVAL_MS = 10_000;
@@ -18,7 +18,7 @@ const POLL_INTERVAL_MS = 10_000;
  * polls `pollShopQueueStatus` every ~10s and updates only the two figures —
  * `คิวที่รออยู่` and `เวลารอโดยประมาณ` — in place.
  *
- * Polling mirrors the house pattern (NewBookingNotifier): pause while the tab is
+ * Polling mirrors the house pattern (ShopNotifier): pause while the tab is
  * hidden (Page Visibility), an immediate first tick, a catch-up tick on refocus,
  * a `cancelled` guard, and a try/catch that KEEPS the last good value on any
  * network/server/rate-limit hiccup (never flashes zeros).

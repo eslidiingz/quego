@@ -4,8 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Toast } from "@/components/ui/Toast";
-import { NotificationPanel, type BookingNotice } from "./NotificationPanel";
-import { pollNewBookings } from "@/app/shop/(authed)/notifications/actions";
+import {
+  NotificationPanel,
+  noticeKey,
+  type ShopNoticeItem,
+} from "./NotificationPanel";
+import {
+  pollShopNotifications,
+  type ShopNotice,
+} from "@/app/shop/(authed)/notifications/actions";
 
 const POLL_INTERVAL_MS = 20_000;
 /** Keep the dropdown bounded — older alerts fall off the bottom. */
@@ -14,10 +21,16 @@ const MAX_ITEMS = 20;
 type ToastState = { id: number; message: string } | null;
 
 /**
- * Live new-booking notifier for the shop area. Polls `pollNewBookings` every
- * ~20s with a server-supplied cursor, and on fresh confirmed bookings: bumps
- * the header bell badge, shows a Toast, plays a short chime, and prepends the
- * booking to the bell dropdown so the shop can see *what* came in.
+ * Live notifier for the shop area. Polls `pollShopNotifications` every ~20s with
+ * a server-supplied cursor, and on fresh events — new confirmed bookings AND
+ * customer-initiated cancellations — bumps the header bell badge, shows a Toast,
+ * plays a short chime, and prepends each event to the bell dropdown so the shop
+ * can see *what* happened.
+ *
+ * One bell, two notice kinds (`new_booking` | `cancellation`); the panel styles
+ * each by kind. Dedupe is keyed by `kind:id`, not id alone — the same booking can
+ * surface first as a new booking and later as a cancellation, and both deserve a
+ * ping.
  *
  * Read model (mirrors the admin's `PendingShopsNotifier`): each notice carries a
  * `read` flag. Opening the bell does NOT clear the badge — the count is the
@@ -29,21 +42,21 @@ type ToastState = { id: number; message: string } | null;
  * layout-only and doesn't know this feature exists.
  *
  * `initialSinceIso` is the server's "now" at page load — the baseline cursor,
- * so only bookings that arrive AFTER load are announced (no historical spam).
+ * so only events that occur AFTER load are announced (no historical spam).
  */
-export function NewBookingNotifier({
+export function ShopNotifier({
   initialSinceIso,
 }: {
   initialSinceIso: string;
 }) {
   const cursorRef = useRef(initialSinceIso);
-  const seenIdsRef = useRef<Set<string>>(new Set());
+  const seenKeysRef = useRef<Set<string>>(new Set());
   const audioCtxRef = useRef<AudioContext | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
 
-  const [items, setItems] = useState<BookingNotice[]>([]);
+  const [items, setItems] = useState<ShopNoticeItem[]>([]);
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   const [soundBlocked, setSoundBlocked] = useState(false);
@@ -52,21 +65,23 @@ export function NewBookingNotifier({
   // Badge count = unread notices. Opening the dropdown no longer resets it.
   const unread = items.reduce((n, i) => (i.read ? n : n + 1), 0);
 
-  const markRead = (id: string) =>
+  const markRead = (key: string) =>
     setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, read: true } : i)),
+      prev.map((i) => (noticeKey(i) === key ? { ...i, read: true } : i)),
     );
 
   const markAllRead = () =>
     setItems((prev) => prev.map((i) => (i.read ? i : { ...i, read: true })));
 
-  async function playChime() {
+  async function playChime(rising: boolean) {
     try {
       const ctx = (audioCtxRef.current ??= new AudioContext());
       if (ctx.state === "suspended") await ctx.resume();
-      // Two soft notes — a recognisable "ding-dong" rather than a harsh beep.
-      beep(ctx, 880, ctx.currentTime, 0.12);
-      beep(ctx, 1174.66, ctx.currentTime + 0.13, 0.2);
+      // A two-note motif: rising "ding-dong" for a new booking, falling for a
+      // cancellation — a recognisable, low-key cue rather than a harsh beep.
+      const [a, b] = rising ? [880, 1174.66] : [1174.66, 880];
+      beep(ctx, a, ctx.currentTime, 0.12);
+      beep(ctx, b, ctx.currentTime + 0.13, 0.2);
       setSoundBlocked(false);
     } catch {
       // Autoplay blocked until the first user gesture — surface the affordance.
@@ -75,7 +90,7 @@ export function NewBookingNotifier({
   }
 
   async function enableSound() {
-    await playChime(); // runs inside a click → counts as a user gesture
+    await playChime(true); // runs inside a click → counts as a user gesture
   }
 
   useEffect(() => {
@@ -84,36 +99,34 @@ export function NewBookingNotifier({
     async function tick() {
       if (document.hidden) return; // Page Visibility: do no work while hidden
       try {
-        const { serverNowIso, bookings } = await pollNewBookings(
+        const { serverNowIso, notices } = await pollShopNotifications(
           cursorRef.current,
         );
         if (cancelled) return;
 
-        const fresh = bookings.filter((b) => !seenIdsRef.current.has(b.id));
-        for (const b of fresh) seenIdsRef.current.add(b.id);
+        const fresh = notices.filter(
+          (n) => !seenKeysRef.current.has(noticeKey(n)),
+        );
+        for (const n of fresh) seenKeysRef.current.add(noticeKey(n));
         cursorRef.current = serverNowIso; // advance only on success
 
         if (fresh.length > 0) {
-          // `fresh` is ascending by created_at — reverse so newest is on top.
+          // `fresh` is ascending by occurredAt — reverse so newest is on top.
           // New notices start unread.
           setItems((prev) =>
             [
               ...fresh
                 .slice()
                 .reverse()
-                .map((b) => ({ ...b, read: false })),
+                .map((n) => ({ ...n, read: false })),
               ...prev,
             ].slice(0, MAX_ITEMS),
           );
           toastSeq.current += 1;
-          setToast({
-            id: toastSeq.current,
-            message:
-              fresh.length === 1
-                ? `มีการจองใหม่: ${fresh[0].customerName} เวลา ${fresh[0].slotTime} น.`
-                : `มีการจองใหม่ ${fresh.length} รายการ`,
-          });
-          void playChime();
+          setToast({ id: toastSeq.current, message: toastMessage(fresh) });
+          // Rising chime if anything positive arrived, falling if it's purely
+          // cancellations — so the shop can tell the valence without looking.
+          void playChime(fresh.some((n) => n.kind === "new_booking"));
           // Re-fetch the server-rendered list + counts in place (the dashboard
           // "การจองวันนี้" list and the /shop/bookings tabs) without a full
           // reload. Client state here (bell count, list, etc.) is preserved.
@@ -197,8 +210,8 @@ export function NewBookingNotifier({
           <NotificationPanel
             items={items}
             unreadCount={unread}
-            onItemClick={(id) => {
-              markRead(id);
+            onItemClick={(key) => {
+              markRead(key);
               setOpen(false);
             }}
             onMarkAllRead={markAllRead}
@@ -217,6 +230,21 @@ export function NewBookingNotifier({
       ) : null}
     </div>
   );
+}
+
+/** One-line Toast summary for a fresh batch — kind-aware, count-aware. */
+function toastMessage(fresh: ShopNotice[]): string {
+  if (fresh.length === 1) {
+    const n = fresh[0];
+    return n.kind === "new_booking"
+      ? `มีการจองใหม่: ${n.customerName} เวลา ${n.slotTime} น.`
+      : `ลูกค้ายกเลิกคิว: ${n.customerName} เวลา ${n.slotTime} น.`;
+  }
+  const cancels = fresh.filter((n) => n.kind === "cancellation").length;
+  const books = fresh.length - cancels;
+  if (cancels === 0) return `มีการจองใหม่ ${books} รายการ`;
+  if (books === 0) return `ลูกค้ายกเลิกคิว ${cancels} รายการ`;
+  return `มีการแจ้งเตือนใหม่ ${fresh.length} รายการ`;
 }
 
 /** Schedule one enveloped sine note on the shared AudioContext. */
