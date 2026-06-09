@@ -13,6 +13,11 @@ import {
   type DayOfWeek,
 } from "@/lib/booking/slot-math";
 import {
+  computeQueueAhead,
+  DEFAULT_SERVICE_DURATION_MINUTES,
+  type QueueLaneRow,
+} from "@/lib/booking/queue-position";
+import {
   dayOfWeekFor,
   getBangkokDateWindow,
   getBangkokNow,
@@ -1320,10 +1325,115 @@ export async function getShopPublicQueueStatus(
   const loadByLine = new Map<string, number>();
   for (const b of rows) {
     const line = b.staff_id ?? SINGLE_QUEUE_LANE;
-    const duration = b.service_duration_minutes ?? 30;
+    const duration = b.service_duration_minutes ?? DEFAULT_SERVICE_DURATION_MINUTES;
     loadByLine.set(line, (loadByLine.get(line) ?? 0) + duration);
   }
   const estimatedWaitMinutes = Math.max(...loadByLine.values());
 
   return { waitingCount: rows.length, estimatedWaitMinutes };
+}
+
+export type BookingQueueStatus = {
+  /**
+   * `false` when there is no live queue to show for this booking — it is not
+   * today's, or already cancelled/completed. The page then hides the live panel
+   * (the static status chip still conveys the terminal state). When `false`,
+   * the figures below are zero.
+   */
+  active: boolean;
+  /** Confirmed bookings ahead of this one in its lane today. 0 = you're next. */
+  queueAhead: number;
+  /** Summed remaining service time of those ahead, in minutes (single lane). */
+  estimatedWaitMinutes: number;
+};
+
+/**
+ * Live queue position for ONE booking, for the customer's confirmation page
+ * (`/bookings/[id]`, OPP-01): "อีก N คิวก่อนถึงคุณ" + an estimated wait.
+ *
+ * Only meaningful while the booking is `confirmed` AND scheduled for today —
+ * the virtual queue is a same-day concept. Future-dated, past, cancelled or
+ * completed bookings return `{ active: false }`, so the island stops polling and
+ * the page falls back to the plain confirmation view.
+ *
+ * Mirrors `getShopPublicQueueStatus`: fetch today's confirmed bookings for the
+ * shop (a small set) and reduce in memory — here through the pure
+ * `computeQueueAhead`, which the client island reuses so the two never disagree.
+ */
+export async function getBookingQueueStatus(
+  bookingId: string,
+): Promise<BookingQueueStatus> {
+  const inactive: BookingQueueStatus = {
+    active: false,
+    queueAhead: 0,
+    estimatedWaitMinutes: 0,
+  };
+
+  const supabase = getSupabaseAdmin();
+  const { data: target } = await supabase
+    .from("bookings")
+    .select(
+      "id, shop_id, booking_date, slot_time, staff_id, status, created_at, service_duration_minutes",
+    )
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (!target) return inactive;
+  const t = target as {
+    id: string;
+    shop_id: string;
+    booking_date: string;
+    slot_time: string;
+    staff_id: string | null;
+    status: BookingStatus;
+    created_at: string;
+    service_duration_minutes: number | null;
+  };
+
+  // No live queue unless the booking is an active, same-day one.
+  if (t.status !== "confirmed" || t.booking_date !== getBangkokToday()) {
+    return inactive;
+  }
+
+  // Whole confirmed lane for today (small set). The wall-clock "remaining"
+  // cutoff (slot >= now) is applied inside computeQueueAhead, so the server and
+  // the polling island share one definition of "ahead" and never drift.
+  const { data } = await supabase
+    .from("bookings")
+    .select("id, slot_time, created_at, staff_id, service_duration_minutes")
+    .eq("shop_id", t.shop_id)
+    .eq("booking_date", t.booking_date)
+    .eq("status", "confirmed");
+
+  const toLaneRow = (r: {
+    id: string;
+    slot_time: string;
+    created_at: string;
+    staff_id: string | null;
+    service_duration_minutes: number | null;
+  }): QueueLaneRow => ({
+    id: r.id,
+    slotTime: r.slot_time.slice(0, 5),
+    createdAt: r.created_at,
+    staffId: r.staff_id,
+    durationMinutes: r.service_duration_minutes ?? DEFAULT_SERVICE_DURATION_MINUTES,
+  });
+
+  const rows = ((data ?? []) as Parameters<typeof toLaneRow>[0][]).map(
+    toLaneRow,
+  );
+  const targetRow = toLaneRow({
+    id: t.id,
+    slot_time: t.slot_time,
+    created_at: t.created_at,
+    staff_id: t.staff_id,
+    service_duration_minutes: t.service_duration_minutes,
+  });
+
+  const { queueAhead, estimatedWaitMinutes } = computeQueueAhead(
+    targetRow,
+    rows,
+    getBangkokNow().timeHHMM,
+  );
+  return { active: true, queueAhead, estimatedWaitMinutes };
 }
