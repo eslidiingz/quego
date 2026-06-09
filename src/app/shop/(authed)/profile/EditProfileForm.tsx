@@ -38,6 +38,7 @@ export function EditProfileForm({
   }, [state]);
 
   const errors = state && !state.ok ? state.fieldErrors : undefined;
+  const cutoffError = state && !state.ok ? state.cutoffError : undefined;
   const submitError = state && !state.ok && !state.fieldErrors ? state.message : null;
 
   const categoryDefault =
@@ -151,6 +152,27 @@ export function EditProfileForm({
             iconLeft={<Icon name="mail" />}
             defaultValue={shop.owner_email ?? ""}
             errorText={errors?.ownerEmail}
+            disabled={pending}
+          />
+        </Section>
+
+        <Section
+          icon="event_repeat"
+          title="นโยบายการเลื่อน/ยกเลิกคิว"
+          description="กำหนดว่าลูกค้าเลื่อนหรือยกเลิกคิวเองได้ถึงกี่ชั่วโมงก่อนถึงเวลานัด"
+        >
+          <Input
+            name="rescheduleCancelCutoffHours"
+            label="ต้องเลื่อน/ยกเลิกล่วงหน้าอย่างน้อย (ชั่วโมง)"
+            required
+            type="number"
+            min={0}
+            max={168}
+            inputMode="numeric"
+            iconLeft={<Icon name="schedule" />}
+            defaultValue={String(shop.reschedule_cancel_cutoff_hours ?? 0)}
+            errorText={cutoffError}
+            helperText="0 = ลูกค้าเลื่อน/ยกเลิกได้จนถึงก่อนเวลานัด • เช่น 24 = ต้องทำก่อนถึงคิวอย่างน้อย 24 ชั่วโมง"
             disabled={pending}
           />
         </Section>

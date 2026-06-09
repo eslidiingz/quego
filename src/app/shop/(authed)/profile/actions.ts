@@ -28,7 +28,13 @@ import {
 
 export type UpdateOwnShopState =
   | { ok: true }
-  | { ok: false; message: string; fieldErrors?: ShopFormErrors }
+  | {
+      ok: false;
+      message: string;
+      fieldErrors?: ShopFormErrors;
+      /** OPP-04: cutoff field error (not part of the shared ShopFormErrors). */
+      cutoffError?: string;
+    }
   | null;
 
 /**
@@ -51,8 +57,29 @@ export async function updateOwnShop(
   parsed.ownerPhone = session.phone;
 
   const fieldErrors = validateShopForm(parsed);
-  if (hasErrors(fieldErrors)) {
-    return { ok: false, message: "กรอกข้อมูลไม่ครบหรือไม่ถูกต้อง", fieldErrors };
+
+  // OPP-04: the cutoff is a profile-only field (the shared shop-form validator
+  // is reused by public registration, which doesn't collect it), so it's parsed
+  // + validated here directly.
+  const cutoffRaw = String(
+    formData.get("rescheduleCancelCutoffHours") ?? "",
+  ).trim();
+  const cutoffHours = Number(cutoffRaw);
+  const cutoffError =
+    cutoffRaw === "" ||
+    !Number.isInteger(cutoffHours) ||
+    cutoffHours < 0 ||
+    cutoffHours > 168
+      ? "ต้องเป็นจำนวนเต็ม 0–168 ชั่วโมง"
+      : undefined;
+
+  if (hasErrors(fieldErrors) || cutoffError) {
+    return {
+      ok: false,
+      message: "กรอกข้อมูลไม่ครบหรือไม่ถูกต้อง",
+      fieldErrors,
+      cutoffError,
+    };
   }
 
   const result = await updateOwnShopProfile(session.shopId, {
@@ -66,6 +93,7 @@ export async function updateOwnShop(
     contactPhone: parsed.contactPhone,
     ownerName: parsed.ownerName,
     ownerEmail: parsed.ownerEmail,
+    rescheduleCancelCutoffHours: cutoffHours,
   });
 
   if (!result.ok) {

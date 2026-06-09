@@ -12,6 +12,8 @@
  * server-side validator so the two sides can't disagree.
  */
 
+import { dayOfWeekFor } from "@/lib/time/bangkok";
+
 export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export const DAYS_OF_WEEK: DayOfWeek[] = [0, 1, 2, 3, 4, 5, 6];
@@ -215,6 +217,92 @@ export function evaluateSlots(params: {
     const isPast = isToday && time <= nowHHMM;
     return { time, isFull, isPast, isAvailable: !isFull && !isPast };
   });
+}
+
+/** The day after a "YYYY-MM-DD" date, as a "YYYY-MM-DD" string. */
+export function nextYmd(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Walk an inclusive "YYYY-MM-DD" window into one `{ dateYmd, dayOfWeek }` entry
+ * per calendar day, ordered earliest → latest. String comparison is safe here
+ * because the ISO date shape sorts chronologically. Shared by the date-chip
+ * builder and the soonest-slot scan so both iterate the window identically.
+ */
+export function eachDateInWindow(
+  windowStart: string,
+  windowEnd: string,
+): { dateYmd: string; dayOfWeek: DayOfWeek }[] {
+  const out: { dateYmd: string; dayOfWeek: DayOfWeek }[] = [];
+  let cursor = windowStart;
+  while (cursor <= windowEnd) {
+    out.push({ dateYmd: cursor, dayOfWeek: dayOfWeekFor(cursor) });
+    cursor = nextYmd(cursor);
+  }
+  return out;
+}
+
+/** A concrete bookable opening: the earliest free start time in the window. */
+export type SoonestSlot = { date: string; time: string };
+
+/**
+ * Scan the window day-by-day and return the earliest still-bookable slot for a
+ * given capacity + staff filter, or null if nothing is free. Powers the
+ * "ใครก็ได้ = เร็วกว่า" hint: running it once per staff choice lets the picker
+ * show each option's soonest opening, so a customer can SEE that letting the
+ * shop assign any capable staff (capacity = #staff) frees up earlier than
+ * pinning one person (capacity = 1).
+ *
+ * Reuses `evaluateSlots`, so "past today" and "all lines busy" are excluded
+ * exactly as in the grid. `takenKeys` (optional) drops slots this client just
+ * lost to a race — same `"YYYY-MM-DD HH:MM"` key shape the form uses.
+ */
+export function findSoonestSlot(params: {
+  days: readonly { dateYmd: string; dayOfWeek: DayOfWeek }[];
+  hours: readonly BusinessHour[];
+  durationMinutes: number;
+  intervals: readonly BookedInterval[];
+  capacity: number;
+  nowDate: string;
+  nowHHMM: string;
+  staffIdFilter?: ReadonlySet<string> | null;
+  takenKeys?: ReadonlySet<string>;
+}): SoonestSlot | null {
+  const {
+    days,
+    hours,
+    durationMinutes,
+    intervals,
+    capacity,
+    nowDate,
+    nowHHMM,
+    staffIdFilter,
+    takenKeys,
+  } = params;
+  for (const { dateYmd, dayOfWeek } of days) {
+    const h = hours[dayOfWeek];
+    if (!h?.isOpen || !h.openTime || !h.closeTime) continue;
+    const avail = evaluateSlots({
+      openTime: h.openTime,
+      closeTime: h.closeTime,
+      durationMinutes,
+      date: dateYmd,
+      intervals,
+      capacity,
+      isToday: dateYmd === nowDate,
+      nowHHMM,
+      staffIdFilter,
+    });
+    for (const s of avail) {
+      if (s.isAvailable && !takenKeys?.has(`${dateYmd} ${s.time}`)) {
+        return { date: dateYmd, time: s.time };
+      }
+    }
+  }
+  return null;
 }
 
 export function hhmmToMinutes(hhmm: string): number {

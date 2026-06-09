@@ -33,11 +33,14 @@ import type { BookingReview } from "@/lib/services/reviews";
 import {
   pushNewBookingToShop,
   pushBookingCancelledToShop,
+  pushCustomerArrivalToShop,
+  pushBookingRescheduledToShop,
 } from "@/lib/services/shop-line";
 import {
   pushBookingConfirmationToCustomer,
   pushBookingCancellationToCustomer,
 } from "@/lib/services/line-linking";
+import { isPastChangeCutoff } from "@/lib/booking/cutoff";
 
 // Re-export so server callers can import {BookingContext} from this module
 // in addition to the pure slot-math file (single source of truth).
@@ -183,6 +186,12 @@ type ShopRow = {
 export async function getBookingContext(
   shopId: string,
   windowDays: number = BOOKING_WINDOW_DAYS,
+  /**
+   * OPP-04: exclude one booking (the one being rescheduled) from the booked
+   * intervals, so its own current slot isn't counted as a busy line against the
+   * move — otherwise the reschedule picker wrongly shows it as full.
+   */
+  excludeBookingId?: string,
 ): Promise<BookingContext | null> {
   const supabase = getSupabaseAdmin();
 
@@ -200,19 +209,22 @@ export async function getBookingContext(
   const windowStart = window[0].dateYmd;
   const windowEnd = window[window.length - 1].dateYmd;
 
+  let bookingsQuery = supabase
+    .from("bookings")
+    .select("booking_date, slot_time, service_duration_minutes, staff_id")
+    .eq("shop_id", shopId)
+    .gte("booking_date", windowStart)
+    .lte("booking_date", windowEnd)
+    .in("status", ["confirmed", "completed"]);
+  if (excludeBookingId) bookingsQuery = bookingsQuery.neq("id", excludeBookingId);
+
   const [{ data: hoursData }, { data: bookingsData }, activeStaff, activeServices, { data: activeStaffRows, error: staffError }] =
     await Promise.all([
       supabase
         .from("shop_business_hours")
         .select("day_of_week, is_open, open_time, close_time")
         .eq("shop_id", shopId),
-      supabase
-        .from("bookings")
-        .select("booking_date, slot_time, service_duration_minutes, staff_id")
-        .eq("shop_id", shopId)
-        .gte("booking_date", windowStart)
-        .lte("booking_date", windowEnd)
-        .in("status", ["confirmed", "completed"]),
+      bookingsQuery,
       countActiveStaff(shopId),
       listActiveServicesByShop(shopId),
       supabase
@@ -496,7 +508,7 @@ export async function createBooking(
   // service so they can never fail the booking. The customer push is keyed by
   // phone (the booking identity key) and is a no-op for anonymous bookings.
   // Shared by both insert paths below.
-  const scheduleLineNotices = () => {
+  const scheduleLineNotices = (bookingId: string) => {
     after(() =>
       pushNewBookingToShop(input.shopId, {
         customerName: name,
@@ -508,6 +520,7 @@ export async function createBooking(
     if (phoneProvided) {
       after(() =>
         pushBookingConfirmationToCustomer(phone, {
+          bookingId,
           shopName: shopData.name as string,
           serviceName,
           bookingDate: input.date,
@@ -547,7 +560,7 @@ export async function createBooking(
       return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
     }
     const bookingId = inserted!.id as string;
-    scheduleLineNotices();
+    scheduleLineNotices(bookingId);
     return { ok: true, bookingId };
   }
 
@@ -628,7 +641,7 @@ export async function createBooking(
 
     if (!insertError) {
       const bookingId = inserted!.id as string;
-      scheduleLineNotices();
+      scheduleLineNotices(bookingId);
       return { ok: true, bookingId };
     }
     // 23P01 = this staff was just taken by a concurrent booking; try the next
@@ -860,7 +873,7 @@ export type UpdateBookingStatusResult =
   | { ok: true }
   | {
       ok: false;
-      code: "not_found" | "unknown";
+      code: "not_found" | "too_late" | "unknown";
       message: string;
     };
 
@@ -910,6 +923,37 @@ export async function cancelOwnBooking(
   customerPhone: string,
 ): Promise<UpdateBookingStatusResult> {
   const supabase = getSupabaseAdmin();
+
+  // Read first so the shop's change-cutoff policy is enforced before the write.
+  // Ownership stays keyed by customer_phone + confirmed status, so a customer
+  // can only ever touch their own confirmed bookings.
+  const { data: target, error: readError } = await supabase
+    .from("bookings")
+    .select("booking_date, slot_time, shops(reschedule_cancel_cutoff_hours)")
+    .eq("id", bookingId)
+    .eq("customer_phone", customerPhone)
+    .eq("status", "confirmed")
+    .maybeSingle();
+  if (readError) {
+    console.error("cancelOwnBooking read error:", readError);
+    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
+  }
+  if (!target) {
+    return {
+      ok: false,
+      code: "not_found",
+      message: "ไม่พบการจองนี้ หรือสถานะไม่อนุญาตให้ยกเลิก",
+    };
+  }
+  const cutoffFail = cutoffGuard(
+    (target as { booking_date: string }).booking_date,
+    (target as { slot_time: string }).slot_time,
+    target as unknown as {
+      shops: { reschedule_cancel_cutoff_hours: number } | null;
+    },
+  );
+  if (cutoffFail) return cutoffFail;
+
   const { data, error } = await supabase
     .from("bookings")
     .update({ status: "cancelled", cancelled_by: "customer" })
@@ -1012,6 +1056,353 @@ export async function cancelBookingByShop(
     );
   }
 
+  return { ok: true };
+}
+
+// ----- Customer self-service: arrival ack + reschedule (OPP-03 / OPP-04) ----
+
+/**
+ * Shared change-cutoff gate for customer self-service cancel/reschedule.
+ * Returns a `too_late` failure when "now" (Bangkok) is within the shop's
+ * configured cutoff window of the slot, else null (allowed). Default 0 → allowed
+ * until the slot starts (still blocks an already-started slot). Hoisted, so the
+ * cancel/reschedule functions above and below can all share it.
+ */
+function cutoffGuard(
+  bookingDate: string,
+  slotTime: string,
+  row: { shops: { reschedule_cancel_cutoff_hours: number } | null },
+): { ok: false; code: "too_late"; message: string } | null {
+  const cutoffHours = row.shops?.reschedule_cancel_cutoff_hours ?? 0;
+  const now = { date: getBangkokToday(), timeHHMM: getBangkokNow().timeHHMM };
+  if (isPastChangeCutoff(bookingDate, slotTime.slice(0, 5), cutoffHours, now)) {
+    return {
+      ok: false,
+      code: "too_late",
+      message:
+        cutoffHours > 0
+          ? `เลยกำหนดเวลาที่เลื่อน/ยกเลิกได้แล้ว (ต้องทำก่อนถึงคิวอย่างน้อย ${cutoffHours} ชั่วโมง) กรุณาติดต่อร้านโดยตรง`
+          : "ช่วงเวลานี้ผ่านไปแล้ว ไม่สามารถดำเนินการได้",
+    };
+  }
+  return null;
+}
+
+export type ArrivalAckResult =
+  | { ok: true; firstAck: boolean }
+  | { ok: false; code: "not_found" | "unknown"; message: string };
+
+/**
+ * Mark that a customer tapped "กำลังมา" in LINE. Ownership is keyed by
+ * `customer_phone` (resolved from the LINE userId by the caller). The
+ * `coming_ack_at is null` guard makes it idempotent so repeated taps notify the
+ * shop only once; on the first ack the shop (if LINE-connected) gets a push.
+ */
+export async function acknowledgeCustomerArrival(
+  bookingId: string,
+  customerPhone: string,
+): Promise<ArrivalAckResult> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("bookings")
+    .update({ coming_ack_at: new Date().toISOString() })
+    .eq("id", bookingId)
+    .eq("customer_phone", customerPhone)
+    .eq("status", "confirmed")
+    .is("coming_ack_at", null)
+    .select("shop_id, customer_name, service_name, booking_date, slot_time")
+    .maybeSingle();
+  if (error) {
+    console.error("acknowledgeCustomerArrival error:", error);
+    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
+  }
+  if (data) {
+    const row = data as {
+      shop_id: string;
+      customer_name: string;
+      service_name: string | null;
+      booking_date: string;
+      slot_time: string;
+    };
+    after(() =>
+      pushCustomerArrivalToShop(row.shop_id, {
+        customerName: row.customer_name,
+        serviceName: row.service_name,
+        bookingDate: row.booking_date,
+        slotTime: row.slot_time.slice(0, 5),
+      }),
+    );
+    return { ok: true, firstAck: true };
+  }
+  // No row updated: either already acknowledged, or not a confirmed booking
+  // owned by this phone. Distinguish so the LINE reply can be accurate.
+  const { data: existing } = await supabase
+    .from("bookings")
+    .select("id")
+    .eq("id", bookingId)
+    .eq("customer_phone", customerPhone)
+    .eq("status", "confirmed")
+    .maybeSingle();
+  if (existing) return { ok: true, firstAck: false };
+  return {
+    ok: false,
+    code: "not_found",
+    message: "ไม่พบคิวนี้ หรือคิวถูกยกเลิก/เสร็จสิ้นแล้ว",
+  };
+}
+
+/**
+ * Cancel a booking from its UUID-gated link (the booking page). The link gets
+ * you to the page, but a DESTRUCTIVE change additionally requires the booking's
+ * phone (entered by the customer) — so this delegates to `cancelOwnBooking`,
+ * which keys the mutation on `customer_phone`, enforces the shop's cutoff, and
+ * notifies the shop. The phone is masked on the page, so a shared link alone
+ * can't cancel someone else's queue (closes the UUID-only IDOR).
+ */
+export async function cancelBookingByLink(
+  bookingId: string,
+  customerPhone: string,
+): Promise<UpdateBookingStatusResult> {
+  if (!PHONE_RE.test(customerPhone)) {
+    return { ok: false, code: "not_found", message: "เบอร์ไม่ตรงกับการจองนี้" };
+  }
+  return cancelOwnBooking(bookingId, customerPhone);
+}
+
+/** Whether a booking can still be self-service changed, + the shop's cutoff. */
+export type BookingChangeEligibility = { changeable: boolean; cutoffHours: number };
+
+export async function getBookingChangeEligibility(
+  bookingId: string,
+): Promise<BookingChangeEligibility> {
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
+    .from("bookings")
+    .select("booking_date, slot_time, status, shops(reschedule_cancel_cutoff_hours)")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (!data) return { changeable: false, cutoffHours: 0 };
+  const row = data as unknown as {
+    booking_date: string;
+    slot_time: string;
+    status: BookingStatus;
+    shops: { reschedule_cancel_cutoff_hours: number } | null;
+  };
+  const cutoffHours = row.shops?.reschedule_cancel_cutoff_hours ?? 0;
+  const now = { date: getBangkokToday(), timeHHMM: getBangkokNow().timeHHMM };
+  const changeable =
+    row.status === "confirmed" &&
+    !isPastChangeCutoff(row.booking_date, row.slot_time.slice(0, 5), cutoffHours, now);
+  return { changeable, cutoffHours };
+}
+
+/**
+ * Everything the reschedule form needs to re-render the picker locked to the
+ * booking's service + staff lane (the customer only changes the date/time).
+ * UUID is the capability. Returns null if the booking is missing.
+ */
+export type RescheduleContext = {
+  shopId: string;
+  serviceId: string | null;
+  serviceName: string | null;
+  serviceDurationMinutes: number;
+  staffId: string | null;
+  staffName: string | null;
+  bookingDate: string;
+  slotTime: string;
+  changeable: boolean;
+  cutoffHours: number;
+};
+
+export async function getBookingForReschedule(
+  bookingId: string,
+): Promise<RescheduleContext | null> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(
+      `shop_id, booking_date, slot_time, status, service_id, service_name,
+       service_duration_minutes, staff_id,
+       shops ( reschedule_cancel_cutoff_hours ),
+       shop_staff ( name )`,
+    )
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const row = data as unknown as {
+    shop_id: string;
+    booking_date: string;
+    slot_time: string;
+    status: BookingStatus;
+    service_id: string | null;
+    service_name: string | null;
+    service_duration_minutes: number;
+    staff_id: string | null;
+    shops: { reschedule_cancel_cutoff_hours: number } | null;
+    shop_staff: { name: string } | null;
+  };
+  const cutoffHours = row.shops?.reschedule_cancel_cutoff_hours ?? 0;
+  const now = { date: getBangkokToday(), timeHHMM: getBangkokNow().timeHHMM };
+  const changeable =
+    row.status === "confirmed" &&
+    !isPastChangeCutoff(row.booking_date, row.slot_time.slice(0, 5), cutoffHours, now);
+  return {
+    shopId: row.shop_id,
+    serviceId: row.service_id,
+    serviceName: row.service_name,
+    serviceDurationMinutes: row.service_duration_minutes,
+    staffId: row.staff_id,
+    staffName: row.shop_staff?.name ?? null,
+    bookingDate: row.booking_date,
+    slotTime: row.slot_time.slice(0, 5),
+    changeable,
+    cutoffHours,
+  };
+}
+
+export type RescheduleResult =
+  | { ok: true }
+  | {
+      ok: false;
+      code:
+        | "invalid"
+        | "not_found"
+        | "shop_unavailable"
+        | "too_late"
+        | "date_closed"
+        | "slot_invalid"
+        | "slot_past"
+        | "slot_taken"
+        | "unknown";
+      message: string;
+    };
+
+/**
+ * Move a confirmed booking to a new date/slot IN PLACE (same booking UUID, same
+ * service + staff lane). Keeping the UUID means the customer's existing
+ * `/bookings/[id]` link and LINE thread stay valid. Re-validates the new slot
+ * end-to-end exactly like createBooking, enforces the shop's cutoff against the
+ * CURRENT slot, and relies on the GiST exclusion constraint (23P01) as the slot
+ * race backstop. The shop is notified (old → new), fail-silent off the response.
+ */
+export async function rescheduleBooking(
+  bookingId: string,
+  customerPhone: string,
+  newDate: string,
+  newSlotTime: string,
+): Promise<RescheduleResult> {
+  if (
+    !DATE_RE.test(newDate) ||
+    !TIME_RE.test(newSlotTime) ||
+    !PHONE_RE.test(customerPhone)
+  ) {
+    return { ok: false, code: "invalid", message: "ข้อมูลการจองไม่ถูกต้อง" };
+  }
+  const supabase = getSupabaseAdmin();
+  const { data, error: readError } = await supabase
+    .from("bookings")
+    .select(
+      `shop_id, booking_date, slot_time, service_duration_minutes,
+       service_name, customer_name,
+       shops ( status, reschedule_cancel_cutoff_hours )`,
+    )
+    .eq("id", bookingId)
+    .eq("customer_phone", customerPhone)
+    .eq("status", "confirmed")
+    .maybeSingle();
+  if (readError) {
+    console.error("rescheduleBooking read error:", readError);
+    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
+  }
+  if (!data) {
+    return {
+      ok: false,
+      code: "not_found",
+      message: "ไม่พบการจองนี้ เบอร์ไม่ตรง หรือสถานะไม่อนุญาตให้เลื่อน",
+    };
+  }
+  const row = data as unknown as {
+    shop_id: string;
+    booking_date: string;
+    slot_time: string;
+    service_duration_minutes: number;
+    service_name: string | null;
+    customer_name: string;
+    shops: { status: string; reschedule_cancel_cutoff_hours: number } | null;
+  };
+  if (!row.shops || row.shops.status !== "approved") {
+    return { ok: false, code: "shop_unavailable", message: "ร้านนี้ยังไม่พร้อมรับการจอง" };
+  }
+  // Cutoff is enforced against the CURRENT slot — you can't reschedule a booking
+  // that is already inside its no-change window.
+  const cutoffFail = cutoffGuard(row.booking_date, row.slot_time, {
+    shops: { reschedule_cancel_cutoff_hours: row.shops.reschedule_cancel_cutoff_hours },
+  });
+  if (cutoffFail) return { ok: false, code: "too_late", message: cutoffFail.message };
+
+  const duration = row.service_duration_minutes;
+
+  // Validate the NEW slot, same rules as createBooking.
+  const window = getBangkokDateWindow(BOOKING_WINDOW_DAYS);
+  if (!new Set(window.map((w) => w.dateYmd)).has(newDate)) {
+    return { ok: false, code: "date_closed", message: "วันที่เลือกอยู่นอกช่วงที่จองได้" };
+  }
+  const dow = dayOfWeekFor(newDate);
+  const { data: hoursRow } = await supabase
+    .from("shop_business_hours")
+    .select("is_open, open_time, close_time")
+    .eq("shop_id", row.shop_id)
+    .eq("day_of_week", dow)
+    .maybeSingle();
+  if (!hoursRow || !hoursRow.is_open || !hoursRow.open_time || !hoursRow.close_time) {
+    return { ok: false, code: "date_closed", message: "ร้านปิดในวันที่เลือก" };
+  }
+  const openHHMM = (hoursRow.open_time as string).slice(0, 5);
+  const closeHHMM = (hoursRow.close_time as string).slice(0, 5);
+  if (!generateSlots(openHHMM, closeHHMM, duration).includes(newSlotTime)) {
+    return { ok: false, code: "slot_invalid", message: "ช่วงเวลานี้ไม่อยู่ในรอบให้บริการของร้าน" };
+  }
+  const today = getBangkokToday();
+  if (newDate === today && newSlotTime <= getBangkokNow().timeHHMM) {
+    return { ok: false, code: "slot_past", message: "ช่วงเวลานี้ผ่านไปแล้ว" };
+  }
+
+  // In-place move keeps the same UUID + staff lane; the GiST exclusion
+  // constraint is the race backstop (23P01 ⇒ the new slot filled under us).
+  const { data: updated, error: updateError } = await supabase
+    .from("bookings")
+    .update({ booking_date: newDate, slot_time: newSlotTime })
+    .eq("id", bookingId)
+    .eq("customer_phone", customerPhone)
+    .eq("status", "confirmed")
+    .select("id")
+    .maybeSingle();
+  if (updateError) {
+    if (updateError.code === "23P01" || updateError.code === "23505") {
+      return {
+        ok: false,
+        code: "slot_taken",
+        message: "ช่วงเวลานี้ถูกจองโดยลูกค้าอีกคนแล้ว กรุณาเลือกใหม่",
+      };
+    }
+    console.error("rescheduleBooking update error:", updateError);
+    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
+  }
+  if (!updated) {
+    return { ok: false, code: "not_found", message: "ไม่พบการจองนี้ หรือสถานะไม่อนุญาตให้เลื่อน" };
+  }
+  const fromDate = row.booking_date;
+  const fromSlot = row.slot_time.slice(0, 5);
+  after(() =>
+    pushBookingRescheduledToShop(row.shop_id, {
+      customerName: row.customer_name,
+      serviceName: row.service_name,
+      fromDate,
+      fromSlotTime: fromSlot,
+      toDate: newDate,
+      toSlotTime: newSlotTime,
+    }),
+  );
   return { ok: true };
 }
 

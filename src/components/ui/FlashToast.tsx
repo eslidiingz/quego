@@ -82,6 +82,13 @@ function mapNotice(
         kind: "error",
         message: "เชื่อมต่อ LINE ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
       };
+    case "reschedule-success":
+      return { kind: "success", message: "เลื่อนเวลาการจองเรียบร้อยแล้ว" };
+    case "reschedule-toolate":
+      return {
+        kind: "error",
+        message: "เลยกำหนดเวลาที่เลื่อน/ยกเลิกได้แล้ว กรุณาติดต่อร้านโดยตรง",
+      };
     default:
       return null;
   }

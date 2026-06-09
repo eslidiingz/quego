@@ -8,6 +8,10 @@ import type {
 } from "./types";
 import { replyLineMessage } from "./client";
 import { recordLineMessage } from "@/lib/services/line-log";
+import {
+  parseBookingPostback,
+  handleBookingPostback,
+} from "@/lib/services/line-booking-actions";
 
 /**
  * Inbound webhook event dispatch. SRP: route a LINE event to the right action
@@ -57,18 +61,31 @@ async function handleEvent(event: LineWebhookEvent): Promise<void> {
       });
       return;
     case "postback":
-      // OPP-03 seam: interactive buttons (กำลังมา/เลื่อน/ยกเลิก) will dispatch
-      // off (event as LinePostbackEvent).postback.data here. Stubbed for infra.
-      await recordLineMessage({
-        recipient: (event as LinePostbackEvent).source?.userId ?? "unknown",
-        direction: "inbound",
-        kind: "postback",
-        status: "received",
-      });
-      return;
+      return handlePostback(event as LinePostbackEvent);
     default:
       return; // tolerate + ignore event types we don't model
   }
+}
+
+/**
+ * OPP-03 — booking action buttons. Record the inbound postback, then resolve +
+ * dispatch it (gated on a userId). The heavy lifting — ownership re-check, the
+ * mutation, and the reply — lives in services/line-booking-actions.ts so this
+ * file stays a thin router.
+ */
+async function handlePostback(event: LinePostbackEvent): Promise<void> {
+  const userId = event.source?.userId;
+  await recordLineMessage({
+    recipient: userId ?? "unknown",
+    direction: "inbound",
+    kind: "postback",
+    status: "received",
+    meta: { data: event.postback.data },
+  });
+  if (!userId) return;
+  const parsed = parseBookingPostback(event.postback.data);
+  if (!parsed) return;
+  await handleBookingPostback(parsed, userId, event.replyToken);
 }
 
 async function handleFollow(event: LineFollowEvent): Promise<void> {

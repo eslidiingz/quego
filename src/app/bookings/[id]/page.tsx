@@ -4,8 +4,14 @@ import { Icon } from "@/components/ui/Icon";
 import { Chip } from "@/components/ui/Chip";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { LandingFooter } from "@/components/landing/LandingFooter";
-import { getBookingById, getBookingQueueStatus } from "@/lib/services/bookings";
+import {
+  getBookingById,
+  getBookingQueueStatus,
+  getBookingChangeEligibility,
+} from "@/lib/services/bookings";
 import { LiveBookingQueue } from "@/components/booking/LiveBookingQueue";
+import { ManageBookingActions } from "./ManageBookingActions";
+import { FlashToast } from "@/components/ui/FlashToast";
 import { formatBaht } from "@/lib/baht";
 
 export const dynamic = "force-dynamic";
@@ -27,10 +33,13 @@ const STATUS_LABEL: Record<
 
 export default async function BookingDetailPage({
   params,
+  searchParams,
 }: {
   params: RouteParams;
+  searchParams: Promise<{ notice?: string }>;
 }) {
   const { id } = await params;
+  const { notice } = await searchParams;
   const [booking, queue] = await Promise.all([
     getBookingById(id),
     getBookingQueueStatus(id),
@@ -38,12 +47,19 @@ export default async function BookingDetailPage({
   if (!booking) notFound();
 
   const status = STATUS_LABEL[booking.status] ?? STATUS_LABEL.confirmed;
+  // OPP-04: only confirmed bookings can be self-service changed; the shop's
+  // cutoff window decides whether the actions are still offered.
+  const eligibility =
+    booking.status === "confirmed"
+      ? await getBookingChangeEligibility(id)
+      : null;
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
       <SiteHeader />
 
       <div className="max-w-2xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
+        <FlashToast notice={notice} />
         <section className="relative overflow-hidden rounded-2xl bg-luxury-gradient text-on-primary p-6 md:p-10 shadow-luxury">
           <div className="flex flex-col items-center text-center gap-3">
             <span className="w-16 h-16 rounded-full bg-on-primary/15 backdrop-blur-sm flex items-center justify-center">
@@ -134,6 +150,37 @@ export default async function BookingDetailPage({
             }
           />
         </section>
+
+        {booking.status === "confirmed" ? (
+          <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 space-y-4">
+            <h2 className="font-display text-headline-md text-on-surface">
+              จัดการคิว
+            </h2>
+            {eligibility?.changeable ? (
+              <>
+                <p className="text-label-md text-on-surface-variant">
+                  ต้องการเปลี่ยนแปลงใช่ไหม? เลื่อนเวลาไปรอบอื่น
+                  หรือยกเลิกคิวนี้ได้เลย
+                </p>
+                <ManageBookingActions bookingId={id} />
+              </>
+            ) : (
+              <div className="flex items-start gap-3">
+                <Icon
+                  name="lock_clock"
+                  className="text-on-surface-variant mt-0.5"
+                />
+                <p className="text-label-md text-on-surface-variant">
+                  เลยกำหนดเวลาที่เลื่อน/ยกเลิกด้วยตนเองแล้ว
+                  {eligibility && eligibility.cutoffHours > 0
+                    ? ` (ต้องทำก่อนถึงคิวอย่างน้อย ${eligibility.cutoffHours} ชั่วโมง)`
+                    : ""}{" "}
+                  หากต้องการเปลี่ยนแปลง กรุณาติดต่อร้านโดยตรง
+                </p>
+              </div>
+            )}
+          </section>
+        ) : null}
 
         {booking.shopAddress || booking.shopContactPhone ? (
           <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 space-y-3">
