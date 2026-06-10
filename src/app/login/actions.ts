@@ -3,6 +3,10 @@
 import { redirect } from "next/navigation";
 import { setCustomerLoginIntent } from "@/lib/auth/customer-session-server";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import {
+  isValidReferralCodeShape,
+  normalizeReferralCode,
+} from "@/lib/loyalty/loyalty-credit";
 
 const PHONE_RE = /^0\d{9}$/u;
 
@@ -44,7 +48,14 @@ export async function startCustomerLogin(
     return { ok: false, message: "คำขอถี่เกินไป กรุณาลองใหม่อีกครั้งในภายหลัง" };
   }
 
-  await setCustomerLoginIntent({ phone });
+  // Optional referral code arriving from a /login?ref=<code> link, forwarded
+  // through the hidden field. Normalize + shape-check here so only a clean,
+  // valid code ever rides the intent cookie; anything else is dropped silently
+  // (a bad ref must never block a legitimate login).
+  const rawRef = normalizeReferralCode(formData.get("ref"));
+  const referralCode = isValidReferralCodeShape(rawRef) ? rawRef : undefined;
+
+  await setCustomerLoginIntent({ phone, referralCode });
 
   redirect("/login/pin");
 }

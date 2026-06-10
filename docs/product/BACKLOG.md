@@ -26,6 +26,29 @@ and GoWabi/Fresha (appointment-slot-centric) leave open.
 > strikes (built then deliberately retired 2026-06-07 — shops just cancel
 > no-shows at their discretion), and pause-intake "หยุดรับคิว" + geofence.
 
+## ✅ Shipped
+
+- **2026-06-06 → 06-09:** OPP-01, OPP-02, OPP-03, OPP-04, OPP-10, OPP-11a,
+  OPP-12, OPP-18a (filter), OPP-19, + LINE connect (shop/customer) +
+  cancellation notifications.
+- **2026-06-10 (parallel batch):**
+  - **OPP-07** — full-screen now-serving "กำลังเรียกคิว" kiosk display at
+    `/shop/display` (chrome-free, polls the same source as the customer queue
+    view; "เรียกคิวถัดไป" advances via `updateBookingStatus`).
+  - **OPP-14** — CRM-lite: per-shop private customer note + cross-booking visit
+    history at `/shop/customers/[phone]` (`shop_customer_notes` table).
+  - **OPP-15** — informational loyalty points (1 แต้ม/completed booking, accrued
+    via the `updateBookingStatus` completion hook) + referral with a 3-day hold
+    (lazy release); customer page `/me/credit`. Tables `loyalty_ledger`,
+    `referrals`, `customers.referral_code`.
+  - **OPP-18** — admin audit log at `/admin/audit` (`admin_audit_logs`),
+    `writeAuditLog()` from every admin mutation. **Roles/RBAC still pending** —
+    only the audit-log half of OPP-18 shipped.
+
+> **Still open:** OPP-05 (waitlist), OPP-08 (QR walk-in), OPP-09 (LIFF), OPP-13
+> (real VIP), OPP-17 (OTP — deferred, needs a messaging channel), OPP-18 roles,
+> OPP-20 (packages/group). See the priority tables + detail sections below.
+
 ---
 
 ## Priority — now / next / later

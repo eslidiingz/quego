@@ -1,8 +1,10 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireAdminSession } from "@/lib/auth/session-server";
+import { writeAuditLog } from "@/lib/services/audit-log";
 
 export type CategoryFormState = {
   ok: boolean;
@@ -81,6 +83,16 @@ export async function createCategory(
     return { ok: false, message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
   }
 
+  after(() =>
+    writeAuditLog({
+      adminId: session.adminId,
+      action: "category.create",
+      entityType: "category",
+      summary: parsed.name,
+      meta: { slug: parsed.slug },
+    }),
+  );
+
   revalidatePath("/admin/categories");
   revalidatePath("/admin");
   return { ok: true, message: `เพิ่ม "${parsed.name}" เรียบร้อย` };
@@ -124,12 +136,22 @@ export async function updateCategory(
     return { ok: false, message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
   }
 
+  after(() =>
+    writeAuditLog({
+      adminId: session.adminId,
+      action: "category.update",
+      entityType: "category",
+      entityId: id,
+      summary: parsed.name,
+    }),
+  );
+
   revalidatePath("/admin/categories");
   return { ok: true, message: "อัปเดตเรียบร้อย" };
 }
 
 export async function deleteCategory(id: string): Promise<CategoryFormState> {
-  await requireAdminSession();
+  const session = await requireAdminSession();
   const supabase = getSupabaseAdmin();
   const { error } = await supabase.from("shop_categories").delete().eq("id", id);
   if (error) {
@@ -138,6 +160,16 @@ export async function deleteCategory(id: string): Promise<CategoryFormState> {
     console.error("deleteCategory error:", error);
     return { ok: false, message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
   }
+
+  after(() =>
+    writeAuditLog({
+      adminId: session.adminId,
+      action: "category.delete",
+      entityType: "category",
+      entityId: id,
+    }),
+  );
+
   revalidatePath("/admin/categories");
   revalidatePath("/admin");
   return { ok: true, message: "ลบเรียบร้อย" };

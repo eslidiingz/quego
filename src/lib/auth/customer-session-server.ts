@@ -15,6 +15,13 @@ const LOGIN_INTENT_TTL_SECONDS = 60 * 10; // 10 minutes
 
 export type CustomerLoginIntent = {
   phone: string;
+  /**
+   * Optional referral code the customer arrived with (`?ref=` on /login).
+   * Carried through to PIN setup so a new customer's referral can be recorded
+   * once their account is created. Additive — older intent cookies without it
+   * decode fine (the field is simply absent).
+   */
+  referralCode?: string;
 };
 
 function getSecret(): Uint8Array {
@@ -96,7 +103,11 @@ export async function getCustomerLoginIntent(): Promise<CustomerLoginIntent | nu
       audience: "customer-login-intent",
     });
     if (typeof payload.phone === "string") {
-      return { phone: payload.phone };
+      const referralCode =
+        typeof payload.referralCode === "string"
+          ? payload.referralCode
+          : undefined;
+      return { phone: payload.phone, referralCode };
     }
     return null;
   } catch {

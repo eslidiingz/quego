@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireAdminSession } from "@/lib/auth/session-server";
 import {
@@ -14,6 +15,7 @@ import {
   hasServiceErrors,
   type ServiceFormErrors,
 } from "@/lib/validation/shop";
+import { writeAuditLog } from "@/lib/services/audit-log";
 
 /**
  * Admin preset (บริการ preset) management actions. Thin `"use server"`
@@ -65,6 +67,16 @@ export async function createPresetAction(
     return { ok: false, message: result.message };
   }
 
+  after(() =>
+    writeAuditLog({
+      adminId: session.adminId,
+      action: "preset.create",
+      entityType: "preset",
+      entityId: result.id,
+      summary: fields.name,
+    }),
+  );
+
   revalidatePath("/admin/presets");
   revalidatePath("/admin");
   return { ok: true, message: `เพิ่ม "${fields.name}" เรียบร้อย` };
@@ -76,7 +88,7 @@ export async function updatePresetAction(
   formData: FormData,
 ): Promise<PresetFormState> {
   const session = await requireAdminSession();
-  const { fieldErrors, input } = toInput(formData);
+  const { fields, fieldErrors, input } = toInput(formData);
   if (hasServiceErrors(fieldErrors)) {
     return { ok: false, message: "กรอกข้อมูลไม่ถูกต้อง", fieldErrors };
   }
@@ -89,6 +101,16 @@ export async function updatePresetAction(
     return { ok: false, message: result.message };
   }
 
+  after(() =>
+    writeAuditLog({
+      adminId: session.adminId,
+      action: "preset.update",
+      entityType: "preset",
+      entityId: presetId,
+      summary: fields.name,
+    }),
+  );
+
   revalidatePath("/admin/presets");
   return { ok: true, message: "อัปเดตเรียบร้อย" };
 }
@@ -100,6 +122,17 @@ export async function setPresetActiveAction(
   const session = await requireAdminSession();
   const result = await setPresetActive(presetId, isActive, session.adminId);
   if (!result.ok) return { ok: false, message: result.message };
+
+  after(() =>
+    writeAuditLog({
+      adminId: session.adminId,
+      action: "preset.toggle_active",
+      entityType: "preset",
+      entityId: presetId,
+      meta: { isActive },
+    }),
+  );
+
   revalidatePath("/admin/presets");
   return { ok: true };
 }
@@ -107,9 +140,19 @@ export async function setPresetActiveAction(
 export async function deletePresetAction(
   presetId: string,
 ): Promise<PresetActionResult> {
-  await requireAdminSession();
+  const session = await requireAdminSession();
   const result = await deletePreset(presetId);
   if (!result.ok) return { ok: false, message: result.message };
+
+  after(() =>
+    writeAuditLog({
+      adminId: session.adminId,
+      action: "preset.delete",
+      entityType: "preset",
+      entityId: presetId,
+    }),
+  );
+
   revalidatePath("/admin/presets");
   revalidatePath("/admin");
   return { ok: true, message: "ลบเรียบร้อย" };
