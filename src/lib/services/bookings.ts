@@ -529,6 +529,20 @@ export async function createBooking(
         }),
       );
     }
+    // OPP-05: clear any waitlist entry this customer held for this (service,
+    // date) — they just booked it. Dynamic import keeps the bookings↔waitlist
+    // dependency one-way (waitlist statically imports getBookingContext from
+    // here), so there's no static import cycle.
+    after(async () => {
+      const { resolveWaitlistForBooking } = await import("@/lib/services/waitlist");
+      await resolveWaitlistForBooking(
+        input.shopId,
+        serviceId,
+        input.date,
+        phoneProvided ? phone : null,
+        bookingId,
+      );
+    });
   };
 
   // The booking occupies [start, start+duration). With variable per-service
@@ -1012,6 +1026,12 @@ export async function cancelOwnBooking(
     }),
   );
 
+  // OPP-05: a confirmed slot just freed — offer it to the waitlist for that date.
+  after(async () => {
+    const { offerWaitlistForFreedSlot } = await import("@/lib/services/waitlist");
+    await offerWaitlistForFreedSlot(cancelled.shop_id, cancelled.booking_date);
+  });
+
   return { ok: true };
 }
 
@@ -1071,6 +1091,12 @@ export async function cancelBookingByShop(
       }),
     );
   }
+
+  // OPP-05: a confirmed slot just freed — offer it to the waitlist for that date.
+  after(async () => {
+    const { offerWaitlistForFreedSlot } = await import("@/lib/services/waitlist");
+    await offerWaitlistForFreedSlot(shopId, cancelled.booking_date);
+  });
 
   return { ok: true };
 }
@@ -1318,7 +1344,7 @@ export async function rescheduleBooking(
   const { data, error: readError } = await supabase
     .from("bookings")
     .select(
-      `shop_id, booking_date, slot_time, service_duration_minutes,
+      `shop_id, booking_date, slot_time, service_id, service_duration_minutes,
        service_name, customer_name,
        shops ( status, reschedule_cancel_cutoff_hours )`,
     )
@@ -1341,6 +1367,7 @@ export async function rescheduleBooking(
     shop_id: string;
     booking_date: string;
     slot_time: string;
+    service_id: string | null;
     service_duration_minutes: number;
     service_name: string | null;
     customer_name: string;
@@ -1419,6 +1446,22 @@ export async function rescheduleBooking(
       toSlotTime: newSlotTime,
     }),
   );
+  // OPP-05: the OLD slot just freed — offer it to the waitlist for that date;
+  // and clear the customer's own waitlist entry for the NEW (service, date) if
+  // they were waiting on it (reschedule keeps the same service). Mirrors
+  // createBooking's resolve hook, closing the asymmetry between the two paths.
+  after(async () => {
+    const { offerWaitlistForFreedSlot, resolveWaitlistForBooking } =
+      await import("@/lib/services/waitlist");
+    await offerWaitlistForFreedSlot(row.shop_id, fromDate);
+    await resolveWaitlistForBooking(
+      row.shop_id,
+      row.service_id,
+      newDate,
+      customerPhone,
+      bookingId,
+    );
+  });
   return { ok: true };
 }
 

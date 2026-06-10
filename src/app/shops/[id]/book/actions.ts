@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createBooking } from "@/lib/services/bookings";
+import { joinWaitlist } from "@/lib/services/waitlist";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 
 export type CreateBookingState =
@@ -70,4 +71,53 @@ export async function createBookingAction(
 
   revalidatePath(`/shops/${shopId}/book`);
   redirect(`/bookings/${result.bookingId}`);
+}
+
+// ----- OPP-05: join the waitlist for a fully-booked (service, date) ---------
+
+export type JoinWaitlistState =
+  | { ok: true; alreadyWaiting: boolean }
+  | { ok: false; code: string; message: string }
+  | null;
+
+/**
+ * Server action wrapper around `joinWaitlist`. Posted by the WaitlistPanel that
+ * appears in the time step when the chosen (service, staff, date) is full. Stays
+ * a pure (state, formData) -> state shape for `useActionState`, surfacing the
+ * result inline (no redirect) so the customer keeps their place in the form.
+ */
+export async function joinWaitlistAction(
+  _prev: JoinWaitlistState,
+  formData: FormData,
+): Promise<JoinWaitlistState> {
+  const shopId = String(formData.get("shopId") ?? "");
+  const serviceId = String(formData.get("serviceId") ?? "");
+  const preferredStaffId = String(formData.get("preferredStaffId") ?? "");
+  const requestedDate = String(formData.get("date") ?? "");
+  const customerName = String(formData.get("customerName") ?? "");
+  const customerPhone = String(formData.get("customerPhone") ?? "");
+
+  // Rate limit per client IP: public endpoint, so cap waitlist spam.
+  const ip = await getClientIp();
+  if (!(await checkRateLimit(`waitlist:${ip}`, 10, 600))) {
+    return {
+      ok: false,
+      code: "rate_limited",
+      message: "คำขอถี่เกินไป กรุณาลองใหม่อีกครั้งในภายหลัง",
+    };
+  }
+
+  const result = await joinWaitlist({
+    shopId,
+    serviceId,
+    preferredStaffId: preferredStaffId || null,
+    requestedDate,
+    customerName,
+    customerPhone,
+  });
+
+  if (!result.ok) {
+    return { ok: false, code: result.code, message: result.message };
+  }
+  return { ok: true, alreadyWaiting: result.alreadyWaiting };
 }

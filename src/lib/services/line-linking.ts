@@ -3,6 +3,10 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { pushLineMessage } from "@/lib/line/client";
 import { buildBookingMessage } from "@/lib/line/format";
 import { buildBookingConfirmationFlex } from "@/lib/line/booking-flex";
+import {
+  buildWaitlistSlotOpenFlex,
+  type WaitlistSlotOpenFlexInput,
+} from "@/lib/line/waitlist-flex";
 
 /**
  * Customer ↔ LINE binding. SRP: the customers.line_user_id lifecycle
@@ -261,5 +265,30 @@ export async function pushBookingCancellationToCustomer(
     );
   } catch (err) {
     console.error("pushBookingCancellationToCustomer error:", err);
+  }
+}
+
+// ----- Outbound: waitlist "a slot just opened" notification (OPP-05) -------
+
+/**
+ * Push the "🔔 มีคิวว่างแล้ว!" bubble to a waitlister's bound LINE account.
+ *
+ * Takes the resolved `lineUserId` rather than a phone: the caller
+ * (`offerWaitlistForFreedSlot`) must already check for a binding to decide
+ * whether to consume the offer for this person (an unbound waitlister is passed
+ * over so the head start isn't wasted), so re-resolving by phone here would be
+ * redundant. Fail-silent by contract: any error is logged, never thrown — a
+ * cancel/reschedule must never fail because of a notification.
+ */
+export async function pushWaitlistSlotOpenToCustomer(
+  lineUserId: string,
+  notice: WaitlistSlotOpenFlexInput,
+): Promise<void> {
+  try {
+    await pushLineMessage(lineUserId, [buildWaitlistSlotOpenFlex(notice)], {
+      kind: "waitlist_slot_open",
+    });
+  } catch (err) {
+    console.error("pushWaitlistSlotOpenToCustomer error:", err);
   }
 }

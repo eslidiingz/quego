@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/customer-session-server";
 import { cancelOwnBooking } from "@/lib/services/bookings";
 import { createReview } from "@/lib/services/reviews";
+import { cancelWaitlistEntry } from "@/lib/services/waitlist";
 
 export async function signOutCustomer() {
   await destroyCustomerSession();
@@ -34,4 +35,13 @@ export async function createMyReview(
     throw new Error(result.message);
   }
   revalidatePath("/me/bookings");
+}
+
+export async function cancelMyWaitlistEntry(entryId: string): Promise<void> {
+  const session = await requireCustomerSession();
+  const result = await cancelWaitlistEntry(entryId, session.phone);
+  if (!result.ok) {
+    throw new Error(result.message);
+  }
+  revalidatePath("/me/waitlist");
 }
