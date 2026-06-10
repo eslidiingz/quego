@@ -18,6 +18,7 @@ import {
 } from "@/lib/booking/slot-math";
 import { getBangkokNow, getBangkokToday } from "@/lib/time/bangkok";
 import { createBookingAction, type CreateBookingState } from "./actions";
+import { WaitlistPanel } from "./WaitlistPanel";
 
 /** Live "now" in Bangkok, re-checked on the client so the picker keeps up with
  *  the wall clock while the page sits open. */
@@ -44,12 +45,20 @@ export function BookingForm({
   context,
   defaultName = "",
   defaultPhone = "",
+  prefill,
+  lineConnected,
 }: {
   context: BookingContext;
   /** Pre-fills the booker fields for a signed-in customer (still editable, so
    *  they can book on someone else's behalf). */
   defaultName?: string;
   defaultPhone?: string;
+  /** OPP-05: waitlist "จองเลย" deep-link prefill (service/staff/date), validated
+   *  against the live context below so a stale/invalid link degrades gracefully. */
+  prefill?: { serviceId?: string; staffId?: string; date?: string };
+  /** Whether the signed-in customer has LINE connected — drives the waitlist
+   *  panel's "connect LINE" hint. Undefined for anonymous visitors. */
+  lineConnected?: boolean;
 }) {
   // Show the service step only when there's a real choice to make: more than
   // one service, or a single *named* one (carries a price worth surfacing).
@@ -60,12 +69,39 @@ export function BookingForm({
     services.length > 1 || (services.length === 1 && services[0].id !== null);
   const autoService = showServiceStep ? null : (services[0] ?? null);
 
+  // OPP-05: resolve the deep-link prefill against the live context. An unknown
+  // service falls back to the normal default; an out-of-window date or a staff
+  // who can't do the service is simply ignored.
+  const prefillService =
+    prefill?.serviceId != null
+      ? (services.find((s) => s.id === prefill.serviceId) ?? null)
+      : null;
+  const initialServiceKey = prefillService
+    ? serviceKey(prefillService)
+    : autoService
+      ? serviceKey(autoService)
+      : null;
+  const initialStaffId =
+    prefill?.staffId && prefillService?.staffIds?.includes(prefill.staffId)
+      ? prefill.staffId
+      : null;
+  // Only pre-select the date when a service is actually selected at mount
+  // (prefill or single-service auto). A stale link whose service no longer
+  // exists must not leave a phantom date with no service picked.
+  const initialDate =
+    initialServiceKey &&
+    prefill?.date &&
+    prefill.date >= context.windowStart &&
+    prefill.date <= context.windowEnd
+      ? prefill.date
+      : null;
+
   const [selectedServiceKey, setSelectedServiceKey] = useState<string | null>(
-    autoService ? serviceKey(autoService) : null,
+    initialServiceKey,
   );
   // Customer's chosen staff member; null = "ใครก็ได้" (any capable staff).
-  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(initialStaffId);
+  const [selectedDate, setSelectedDate] = useState<string | null>(initialDate);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [name, setName] = useState(defaultName);
   const [phone, setPhone] = useState(defaultPhone);
@@ -410,15 +446,41 @@ export function BookingForm({
           step={stepBase + 2}
           title="เลือกเวลา"
           description={
-            selectedService && selectedDay?.status === "available"
-              ? `บริการครั้งละ ${selectedService.durationMinutes} นาที`
-              : "กรุณาเลือกวันที่เปิดบริการก่อน"
+            selectedDay?.status === "available"
+              ? `บริการครั้งละ ${selectedService?.durationMinutes} นาที`
+              : selectedDay?.status === "full"
+                ? "วันนี้คิวเต็ม — รับการแจ้งเตือนเมื่อมีคิวว่างได้"
+                : "กรุณาเลือกวันที่เปิดบริการก่อน"
           }
         >
           {!selectedDate ? (
             <EmptyHint icon="event" message="ยังไม่ได้เลือกวัน" />
           ) : selectedDay?.status === "closed" ? (
             <EmptyHint icon="event_busy" message="ร้านปิดในวันนี้" />
+          ) : selectedDay?.status === "full" ? (
+            selectedService?.id ? (
+              <WaitlistPanel
+                // Fresh instance per target so a submit/error result (and the
+                // typed name/phone) never bleed from one full date to another.
+                key={`${selectedService.id}:${selectedStaffId ?? "any"}:${selectedDate}`}
+                shopId={context.shop.id}
+                serviceId={selectedService.id}
+                serviceName={selectedService.name}
+                preferredStaffId={showStaffStep ? selectedStaffId : null}
+                staffLabel={
+                  showStaffStep && selectedStaffId
+                    ? (capableStaff.find((s) => s.id === selectedStaffId)?.name ?? null)
+                    : null
+                }
+                date={selectedDate}
+                dateLabel={formatDateLabel(selectedDate, now.date)}
+                defaultName={defaultName}
+                defaultPhone={defaultPhone}
+                lineConnected={lineConnected}
+              />
+            ) : (
+              <EmptyHint icon="event_busy" message="ไม่มีคิวว่างในวันนี้" />
+            )
           ) : slots.length === 0 ? (
             <EmptyHint icon="schedule" message="ไม่มีรอบให้บริการในวันนี้" />
           ) : (
@@ -490,24 +552,28 @@ export function BookingForm({
         </div>
       ) : null}
 
-      <div className="sticky bottom-0 -mx-4 md:mx-0 px-4 md:px-0 py-4 bg-background/95 backdrop-blur border-t border-outline-variant md:bg-transparent md:border-0 md:backdrop-blur-0 md:py-0">
-        <Button
-          type="submit"
-          size="xl"
-          rounded="full"
-          fullWidth
-          disabled={!canSubmit || pending}
-          iconLeft={
-            pending ? (
-              <Icon name="progress_activity" className="animate-spin" />
-            ) : (
-              <Icon name="event_available" />
-            )
-          }
-        >
-          {pending ? "กำลังจองคิว..." : "ยืนยันการจอง"}
-        </Button>
-      </div>
+      {/* On a full day the actionable CTA is the waitlist join inside
+          WaitlistPanel, so the permanently-disabled booking submit is hidden. */}
+      {selectedDay?.status === "full" ? null : (
+        <div className="sticky bottom-0 -mx-4 md:mx-0 px-4 md:px-0 py-4 bg-background/95 backdrop-blur border-t border-outline-variant md:bg-transparent md:border-0 md:backdrop-blur-0 md:py-0">
+          <Button
+            type="submit"
+            size="xl"
+            rounded="full"
+            fullWidth
+            disabled={!canSubmit || pending}
+            iconLeft={
+              pending ? (
+                <Icon name="progress_activity" className="animate-spin" />
+              ) : (
+                <Icon name="event_available" />
+              )
+            }
+          >
+            {pending ? "กำลังจองคิว..." : "ยืนยันการจอง"}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }
@@ -687,7 +753,9 @@ function DateChip({
   selected: boolean;
   onClick: () => void;
 }) {
-  const disabled = day.status !== "available";
+  // Closed days stay disabled; FULL days are clickable so the customer can open
+  // the waitlist for that date (OPP-05) — the time step then shows the panel.
+  const disabled = day.status === "closed";
   return (
     <button
       type="button"
@@ -702,7 +770,7 @@ function DateChip({
           : day.status === "closed"
             ? "bg-surface-container-low/40 text-on-surface-variant/50 border-transparent cursor-not-allowed"
             : day.status === "full"
-              ? "bg-surface-container-low text-on-surface-variant border-transparent cursor-not-allowed"
+              ? "bg-surface-container-low text-on-surface-variant border-transparent hover:bg-surface-container-high"
               : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
       )}
     >
@@ -877,6 +945,15 @@ function formatSoonest(s: SoonestSlot, today: string): string {
         ? "พรุ่งนี้"
         : `${d} ${THAI_MONTH_SHORT[m - 1]}`;
   return `${label} ${s.time}`;
+}
+
+/** "วันนี้ 15 มิ.ย." / "พรุ่งนี้ 16 มิ.ย." / "18 มิ.ย." — a date label, no time. */
+function formatDateLabel(date: string, today: string): string {
+  const [, m, d] = date.split("-").map(Number);
+  const dm = `${d} ${THAI_MONTH_SHORT[m - 1]}`;
+  if (date === today) return `วันนี้ ${dm}`;
+  if (date === nextYmd(today)) return `พรุ่งนี้ ${dm}`;
+  return dm;
 }
 
 function computeSlotsForDay(

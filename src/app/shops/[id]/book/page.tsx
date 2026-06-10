@@ -6,6 +6,7 @@ import { LandingFooter } from "@/components/landing/LandingFooter";
 import { getBookingContext } from "@/lib/services/bookings";
 import { getCustomerSession } from "@/lib/auth/customer-session-server";
 import { getCustomerProfile } from "@/lib/services/customers";
+import { getLineLinkStatus } from "@/lib/services/line-linking";
 import { BookingForm } from "./BookingForm";
 
 export const dynamic = "force-dynamic";
@@ -23,17 +24,29 @@ export async function generateMetadata({ params }: { params: RouteParams }) {
 
 export default async function BookShopPage({
   params,
+  searchParams,
 }: {
   params: RouteParams;
+  // OPP-05: a waitlist "จองเลย" deep link carries serviceId/staffId/date so the
+  // booking form lands prefilled, ready to pick a freshly-freed time.
+  searchParams: Promise<{ serviceId?: string; staffId?: string; date?: string }>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
   const context = await getBookingContext(id);
   if (!context) notFound();
 
   // Pre-fill the booker fields when a customer is signed in. Public page, so
-  // this is best-effort: no session simply means an empty form.
+  // this is best-effort: no session simply means an empty form. We also surface
+  // whether their LINE is connected, so the waitlist panel can nudge them to
+  // connect it (the channel the "slot opened" alert rides on).
   const session = await getCustomerSession();
-  const profile = session ? await getCustomerProfile(session.customerId) : null;
+  const [profile, lineStatus] = session
+    ? await Promise.all([
+        getCustomerProfile(session.customerId),
+        getLineLinkStatus(session.customerId),
+      ])
+    : [null, null];
 
   // A shop is bookable only once it has at least one active service.
   const hasServices = context.services.length > 0;
@@ -76,6 +89,8 @@ export default async function BookShopPage({
             context={context}
             defaultName={profile?.name ?? ""}
             defaultPhone={profile?.phone ?? session?.phone ?? ""}
+            prefill={{ serviceId: sp.serviceId, staffId: sp.staffId, date: sp.date }}
+            lineConnected={lineStatus?.linked}
           />
         ) : (
           <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 text-center space-y-3">

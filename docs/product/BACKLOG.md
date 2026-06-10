@@ -44,10 +44,23 @@ and GoWabi/Fresha (appointment-slot-centric) leave open.
   - **OPP-18** — admin audit log at `/admin/audit` (`admin_audit_logs`),
     `writeAuditLog()` from every admin mutation. **Roles/RBAC still pending** —
     only the audit-log half of OPP-18 shipped.
+- **2026-06-10 (OPP-05):**
+  - **OPP-05** — customer waitlist for a fully-booked (shop, service, date).
+    Surfaces in the booking form's full-day state (full date chips are now
+    tappable → a "แจ้งเตือนเมื่อมีคิวว่าง" panel) and at `/me/waitlist`. On
+    cancel / reschedule-away the freed slot is offered over LINE to the oldest
+    eligible waitlister — availability re-verified with the SAME slot-math the
+    picker uses, so a freed staff-X line never falsely pings a service that needs
+    staff Y. The push is a **head start** (a "จองเลย" deep link into the normal,
+    race-safe booking flow), **not an exclusive hold**; "roll on if unclaimed" is
+    event-driven (the next cancellation re-offers, gated by a 15-min claim
+    window) so it stays on the project's polling/`after()` rails with no cron.
+    New `waitlist_entries` table; `waitlist.ts` service + pure
+    `lib/waitlist/eligibility.ts` (unit-tested).
 
-> **Still open:** OPP-05 (waitlist), OPP-08 (QR walk-in), OPP-09 (LIFF), OPP-13
-> (real VIP), OPP-17 (OTP — deferred, needs a messaging channel), OPP-18 roles,
-> OPP-20 (packages/group). See the priority tables + detail sections below.
+> **Still open:** OPP-08 (QR walk-in), OPP-09 (LIFF), OPP-13 (real VIP), OPP-17
+> (OTP — deferred, needs a messaging channel), OPP-18 roles, OPP-20
+> (packages/group). See the priority tables + detail sections below.
 
 ---
 
