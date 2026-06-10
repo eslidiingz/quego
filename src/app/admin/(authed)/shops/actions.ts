@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminSession } from "@/lib/auth/session-server";
@@ -16,6 +17,7 @@ import {
   validateShopForm,
   type ShopFormErrors,
 } from "@/lib/validation/shop";
+import { writeAuditLog } from "@/lib/services/audit-log";
 
 export type ShopActionResult = { ok: boolean; message: string };
 
@@ -37,6 +39,19 @@ export async function approveShop(id: string): Promise<ShopActionResult> {
     return { ok: false, message: result.message };
   }
 
+  // Record the moderation action off the response path — `after()` guarantees
+  // the (fail-silent) audit insert runs even after the response flushes,
+  // mirroring the LINE/credit side-effects in bookings.ts. A detached
+  // `void` promise could be dropped on serverless tear-down.
+  after(() =>
+    writeAuditLog({
+      adminId: session.adminId,
+      action: "shop.approve",
+      entityType: "shop",
+      entityId: id,
+    }),
+  );
+
   revalidatePath("/admin/shops");
   revalidatePath("/admin");
   return { ok: true, message: "อนุมัติร้านเรียบร้อย" };
@@ -52,6 +67,16 @@ export async function rejectShop(
   if (!result.ok) {
     return { ok: false, message: result.message };
   }
+
+  after(() =>
+    writeAuditLog({
+      adminId: session.adminId,
+      action: "shop.reject",
+      entityType: "shop",
+      entityId: id,
+      meta: { reason },
+    }),
+  );
 
   revalidatePath("/admin/shops");
   revalidatePath("/admin");
@@ -86,6 +111,16 @@ export async function updateShop(
     return { ok: false, message: result.message };
   }
 
+  after(() =>
+    writeAuditLog({
+      adminId: session.adminId,
+      action: "shop.update",
+      entityType: "shop",
+      entityId: id,
+      summary: parsed.name,
+    }),
+  );
+
   revalidatePath("/admin/shops");
   revalidatePath("/admin");
   return { ok: true };
@@ -110,5 +145,16 @@ export async function startImpersonation(shopId: string): Promise<void> {
     { shopId: shop.id, phone: shop.owner_phone, shopName: shop.name },
     session.adminId,
   );
+  // Log BEFORE redirect — redirect() throws to unwind, so anything after it
+  // never runs (and `after()` would be discarded by the redirect). Awaited so
+  // the impersonation hand-off is guaranteed recorded; writeAuditLog is
+  // fail-silent so it can't break the redirect.
+  await writeAuditLog({
+    adminId: session.adminId,
+    action: "shop.impersonate",
+    entityType: "shop",
+    entityId: shop.id,
+    meta: { shopName: shop.name },
+  });
   redirect("/shop");
 }

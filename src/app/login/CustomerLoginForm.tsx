@@ -6,7 +6,12 @@ import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Icon } from "@/components/ui/Icon";
 import { startCustomerLogin, type StartCustomerLoginState } from "./actions";
 
-export function CustomerLoginForm() {
+export function CustomerLoginForm({
+  referralCode,
+}: {
+  /** Referral code from a /login?ref=<code> link; forwarded to step 1. */
+  referralCode?: string;
+}) {
   const [state, formAction, pending] = useActionState<
     StartCustomerLoginState,
     FormData
@@ -14,6 +19,9 @@ export function CustomerLoginForm() {
 
   return (
     <form action={formAction} className="flex flex-col gap-4" noValidate>
+      {referralCode ? (
+        <input type="hidden" name="ref" value={referralCode} />
+      ) : null}
       <PhoneInput
         name="phone"
         label="เบอร์โทรศัพท์ของคุณ"

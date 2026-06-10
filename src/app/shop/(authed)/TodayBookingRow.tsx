@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Chip } from "@/components/ui/Chip";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
@@ -74,9 +75,23 @@ export function TodayBookingRow({ booking }: { booking: BookingListItem }) {
 
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <p className="truncate text-body-md font-bold text-on-surface">
-                {booking.customerName}
-              </p>
+              {booking.customerPhone ? (
+                <Link
+                  href={`/shop/customers/${booking.customerPhone}`}
+                  className="group inline-flex min-w-0 items-center gap-1 text-body-md font-bold text-on-surface hover:text-primary"
+                >
+                  <span className="truncate">{booking.customerName}</span>
+                  <Icon
+                    name="chevron_right"
+                    size={16}
+                    className="shrink-0 text-on-surface-variant group-hover:text-primary"
+                  />
+                </Link>
+              ) : (
+                <p className="truncate text-body-md font-bold text-on-surface">
+                  {booking.customerName}
+                </p>
+              )}
               {!isConfirmed ? (
                 <Chip variant={chip.variant} size="sm" className="shrink-0">
                   {chipLabel}

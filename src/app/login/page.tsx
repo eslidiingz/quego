@@ -10,7 +10,7 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ tab?: string; notice?: string }>;
+type SearchParams = Promise<{ tab?: string; notice?: string; ref?: string }>;
 
 function resolveTab(raw: string | undefined): LoginTabKey {
   return raw === "shop" ? "shop" : "customer";
@@ -21,7 +21,7 @@ export default async function LoginPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const { tab, notice } = await searchParams;
+  const { tab, notice, ref } = await searchParams;
   const active = resolveTab(tab);
 
   return (
@@ -37,7 +37,11 @@ export default async function LoginPage({
         footer={`© ${new Date().getFullYear()} queva · Premium Queue Concierge`}
       >
         <LoginTabs active={active} />
-        {active === "customer" ? <CustomerLoginForm /> : <ShopLoginPhoneForm />}
+        {active === "customer" ? (
+          <CustomerLoginForm referralCode={ref} />
+        ) : (
+          <ShopLoginPhoneForm />
+        )}
       </AuthHeroShell>
     </>
   );

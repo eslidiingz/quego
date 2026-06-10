@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
@@ -31,9 +32,23 @@ export function BookingRow({ booking }: { booking: BookingListItem }) {
         <div className="min-w-0 flex-1 space-y-2">
           <TimeBadge time={booking.slotTime} />
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-display text-headline-md text-on-surface">
-              {booking.customerName}
-            </h3>
+            {booking.customerPhone ? (
+              <Link
+                href={`/shop/customers/${booking.customerPhone}`}
+                className="group inline-flex items-center gap-1 font-display text-headline-md text-on-surface hover:text-primary"
+              >
+                <span>{booking.customerName}</span>
+                <Icon
+                  name="chevron_right"
+                  size={18}
+                  className="text-on-surface-variant group-hover:text-primary"
+                />
+              </Link>
+            ) : (
+              <h3 className="font-display text-headline-md text-on-surface">
+                {booking.customerName}
+              </h3>
+            )}
             <Chip variant={status.variant} size="sm">
               {status.label}
             </Chip>

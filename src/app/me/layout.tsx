@@ -38,6 +38,13 @@ export default async function MeLayout({
                 <span className="hidden sm:inline">คิวของฉัน</span>
               </Link>
               <Link
+                href="/me/credit"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-label-md font-semibold text-on-surface-variant hover:bg-surface-container-low transition-colors"
+              >
+                <Icon name="loyalty" size={18} />
+                <span className="hidden sm:inline">เครดิต</span>
+              </Link>
+              <Link
                 href="/me/profile"
                 className="flex items-center gap-1.5 px-3 py-2 rounded-full text-label-md font-semibold text-on-surface-variant hover:bg-surface-container-low transition-colors"
               >

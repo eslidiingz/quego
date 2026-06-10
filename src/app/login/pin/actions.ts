@@ -10,6 +10,7 @@ import {
   createOrSetCustomerPin,
   verifyCustomerPin,
 } from "@/lib/services/customers";
+import { ensureReferralForNewCustomer } from "@/lib/services/loyalty";
 import { checkRateLimits, getClientIp } from "@/lib/security/rate-limit";
 
 export type PinFormState =
@@ -81,6 +82,17 @@ export async function setupCustomerPin(
     customerId: result.customerId,
     phone: intent.phone,
   });
+
+  // First-time account created via a referral link → record the held referral
+  // (REFERRAL_HOLD_DAYS hold, reward released later once the friend uses the
+  // service). Best-effort: a referral never blocks account creation, so we
+  // ignore the result. Done BEFORE clearing the intent so the code is still
+  // available. Only the SETUP path runs this — a returning login can't be a
+  // "new customer".
+  if (intent.referralCode) {
+    await ensureReferralForNewCustomer(intent.phone, intent.referralCode);
+  }
+
   await clearCustomerLoginIntent();
   redirect("/me/bookings");
 }
