@@ -113,6 +113,9 @@ export function LiveBookingQueue({
 
   const aheadLabel = formatQueueAheadLabel(status.queueAhead);
   const waitLabel = formatWaitLabel(status.estimatedWaitMinutes);
+  // When the customer is next in line there's no meaningful wait to estimate —
+  // hide the "เวลารอโดยประมาณ" row so the headline ("คุณคือคิวถัดไป") stands alone.
+  const isNext = status.queueAhead <= 0;
 
   return (
     <section className="relative overflow-hidden rounded-2xl border border-primary/20 bg-primary-container/15 p-5 md:p-6">
@@ -136,18 +139,20 @@ export function LiveBookingQueue({
         {aheadLabel}
       </p>
 
-      <div className="mt-3 flex items-center gap-2 text-body-md text-on-surface-variant">
-        <Icon name="schedule" size={18} className="text-tertiary" />
-        <span>
-          เวลารอโดยประมาณ{" "}
-          <span
-            key={`wait-${rev}`}
-            className="queva-fade-in font-semibold text-on-surface tabular-nums"
-          >
-            {waitLabel}
+      {isNext ? null : (
+        <div className="mt-3 flex items-center gap-2 text-body-md text-on-surface-variant">
+          <Icon name="schedule" size={18} className="text-tertiary" />
+          <span>
+            เวลารอโดยประมาณ{" "}
+            <span
+              key={`wait-${rev}`}
+              className="queva-fade-in font-semibold text-on-surface tabular-nums"
+            >
+              {waitLabel}
+            </span>
           </span>
-        </span>
-      </div>
+        </div>
+      )}
     </section>
   );
 }

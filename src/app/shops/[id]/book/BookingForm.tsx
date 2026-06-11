@@ -368,7 +368,7 @@ export function BookingForm({
         <Section
           step={1}
           title="เลือกบริการ"
-          description="เลือกบริการที่คุณต้องการเข้ารับ"
+          description="เลือกบริการที่ต้องการ"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
             {services.map((svc) => (
@@ -830,13 +830,7 @@ function SlotButton({
             ? "bg-surface-container-low/40 text-on-surface-variant/50 border-transparent cursor-not-allowed line-through"
             : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
       )}
-      title={
-        slot.isTaken
-          ? "ช่วงเวลานี้ถูกจองแล้ว"
-          : slot.isPast
-            ? "ช่วงเวลานี้ผ่านไปแล้ว"
-            : undefined
-      }
+      title={slot.isTaken ? "ช่วงเวลานี้ถูกจองแล้ว" : undefined}
     >
       {slot.time}
     </button>
@@ -869,7 +863,6 @@ type SlotView = {
   time: string;
   isAvailable: boolean;
   isTaken: boolean;
-  isPast: boolean;
 };
 
 /** Stable identity for a service in local state (the implicit one has no id). */
@@ -978,15 +971,19 @@ function computeSlotsForDay(
     nowHHMM: now.timeHHMM,
     staffIdFilter: staffFilter,
   });
-  return avail.map((s) => {
-    const locTaken = locallyTaken.has(takenKey(day.dateYmd, s.time));
-    return {
-      time: s.time,
-      isTaken: s.isFull || locTaken,
-      isPast: s.isPast,
-      isAvailable: s.isAvailable && !locTaken,
-    };
-  });
+  // Past slots (today only) are hidden, not greyed out — a customer can't book
+  // a time that has already gone, so showing it adds noise. Taken-but-future
+  // slots stay visible (disabled) so the customer can see the day filling up.
+  return avail
+    .filter((s) => !s.isPast)
+    .map((s) => {
+      const locTaken = locallyTaken.has(takenKey(day.dateYmd, s.time));
+      return {
+        time: s.time,
+        isTaken: s.isFull || locTaken,
+        isAvailable: s.isAvailable && !locTaken,
+      };
+    });
 }
 
 const THAI_DAY_SHORT = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
