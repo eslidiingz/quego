@@ -85,7 +85,7 @@ const MAX_COMMENT_LENGTH = 1000;
  * 1000 characters is rejected. Returns the normalized comment on success so
  * callers persist exactly what we validated.
  */
-function validateReviewInput(
+export function validateReviewInput(
   rating: number,
   comment: string | null,
 ):
@@ -108,7 +108,7 @@ function validateReviewInput(
  * Falls back to a generic label for blank names, and returns a single-token
  * name unchanged (there is no surname to abbreviate).
  */
-function maskReviewerName(name: string | null): string {
+export function maskReviewerName(name: string | null): string {
   const trimmed = (name ?? "").trim();
   if (trimmed.length === 0) return "สมาชิก Queva";
   const parts = trimmed.split(/\s+/);

@@ -65,7 +65,7 @@ export async function listBusinessHours(
 // with the action-layer regex; both enforce the same granularity.
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]0$/u;
 
-function validate(hours: BusinessHour[]): string | null {
+export function validate(hours: BusinessHour[]): string | null {
   if (hours.length !== 7) return "ต้องระบุข้อมูลครบทั้ง 7 วัน";
   const seen = new Set<number>();
   for (const h of hours) {

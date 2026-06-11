@@ -72,7 +72,7 @@ const PRESET_COLUMNS =
   "id, category_id, name, description, duration_minutes, price, is_active, sort_order";
 
 /** Postgres `numeric` arrives over the wire as a string — coerce to number. */
-function toPrice(value: number | string | null): number | null {
+export function toPrice(value: number | string | null): number | null {
   if (value == null) return null;
   const n = typeof value === "string" ? Number(value) : value;
   return Number.isFinite(n) ? n : null;
@@ -204,7 +204,7 @@ type NormalizedPreset = {
  * present, a non-negative two-decimal number. Mirrors the action-layer
  * validator but never trusts it.
  */
-function normalize(input: ServicePresetInput): NormalizedPreset | null {
+export function normalize(input: ServicePresetInput): NormalizedPreset | null {
   const name = input.name.trim();
   if (name.length === 0 || name.length > 120) return null;
 

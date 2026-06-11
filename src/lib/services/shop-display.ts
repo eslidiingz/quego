@@ -53,7 +53,7 @@ const EMPTY_SNAPSHOT: ShopDisplaySnapshot = {
  * label for a blank name. Mirrors `maskReviewerName` in `reviews.ts` so the
  * masking rule is consistent across surfaces.
  */
-function maskCustomerName(name: string | null): string {
+export function maskCustomerName(name: string | null): string {
   const trimmed = (name ?? "").trim();
   if (trimmed.length === 0) return "ลูกค้า";
   const parts = trimmed.split(/\s+/);
