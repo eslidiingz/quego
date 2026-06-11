@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
+import { formatBaht } from "@/lib/baht";
 import {
   evaluateSlots,
   eachDateInWindow,
@@ -622,38 +623,43 @@ function ServiceCard({
   selected: boolean;
   onClick: () => void;
 }) {
-  const price = formatPrice(service.price);
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={selected}
       className={cn(
-        "flex flex-col items-start gap-1 rounded-xl p-4 text-left transition-all border-2",
+        "flex items-center justify-between gap-3 rounded-xl p-4 text-left transition-all border-2",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         selected
           ? "bg-primary text-on-primary border-primary shadow-tinted"
           : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
       )}
     >
-      <span className="font-display text-headline-sm leading-tight">
-        {service.name}
+      <span className="min-w-0">
+        <span className="block font-display text-headline-sm leading-tight">
+          {service.name}
+        </span>
+        <span
+          className={cn(
+            "mt-0.5 flex items-center gap-1 text-label-sm",
+            selected ? "opacity-90" : "text-on-surface-variant",
+          )}
+        >
+          <Icon name="schedule" size={14} />
+          {service.durationMinutes} นาที
+        </span>
       </span>
-      <span
-        className={cn(
-          "flex items-center gap-2 text-label-md",
-          selected ? "opacity-90" : "text-on-surface-variant",
-        )}
-      >
-        <Icon name="schedule" size={16} />
-        {service.durationMinutes} นาที
-        {price ? (
-          <>
-            <span aria-hidden>·</span>
-            <span className="font-semibold">{price}</span>
-          </>
-        ) : null}
-      </span>
+      {service.price != null ? (
+        <span
+          className={cn(
+            "shrink-0 text-body-md font-semibold",
+            selected ? "text-on-primary" : "text-primary",
+          )}
+        >
+          {formatBaht(service.price)}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -868,15 +874,6 @@ type SlotView = {
 /** Stable identity for a service in local state (the implicit one has no id). */
 function serviceKey(s: BookingService): string {
   return s.id ?? "__implicit__";
-}
-
-/** Format an optional price as Thai baht, or null when unpriced. */
-function formatPrice(price: number | null): string | null {
-  if (price == null) return null;
-  return `${price.toLocaleString("th-TH", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })} บาท`;
 }
 
 /** Stable key for a (date, slotTime) pair used in the locally-taken set. */

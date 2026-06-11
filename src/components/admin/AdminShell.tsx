@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 import { signOutAdmin } from "@/app/admin/actions";
 
 const navItems = [
-  { href: "/admin", label: "Dashboard", icon: "dashboard" },
+  { href: "/admin", label: "ภาพรวม", icon: "dashboard" },
   { href: "/admin/shops", label: "ร้านในระบบ", icon: "storefront" },
   { href: "/admin/categories", label: "หมวดหมู่ร้าน", icon: "category" },
   { href: "/admin/presets", label: "บริการ preset", icon: "stacks" },
@@ -70,7 +70,7 @@ export function AdminShell({
           <div className="min-w-0">
             <p className="text-label-md text-on-surface font-bold truncate">{adminName}</p>
             <p className="text-label-sm text-on-surface-variant">{adminPhone}</p>
-            <span className="text-label-sm uppercase font-bold text-primary tracking-widest">
+            <span className="text-label-sm uppercase font-bold text-secondary tracking-widest">
               Admin
             </span>
           </div>

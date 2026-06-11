@@ -109,6 +109,7 @@ export function ManageBookingActions({ bookingId }: { bookingId: string }) {
             name="phone"
             label="เบอร์โทรที่ใช้จอง"
             required
+            placeholder="กรอกเบอร์โทรที่ใช้จองคิวนี้"
             value={phone}
             onChange={setPhone}
             errorText={error ?? undefined}

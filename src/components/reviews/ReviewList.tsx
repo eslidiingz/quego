@@ -48,16 +48,11 @@ export function ReviewList({ reviews, initialCount = 3 }: ReviewListProps) {
               </>
             ) : (
               <>
-                ดูรีวิวทั้งหมด ({reviews.length})
+                ดูอีก {hiddenCount} รีวิว
                 <Icon name="expand_more" size={18} />
               </>
             )}
           </button>
-          {!expanded ? (
-            <p className="text-label-sm text-on-surface-variant text-center mt-2">
-              ยังมีอีก {hiddenCount} รีวิว
-            </p>
-          ) : null}
         </div>
       ) : null}
     </>

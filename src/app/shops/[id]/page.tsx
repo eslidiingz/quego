@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
+import { Button, buttonClassName } from "@/components/ui/Button";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { Chip } from "@/components/ui/Chip";
 import { BusinessHoursPanel } from "@/components/booking/BusinessHoursPanel";
 import { LiveQueueStatus } from "@/components/booking/LiveQueueStatus";
+import { ServiceList } from "@/components/booking/ServiceList";
 import { ShopReviewsSection } from "@/components/reviews/ShopReviewsSection";
 import { getPublicShopById } from "@/lib/services/shops";
 import {
@@ -14,11 +17,45 @@ import {
 } from "@/lib/services/bookings";
 import { listShopReviews } from "@/lib/services/reviews";
 import { getBangkokNow } from "@/lib/time/bangkok";
-import { formatBaht } from "@/lib/baht";
 
 export const dynamic = "force-dynamic";
 
 type RouteParams = Promise<{ id: string }>;
+
+const DAY_LABELS = [
+  "อาทิตย์",
+  "จันทร์",
+  "อังคาร",
+  "พุธ",
+  "พฤหัสบดี",
+  "ศุกร์",
+  "เสาร์",
+] as const;
+
+/**
+ * Hero fallback when the shop is closed for the rest of today: find the next
+ * day (within a week) the shop opens and phrase it as "เปิดพรุ่งนี้/เปิดวัน… HH:MM น.".
+ * Returns null only if no open day is configured at all.
+ */
+function nextOpeningNote(
+  hours: {
+    dayOfWeek: number;
+    isOpen: boolean;
+    openTime: string | null;
+    closeTime: string | null;
+  }[],
+  currentDay: number,
+): string | null {
+  for (let offset = 1; offset <= 7; offset += 1) {
+    const dow = (currentDay + offset) % 7;
+    const h = hours.find((x) => x.dayOfWeek === dow);
+    if (h?.isOpen && h.openTime && h.closeTime) {
+      const when = offset === 1 ? "พรุ่งนี้" : `วัน${DAY_LABELS[dow]}`;
+      return `เปิด${when} ${h.openTime} น.`;
+    }
+  }
+  return null;
+}
 
 export async function generateMetadata({ params }: { params: RouteParams }) {
   const { id } = await params;
@@ -57,7 +94,9 @@ export default async function ShopDetailPage({
   );
 
   // Today's at-a-glance time note for the hero: "open until X" while open,
-  // opening time while still before opening, nothing once closed for the day.
+  // opening time while still before opening, and — once closed for the day or
+  // on a day the shop doesn't open — the NEXT opening ("เปิดพรุ่งนี้ HH:MM น.")
+  // so a visitor never has to scroll to the hours table to learn when to return.
   // "เปิดถึง" reads unambiguously vs. "ปิด HH:MM" which can scan as "closed".
   const todayTimeNote =
     todayHours?.isOpen && todayHours.openTime && todayHours.closeTime
@@ -65,8 +104,8 @@ export default async function ShopDetailPage({
         ? `เปิดถึง ${todayHours.closeTime} น.`
         : now.timeHHMM < todayHours.openTime
           ? `เปิด ${todayHours.openTime} น.`
-          : null
-      : null;
+          : nextOpeningNote(shop.hours, now.dayOfWeek)
+      : nextOpeningNote(shop.hours, now.dayOfWeek);
 
   // Short area line for the hero (เขต, จังหวัด) — location is a primary
   // booking-decision input, so surface it up top instead of only at page end.
@@ -76,23 +115,34 @@ export default async function ShopDetailPage({
     shop.address || shop.province || shop.contact_phone,
   );
 
+  // A shop is bookable only once it has at least one active service. When it is,
+  // mobile gets a sticky booking bar (below) — pad the page so the last content
+  // and footer clear the fixed bar instead of hiding behind it.
+  const isBookable = shop.services.length > 0;
+
   return (
-    <main className="min-h-screen bg-background flex flex-col">
+    <main
+      className={cn(
+        "min-h-screen bg-background flex flex-col",
+        isBookable &&
+          "pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:pb-0",
+      )}
+    >
       <SiteHeader />
 
       <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
         <Link
           href="/"
-          className="inline-flex items-center gap-1 text-label-md text-on-surface-variant hover:text-primary transition-colors"
+          className="inline-flex min-h-11 -my-2 items-center gap-1 text-label-md text-on-surface-variant hover:text-primary transition-colors"
         >
           <Icon name="arrow_back" size={18} />
           กลับหน้าค้นหา
         </Link>
 
         {/* Hero */}
-        <section className="relative overflow-hidden rounded-2xl bg-luxury-gradient text-on-primary shadow-luxury p-6 md:p-10">
+        <section className="relative overflow-hidden rounded-xl bg-luxury-gradient text-on-primary shadow-luxury p-6 md:p-10">
           <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
-            <span className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-on-primary/15 backdrop-blur-sm flex items-center justify-center shrink-0">
+            <span className="w-16 h-16 md:w-20 md:h-20 rounded-lg bg-on-primary/15 backdrop-blur-sm flex items-center justify-center shrink-0">
               <Icon
                 name={shop.category.icon ?? "storefront"}
                 className="text-on-primary"
@@ -132,7 +182,11 @@ export default async function ShopDetailPage({
                 ) : null}
                 {reviewData.summary.count > 0 ? (
                   // Same glass treatment; gold star reads clearly on the teal hero.
-                  <span className="inline-flex items-center gap-1 rounded-full bg-on-primary/15 backdrop-blur-sm px-2.5 py-0.5 text-label-sm font-semibold text-on-primary">
+                  <span
+                    role="img"
+                    aria-label={`คะแนนเฉลี่ย ${reviewData.summary.average.toFixed(1)} จาก 5 ดาว จาก ${reviewData.summary.count} รีวิว`}
+                    className="inline-flex items-center gap-1 rounded-full bg-on-primary/15 backdrop-blur-sm px-2.5 py-0.5 text-label-sm font-semibold text-on-primary"
+                  >
                     <Icon name="star" filled size={14} className="text-tertiary-fixed-dim" />
                     <span className="tabular-nums">
                       {reviewData.summary.average.toFixed(1)}
@@ -156,11 +210,15 @@ export default async function ShopDetailPage({
         {/* Decision zone — live queue status and the primary CTA share one card
             so the status reads as direct support for the "book now" action. */}
         <QueueStatusPanel status={queueStatus} shopId={shop.id} isOpen={isOpenNow}>
-          {shop.services.length > 0 ? (
+          {isBookable ? (
             <>
               <Link
                 href={`/shops/${shop.id}/book`}
-                className="inline-flex items-center justify-center gap-2 w-full h-14 px-6 rounded-full bg-primary text-on-primary font-bold text-label-lg shadow-tinted hover:opacity-90 transition-opacity"
+                className={buttonClassName({
+                  size: "xl",
+                  fullWidth: true,
+                  className: "shadow-tinted",
+                })}
               >
                 <Icon name="event_available" />
                 จองคิวร้านนี้
@@ -171,13 +229,16 @@ export default async function ShopDetailPage({
             </>
           ) : (
             <>
-              <div
-                aria-disabled="true"
-                className="inline-flex items-center justify-center gap-2 w-full h-14 px-6 rounded-full bg-surface-container text-on-surface-variant font-bold text-label-lg cursor-not-allowed select-none"
+              <Button
+                type="button"
+                disabled
+                size="xl"
+                fullWidth
+                iconLeft={<Icon name="event_busy" />}
+                className="bg-surface-container text-on-surface-variant hover:bg-surface-container shadow-none"
               >
-                <Icon name="event_busy" />
                 ยังไม่เปิดให้จอง
-              </div>
+              </Button>
               <p className="text-label-sm text-on-surface-variant text-center">
                 ร้านนี้ยังไม่ได้เพิ่มบริการที่เปิดให้จอง
               </p>
@@ -190,33 +251,14 @@ export default async function ShopDetailPage({
         {shop.services.length > 0 ? (
           <section className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
             <header className="px-5 md:px-6 py-4 border-b border-outline-variant/40">
-              <h2 className="font-display text-headline-md text-on-surface">
+              <h2 className="font-display text-headline-md text-on-surface flex items-center gap-2">
                 บริการ
+                <span className="text-label-md font-semibold text-on-surface-variant tabular-nums">
+                  ({shop.services.length})
+                </span>
               </h2>
             </header>
-            <ul className="divide-y divide-outline-variant/40">
-              {shop.services.map((service) => (
-                <li
-                  key={service.id}
-                  className="px-5 md:px-6 py-4 flex items-center justify-between gap-4"
-                >
-                  <div className="min-w-0">
-                    <p className="text-body-md font-medium text-on-surface">
-                      {service.name}
-                    </p>
-                    <p className="text-label-sm text-on-surface-variant flex items-center gap-1 mt-0.5">
-                      <Icon name="schedule" size={14} />
-                      {formatDuration(service.durationMinutes)}
-                    </p>
-                  </div>
-                  {service.price != null ? (
-                    <span className="text-body-md font-semibold text-primary shrink-0">
-                      {formatBaht(service.price)}
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+            <ServiceList services={shop.services} initialCount={5} />
           </section>
         ) : null}
 
@@ -283,6 +325,25 @@ export default async function ShopDetailPage({
         </section>
       </div>
 
+      {/* Mobile sticky booking bar — keeps the page's primary action reachable
+          without scrolling back to the decision card. Mobile only; on ≥sm the
+          in-card CTA stays in view well enough. Hidden when not bookable. */}
+      {isBookable ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-outline-variant bg-surface/95 backdrop-blur px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden">
+          <Link
+            href={`/shops/${shop.id}/book`}
+            className={buttonClassName({
+              size: "xl",
+              fullWidth: true,
+              className: "shadow-tinted",
+            })}
+          >
+            <Icon name="event_available" />
+            จองคิวร้านนี้
+          </Link>
+        </div>
+      ) : null}
+
       <LandingFooter />
     </main>
   );
@@ -335,7 +396,7 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="w-9 h-9 rounded-full bg-primary-container/15 text-primary flex items-center justify-center shrink-0 mt-0.5">
+      <span className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
         <Icon name={icon} size={18} />
       </span>
       <div className="min-w-0">
@@ -346,14 +407,6 @@ function InfoRow({
       </div>
     </div>
   );
-}
-
-function formatDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes} นาที`;
-  const hours = Math.floor(minutes / 60);
-  const rem = minutes % 60;
-  if (rem === 0) return `${hours} ชั่วโมง`;
-  return `${hours} ชม. ${rem} นาที`;
 }
 
 function formatPhone(raw: string): string {

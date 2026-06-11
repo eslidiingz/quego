@@ -13,7 +13,7 @@ const COLS: FootCol[] = [
     ],
   },
   {
-    title: "สำหรับร้านค้า",
+    title: "สำหรับร้าน",
     links: [
       { label: "ลงทะเบียนร้าน", href: "/shops/register" },
       { label: "จัดการคิว", href: "/shop/login" },
