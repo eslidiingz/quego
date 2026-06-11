@@ -78,9 +78,7 @@ export default async function BookShopPage({
             {context.shop.name}
           </h1>
           <p className="text-body-md opacity-90 mt-2">
-            {hasServices
-              ? `${serviceLabel} · จองล่วงหน้าได้ ${countDays(context.windowStart, context.windowEnd)} วัน`
-              : "ร้านนี้ยังไม่เปิดให้จอง"}
+            {hasServices ? serviceLabel : "ร้านนี้ยังไม่เปิดให้จอง"}
           </p>
         </section>
 
@@ -122,13 +120,5 @@ export default async function BookShopPage({
       <LandingFooter />
     </main>
   );
-}
-
-function countDays(start: string, end: string): number {
-  const [y1, m1, d1] = start.split("-").map(Number);
-  const [y2, m2, d2] = end.split("-").map(Number);
-  const a = Date.UTC(y1, m1 - 1, d1);
-  const b = Date.UTC(y2, m2 - 1, d2);
-  return Math.round((b - a) / (24 * 60 * 60 * 1000)) + 1;
 }
 

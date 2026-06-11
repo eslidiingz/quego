@@ -12,7 +12,6 @@ import {
 import { LiveBookingQueue } from "@/components/booking/LiveBookingQueue";
 import { ManageBookingActions } from "./ManageBookingActions";
 import { FlashToast } from "@/components/ui/FlashToast";
-import { formatBaht } from "@/lib/baht";
 
 export const dynamic = "force-dynamic";
 
@@ -101,35 +100,14 @@ export default async function BookingDetailPage({
             <InfoRow
               icon="design_services"
               label="บริการ"
-              value={
-                <span>
-                  {booking.serviceName}
-                  <span className="text-on-surface-variant">
-                    {" "}
-                    · {booking.serviceDurationMinutes} นาที
-                    {booking.servicePrice != null
-                      ? ` · ${formatBaht(booking.servicePrice)}`
-                      : ""}
-                  </span>
-                </span>
-              }
+              value={booking.serviceName}
             />
           ) : null}
           {booking.staffName ? (
             <InfoRow
               icon="person"
               label="ผู้ให้บริการ"
-              value={
-                <span>
-                  {booking.staffName}
-                  {booking.staffRole ? (
-                    <span className="text-on-surface-variant">
-                      {" "}
-                      · {booking.staffRole}
-                    </span>
-                  ) : null}
-                </span>
-              }
+              value={booking.staffName}
             />
           ) : null}
           <InfoRow icon="badge" label="ชื่อผู้จอง" value={booking.customerName} />
@@ -137,7 +115,7 @@ export default async function BookingDetailPage({
             <InfoRow
               icon="phone"
               label="เบอร์ติดต่อ"
-              value={maskPhone(booking.customerPhone)}
+              value={formatPhone(booking.customerPhone)}
             />
           ) : null}
           <InfoRow
@@ -279,7 +257,7 @@ function formatThaiDate(ymd: string): string {
   const day = dt.getUTCDay();
   const dayLabel = THAI_DAY_LONG[day];
   const monthLabel = THAI_MONTH_LONG[m - 1];
-  return `วัน${dayLabel}ที่ ${d} ${monthLabel} ${y + 543}`;
+  return `${dayLabel}ที่ ${d} ${monthLabel} ${y + 543}`;
 }
 
 function formatPhone(raw: string): string {
@@ -287,19 +265,6 @@ function formatPhone(raw: string): string {
     return `${raw.slice(0, 3)}-${raw.slice(3, 6)}-${raw.slice(6)}`;
   }
   return raw;
-}
-
-// SEC-03: this page is UUID-gated and link-shareable, so the customer's phone
-// must not be shown in full — reveal only enough for the booker to recognise
-// their own number.
-function maskPhone(raw: string): string {
-  if (/^\d{10}$/u.test(raw)) {
-    return `${raw.slice(0, 3)}-xxx-xx${raw.slice(8)}`;
-  }
-  if (/^\d{4,}$/u.test(raw)) {
-    return `${"x".repeat(raw.length - 2)}${raw.slice(-2)}`;
-  }
-  return "•••";
 }
 
 const THAI_DAY_LONG = [

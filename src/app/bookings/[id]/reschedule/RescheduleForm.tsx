@@ -33,7 +33,7 @@ type DayView = {
   month0: number;
   status: DayStatus;
 };
-type SlotView = { time: string; isAvailable: boolean };
+type SlotView = { time: string; isAvailable: boolean; isCurrent: boolean };
 
 export function RescheduleForm({
   bookingId,
@@ -150,8 +150,19 @@ export function RescheduleForm({
       isToday: selectedDay.dateYmd === now.date,
       nowHHMM: now.timeHHMM,
       staffIdFilter: staffFilter,
-    }).map((s) => ({ time: s.time, isAvailable: s.isAvailable }));
-  }, [selectedDay, context.hours, context.bookedIntervals, durationMinutes, capacity, staffFilter, now]);
+    }).map((s) => {
+      // The booking's own slot is excluded from busy intervals (so it isn't
+      // counted against the move), which would otherwise make it look free.
+      // A reschedule must land on a DIFFERENT time, so lock the original slot.
+      const isCurrent =
+        selectedDay.dateYmd === currentDate && s.time === currentSlot;
+      return {
+        time: s.time,
+        isAvailable: s.isAvailable && !isCurrent,
+        isCurrent,
+      };
+    });
+  }, [selectedDay, context.hours, context.bookedIntervals, durationMinutes, capacity, staffFilter, now, currentDate, currentSlot]);
 
   const isUnchanged =
     selectedDate === currentDate && selectedSlot === currentSlot;
@@ -338,14 +349,18 @@ function SlotButton({
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       aria-pressed={selected}
+      aria-label={slot.isCurrent ? `${slot.time} — เวลาปัจจุบัน` : undefined}
+      title={slot.isCurrent ? "เวลาปัจจุบันของคุณ" : undefined}
       className={cn(
         "rounded-full px-3 py-2.5 text-label-md font-semibold border-2 transition-all",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         selected
           ? "bg-primary text-on-primary border-primary shadow-tinted"
-          : disabled
-            ? "bg-surface-container-low/40 text-on-surface-variant/50 border-transparent cursor-not-allowed line-through"
-            : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
+          : slot.isCurrent
+            ? "bg-secondary-container/40 text-on-secondary-container/70 border-secondary/30 cursor-not-allowed"
+            : disabled
+              ? "bg-surface-container-low/40 text-on-surface-variant/50 border-transparent cursor-not-allowed line-through"
+              : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container-high",
       )}
     >
       {slot.time}

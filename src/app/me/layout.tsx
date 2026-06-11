@@ -5,6 +5,8 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { requireCustomerSession } from "@/lib/auth/customer-session-server";
 import { signOutCustomer } from "@/app/me/actions";
 import { SignOutButton } from "./SignOutButton";
+import { MeBottomNav } from "./MeBottomNav";
+import { ME_NAV_ITEMS } from "./nav-items";
 
 export const dynamic = "force-dynamic";
 
@@ -29,35 +31,20 @@ export default async function MeLayout({
           </Link>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            <nav className="flex items-center gap-1">
-              <Link
-                href="/me/bookings"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-label-md font-semibold text-on-surface-variant hover:bg-surface-container-low transition-colors"
-              >
-                <Icon name="confirmation_number" size={18} />
-                <span className="hidden sm:inline">คิวของฉัน</span>
-              </Link>
-              <Link
-                href="/me/waitlist"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-label-md font-semibold text-on-surface-variant hover:bg-surface-container-low transition-colors"
-              >
-                <Icon name="notifications_active" size={18} />
-                <span className="hidden sm:inline">รอคิว</span>
-              </Link>
-              <Link
-                href="/me/credit"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-label-md font-semibold text-on-surface-variant hover:bg-surface-container-low transition-colors"
-              >
-                <Icon name="loyalty" size={18} />
-                <span className="hidden sm:inline">เครดิต</span>
-              </Link>
-              <Link
-                href="/me/profile"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-label-md font-semibold text-on-surface-variant hover:bg-surface-container-low transition-colors"
-              >
-                <Icon name="person" size={18} />
-                <span className="hidden sm:inline">โปรไฟล์</span>
-              </Link>
+            {/* Inline destinations live in the top bar on tablet/desktop only.
+                On mobile they move to the fixed {@link MeBottomNav} so the
+                narrow top bar stays uncluttered (app-style chrome). */}
+            <nav className="hidden items-center gap-1 sm:flex">
+              {ME_NAV_ITEMS.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-full text-label-md font-semibold text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                >
+                  <Icon name={item.icon} size={18} />
+                  <span>{item.label}</span>
+                </Link>
+              ))}
             </nav>
             <ThemeToggle />
             <SignOutButton onSignOut={signOutCustomer} />
@@ -65,7 +52,10 @@ export default async function MeLayout({
         </div>
       </header>
 
-      <main className="flex-1">{children}</main>
+      {/* pb clears the fixed bottom nav on mobile; it's hidden on sm:+. */}
+      <main className="flex-1 pb-20 sm:pb-0">{children}</main>
+
+      <MeBottomNav />
     </div>
   );
 }
