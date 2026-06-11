@@ -115,7 +115,11 @@ export default async function BookingDetailPage({
             <InfoRow
               icon="phone"
               label="เบอร์ติดต่อ"
-              value={formatPhone(booking.customerPhone)}
+              value={
+                <span className="font-mono tracking-wider">
+                  {maskPhone(booking.customerPhone)}
+                </span>
+              }
             />
           ) : null}
           <InfoRow
@@ -265,6 +269,22 @@ function formatPhone(raw: string): string {
     return `${raw.slice(0, 3)}-${raw.slice(3, 6)}-${raw.slice(6)}`;
   }
   return raw;
+}
+
+/**
+ * Mask the booking owner's phone on this *shareable* page. The cancel/reschedule
+ * flows require re-entering the full number, so printing it here would let anyone
+ * with the link cancel the queue. We reveal the prefix + last 2 digits (enough for
+ * the real owner to recognise their own booking) and hide the middle 5.
+ * The shop's own contact phone is intentionally NOT masked — it's public.
+ */
+function maskPhone(raw: string): string {
+  if (raw.length === 10 && /^\d+$/u.test(raw)) {
+    return `${raw.slice(0, 3)}-XXX-XX${raw.slice(8)}`;
+  }
+  // Fallback for non-standard lengths: keep last 2, mask the rest.
+  if (raw.length > 2) return `${"X".repeat(raw.length - 2)}${raw.slice(-2)}`;
+  return "XX";
 }
 
 const THAI_DAY_LONG = [

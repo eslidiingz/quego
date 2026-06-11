@@ -6,7 +6,7 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 const NAV_LINKS: { label: string; href: string }[] = [
   { label: "ค้นหาร้าน", href: "#shops" },
   { label: "วิธีใช้งาน", href: "#how" },
-  { label: "สำหรับร้านค้า", href: "/shops/register" },
+  { label: "สำหรับร้าน", href: "/shops/register" },
 ];
 
 /**

@@ -23,8 +23,13 @@ export function ShopReviewsSection({ summary, reviews }: ShopReviewsSectionProps
   return (
     <section className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
       <header className="flex items-center justify-between gap-3 px-5 md:px-6 py-4 border-b border-outline-variant/40">
-        <h2 className="font-display text-headline-md text-on-surface">
+        <h2 className="font-display text-headline-md text-on-surface flex items-center gap-2">
           รีวิวจากลูกค้า
+          {hasReviews ? (
+            <span className="text-label-md font-semibold text-on-surface-variant tabular-nums">
+              ({summary.count})
+            </span>
+          ) : null}
         </h2>
         {hasReviews ? <RatingSummaryInline summary={summary} /> : null}
       </header>
@@ -45,10 +50,14 @@ export function ShopReviewsSection({ summary, reviews }: ShopReviewsSectionProps
  */
 function RatingSummaryInline({ summary }: { summary: ShopRatingSummary }) {
   return (
-    <span className="flex items-center gap-1.5 shrink-0">
-      <p className="font-display font-semibold text-[28px] leading-none text-on-surface tabular-nums">
+    <span
+      role="img"
+      aria-label={`คะแนนเฉลี่ย ${summary.average.toFixed(1)} จาก 5 ดาว จาก ${summary.count} รีวิว`}
+      className="flex items-center gap-1.5 shrink-0"
+    >
+      <span className="font-display font-semibold text-display-sm leading-none text-on-surface tabular-nums">
         {summary.average.toFixed(1)}
-      </p>
+      </span>
       <Icon name="star" filled size={20} className="text-tertiary" />
     </span>
   );
@@ -62,7 +71,7 @@ function EmptyReviews() {
       </div>
       <p className="text-body-md text-on-surface">ยังไม่มีรีวิว</p>
       <p className="text-label-md text-on-surface-variant mt-1">
-        เป็นคนแรกที่รีวิวร้านนี้
+        รีวิวได้หลังเข้าใช้บริการที่ร้าน
       </p>
     </div>
   );

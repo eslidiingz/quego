@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { PhoneInput } from "@/components/ui/PhoneInput";
@@ -60,6 +60,8 @@ export function RescheduleForm({
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
+  const timeSectionRef = useRef<HTMLElement>(null);
+  const identitySectionRef = useRef<HTMLElement>(null);
   const [state, formAction, pending] = useActionState<RescheduleState, FormData>(
     rescheduleBookingAction,
     null,
@@ -87,6 +89,25 @@ export function RescheduleForm({
       document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
+
+  // Step-by-step guidance: after a date is picked, slide to the time picker;
+  // after a slot is picked, slide to identity confirmation. Keeps the next
+  // action in view on mobile without the customer hunting for it.
+  useEffect(() => {
+    if (!selectedDate) return;
+    timeSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (!selectedSlot) return;
+    identitySectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [selectedSlot]);
 
   // Capacity + filter for the LOCKED staff lane: a specific staff is one line;
   // a single-queue shop uses the shop capacity with no filter.
@@ -204,7 +225,10 @@ export function RescheduleForm({
         </div>
       </section>
 
-      <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 space-y-4">
+      <section
+        ref={timeSectionRef}
+        className="scroll-mt-4 bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 space-y-4"
+      >
         <h2 className="font-display text-headline-md text-on-surface">
           เลือกเวลาใหม่
         </h2>
@@ -228,7 +252,10 @@ export function RescheduleForm({
         )}
       </section>
 
-      <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 space-y-4">
+      <section
+        ref={identitySectionRef}
+        className="scroll-mt-4 bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 space-y-4"
+      >
         <h2 className="font-display text-headline-md text-on-surface">
           ยืนยันตัวตน
         </h2>
@@ -238,6 +265,7 @@ export function RescheduleForm({
           required
           value={phone}
           onChange={setPhone}
+          placeholder="08X-XXX-XXXX"
           helperText="กรอกเบอร์เดียวกับที่ใช้จองคิวนี้ เพื่อยืนยันว่าเป็นเจ้าของคิว"
           disabled={pending}
         />
