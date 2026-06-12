@@ -143,6 +143,113 @@ export function buildBookingConfirmationFlex(
   };
 }
 
+// ----- Shop-facing notification bubble ------------------------------------
+
+export type ShopFlexDetailRow = { label: string; value: string };
+
+export type ShopNotificationFlexInput = {
+  /**
+   * Notification-preview text + non-flex fallback — pass the existing plain-text
+   * body (formatNewBookingMessage, …) so the flex and the preview never drift.
+   */
+  altText: string;
+  /** First line, e.g. "🔔 มีการจองใหม่". */
+  heading: string;
+  /** Accent color for the identity line (green / red / amber by event). */
+  accentColor: string;
+  /** Who the booking is for — shown bold in the accent color (the customer). */
+  customerName: string;
+  /** Label/value rows under the separator (บริการ, วันเวลา, จาก, เป็น, …). */
+  rows: ShopFlexDetailRow[];
+  /** Optional single CTA that deep-links into the shop app. */
+  cta?: { label: string; uri: string };
+};
+
+/**
+ * The standard service + datetime rows shared by most shop notices. Reschedule
+ * (จาก → เป็น) composes its own rows instead, so this stays the single-datetime
+ * shape. Pure; mirrors the row set the customer confirmation bubble builds.
+ */
+export function bookingDetailRows(
+  serviceName: string | null,
+  bookingDate: string,
+  slotTime: string,
+): ShopFlexDetailRow[] {
+  const rows: ShopFlexDetailRow[] = [];
+  if (serviceName) rows.push({ label: "บริการ", value: serviceName });
+  rows.push({
+    label: "วันเวลา",
+    value: `${formatBookingDate(bookingDate)} ${slotTime} น.`,
+  });
+  return rows;
+}
+
+/**
+ * Shop-facing notification bubble — the visual twin of the customer's
+ * buildBookingConfirmationFlex (heading · accent identity line · separator ·
+ * detail rows), so a shop's LINE alerts read as the same product the customer
+ * sees. Presentation only: the caller (services/shop-line.ts) owns each event's
+ * heading, accent, rows, and altText. The optional CTA is a neutral secondary
+ * button (it never competes with the event accent) linking into the shop app.
+ */
+export function buildShopNotificationFlex(
+  input: ShopNotificationFlexInput,
+): LineFlexMessage {
+  const bubble: Record<string, unknown> = {
+    type: "bubble",
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "sm",
+      contents: [
+        {
+          type: "text",
+          text: input.heading,
+          weight: "bold",
+          size: "lg",
+          color: TEXT_STRONG,
+        },
+        {
+          type: "text",
+          // A flex text node rejects an empty string (silent 400); the name is
+          // validated non-empty upstream, but fall back defensively.
+          text: input.customerName.trim() || "ลูกค้า",
+          weight: "bold",
+          size: "md",
+          color: input.accentColor,
+          wrap: true,
+        },
+        { type: "separator", margin: "md" },
+        {
+          type: "box",
+          layout: "vertical",
+          margin: "md",
+          spacing: "sm",
+          contents: input.rows.map((r) => detailLine(r.label, r.value)),
+        },
+      ],
+    },
+  };
+
+  if (input.cta) {
+    bubble.footer = {
+      type: "box",
+      layout: "vertical",
+      spacing: "sm",
+      contents: [
+        {
+          type: "button",
+          style: "secondary",
+          height: "sm",
+          action: { type: "uri", label: input.cta.label, uri: input.cta.uri },
+        },
+      ],
+    };
+  }
+
+  return { type: "flex", altText: input.altText, contents: bubble };
+}
+
 /**
  * The two-step in-chat cancel confirmation bubble — shown in reply to the
  * "ยกเลิกคิว" tap so one accidental tap can't drop a queue. "ยืนยันยกเลิก" →

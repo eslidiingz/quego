@@ -5,7 +5,7 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { requireCustomerSession } from "@/lib/auth/customer-session-server";
 import { signOutCustomer } from "@/app/me/actions";
 import { SignOutButton } from "./SignOutButton";
-import { MeBottomNav } from "./MeBottomNav";
+import { CustomerBottomNav } from "@/components/layout/CustomerBottomNav";
 import { ME_NAV_ITEMS } from "./nav-items";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +32,8 @@ export default async function MeLayout({
 
           <div className="flex items-center gap-1 sm:gap-2">
             {/* Inline destinations live in the top bar on tablet/desktop only.
-                On mobile they move to the fixed {@link MeBottomNav} so the
-                narrow top bar stays uncluttered (app-style chrome). */}
+                On mobile they move to the fixed {@link CustomerBottomNav} so
+                the narrow top bar stays uncluttered (app-style chrome). */}
             <nav className="hidden items-center gap-1 sm:flex">
               {ME_NAV_ITEMS.map((item) => (
                 <Link
@@ -55,7 +55,7 @@ export default async function MeLayout({
       {/* pb clears the fixed bottom nav on mobile; it's hidden on sm:+. */}
       <main className="flex-1 pb-20 sm:pb-0">{children}</main>
 
-      <MeBottomNav />
+      <CustomerBottomNav />
     </div>
   );
 }

@@ -2,6 +2,12 @@ import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { pushLineMessage } from "@/lib/line/client";
 import { buildBookingMessage } from "@/lib/line/format";
+import {
+  buildShopNotificationFlex,
+  bookingDetailRows,
+  type ShopFlexDetailRow,
+} from "@/lib/line/booking-flex";
+import { absoluteUrl } from "@/lib/url";
 
 /**
  * Shop ↔ LINE binding + outbound notifications. SRP: the shops.line_user_id
@@ -99,13 +105,40 @@ export type NewBookingNotice = {
 };
 
 /**
+ * Shared notification chrome. Each event's heading is single-sourced here so the
+ * flex bubble and its plain-text altText (the formatXxx body) can never drift,
+ * and the accent color of the identity line carries the event's tone: green for
+ * positive (new booking / on the way), red for a cancel, amber for a reschedule.
+ * These mirror buildBookingConfirmationFlex on the customer side so the two
+ * personas see the same product.
+ */
+const ACCENT_POSITIVE = "#1F7A3D"; // brand green
+const ACCENT_DANGER = "#C0392B";
+const ACCENT_WARNING = "#B45309"; // amber
+
+const HEADING_NEW_BOOKING = "🔔 มีการจองใหม่";
+const HEADING_CANCELLED = "❌ ลูกค้ายกเลิกการจอง";
+const HEADING_ARRIVAL = "🚶 ลูกค้ากำลังมา";
+const HEADING_RESCHEDULED = "🕓 ลูกค้าเลื่อนเวลา";
+
+/**
+ * The CTA every shop notice carries — one tap into the queue dashboard to act on
+ * the booking. A neutral secondary button, so it never reads as destructive on a
+ * cancel card. Resolved per call because absoluteUrl reads env at call time.
+ */
+function shopDashboardCta(): { label: string; uri: string } {
+  return { label: "จัดการคิว", uri: absoluteUrl("/shop") };
+}
+
+/**
  * Build the Thai new-booking message body. Thin persona wrapper over the shared
  * builder (lib/line/format.ts) — owns only the shop-facing heading + identity
- * line. Exported so it stays unit-tested without a live channel.
+ * line. Exported so it stays unit-tested without a live channel; also rides
+ * along as the flex altText (notification preview + non-flex clients).
  */
 export function formatNewBookingMessage(notice: NewBookingNotice): string {
   return buildBookingMessage({
-    heading: "🔔 มีการจองใหม่",
+    heading: HEADING_NEW_BOOKING,
     identityLine: `ลูกค้า: ${notice.customerName}`,
     serviceName: notice.serviceName,
     bookingDate: notice.bookingDate,
@@ -115,8 +148,10 @@ export function formatNewBookingMessage(notice: NewBookingNotice): string {
 
 /**
  * Push a new-booking notification to the shop's bound LINE account, if any.
- * Fail-silent by contract: a missing binding is a no-op and any error is logged,
- * never thrown — booking creation must never fail because of a notification.
+ * Sends the flex card (the visual twin of the customer's confirmation bubble),
+ * with formatNewBookingMessage as altText. Fail-silent by contract: a missing
+ * binding is a no-op and any error is logged, never thrown — booking creation
+ * must never fail because of a notification.
  */
 export async function pushNewBookingToShop(
   shopId: string,
@@ -133,7 +168,20 @@ export async function pushNewBookingToShop(
 
     await pushLineMessage(
       data.line_user_id as string,
-      [{ type: "text", text: formatNewBookingMessage(notice) }],
+      [
+        buildShopNotificationFlex({
+          altText: formatNewBookingMessage(notice),
+          heading: HEADING_NEW_BOOKING,
+          accentColor: ACCENT_POSITIVE,
+          customerName: notice.customerName,
+          rows: bookingDetailRows(
+            notice.serviceName,
+            notice.bookingDate,
+            notice.slotTime,
+          ),
+          cta: shopDashboardCta(),
+        }),
+      ],
       { kind: "new_booking" },
     );
   } catch (err) {
@@ -153,7 +201,7 @@ export async function pushNewBookingToShop(
  */
 export function formatBookingCancelledMessage(notice: NewBookingNotice): string {
   return buildBookingMessage({
-    heading: "❌ ลูกค้ายกเลิกการจอง",
+    heading: HEADING_CANCELLED,
     identityLine: `ลูกค้า: ${notice.customerName}`,
     serviceName: notice.serviceName,
     bookingDate: notice.bookingDate,
@@ -163,6 +211,7 @@ export function formatBookingCancelledMessage(notice: NewBookingNotice): string 
 
 /**
  * Push a customer-cancellation notice to the shop's bound LINE account, if any.
+ * Sends the flex card (red accent) with formatBookingCancelledMessage as altText.
  * Fail-silent by contract (mirrors pushNewBookingToShop): a missing binding is
  * a no-op and any error is logged, never thrown — cancelling a booking must
  * never fail because of a notification.
@@ -182,7 +231,20 @@ export async function pushBookingCancelledToShop(
 
     await pushLineMessage(
       data.line_user_id as string,
-      [{ type: "text", text: formatBookingCancelledMessage(notice) }],
+      [
+        buildShopNotificationFlex({
+          altText: formatBookingCancelledMessage(notice),
+          heading: HEADING_CANCELLED,
+          accentColor: ACCENT_DANGER,
+          customerName: notice.customerName,
+          rows: bookingDetailRows(
+            notice.serviceName,
+            notice.bookingDate,
+            notice.slotTime,
+          ),
+          cta: shopDashboardCta(),
+        }),
+      ],
       { kind: "booking_cancelled" },
     );
   } catch (err) {
@@ -198,7 +260,7 @@ export async function pushBookingCancelledToShop(
  */
 export function formatCustomerArrivalMessage(notice: NewBookingNotice): string {
   return buildBookingMessage({
-    heading: "🚶 ลูกค้ากำลังมา",
+    heading: HEADING_ARRIVAL,
     identityLine: `ลูกค้า: ${notice.customerName}`,
     serviceName: notice.serviceName,
     bookingDate: notice.bookingDate,
@@ -208,7 +270,8 @@ export function formatCustomerArrivalMessage(notice: NewBookingNotice): string {
 
 /**
  * Push a "customer tapped กำลังมา" notice to the shop's bound LINE account, if
- * any. Fail-silent by contract — mirrors pushNewBookingToShop.
+ * any. Sends the flex card (green accent) with formatCustomerArrivalMessage as
+ * altText. Fail-silent by contract — mirrors pushNewBookingToShop.
  */
 export async function pushCustomerArrivalToShop(
   shopId: string,
@@ -225,7 +288,20 @@ export async function pushCustomerArrivalToShop(
 
     await pushLineMessage(
       data.line_user_id as string,
-      [{ type: "text", text: formatCustomerArrivalMessage(notice) }],
+      [
+        buildShopNotificationFlex({
+          altText: formatCustomerArrivalMessage(notice),
+          heading: HEADING_ARRIVAL,
+          accentColor: ACCENT_POSITIVE,
+          customerName: notice.customerName,
+          rows: bookingDetailRows(
+            notice.serviceName,
+            notice.bookingDate,
+            notice.slotTime,
+          ),
+          cta: shopDashboardCta(),
+        }),
+      ],
       { kind: "customer_arrival" },
     );
   } catch (err) {
@@ -256,7 +332,7 @@ function formatNoticeDate(ymd: string): string {
  * single-datetime shared builder.
  */
 export function formatBookingRescheduledMessage(notice: RescheduleNotice): string {
-  const lines = ["🕓 ลูกค้าเลื่อนเวลา", `ลูกค้า: ${notice.customerName}`];
+  const lines = [HEADING_RESCHEDULED, `ลูกค้า: ${notice.customerName}`];
   if (notice.serviceName) lines.push(`บริการ: ${notice.serviceName}`);
   lines.push(
     `จาก: ${formatNoticeDate(notice.fromDate)} ${notice.fromSlotTime} น.`,
@@ -266,8 +342,23 @@ export function formatBookingRescheduledMessage(notice: RescheduleNotice): strin
 }
 
 /**
- * Push a reschedule notice to the shop's bound LINE account, if any.
- * Fail-silent by contract — mirrors pushNewBookingToShop.
+ * The flex detail rows for a reschedule — the two-datetime (จาก → เป็น) shape,
+ * which is why this composes rows directly rather than via bookingDetailRows.
+ */
+function rescheduleDetailRows(notice: RescheduleNotice): ShopFlexDetailRow[] {
+  const rows: ShopFlexDetailRow[] = [];
+  if (notice.serviceName) rows.push({ label: "บริการ", value: notice.serviceName });
+  rows.push(
+    { label: "จาก", value: `${formatNoticeDate(notice.fromDate)} ${notice.fromSlotTime} น.` },
+    { label: "เป็น", value: `${formatNoticeDate(notice.toDate)} ${notice.toSlotTime} น.` },
+  );
+  return rows;
+}
+
+/**
+ * Push a reschedule notice to the shop's bound LINE account, if any. Sends the
+ * flex card (amber accent, จาก → เป็น rows) with formatBookingRescheduledMessage
+ * as altText. Fail-silent by contract — mirrors pushNewBookingToShop.
  */
 export async function pushBookingRescheduledToShop(
   shopId: string,
@@ -284,7 +375,16 @@ export async function pushBookingRescheduledToShop(
 
     await pushLineMessage(
       data.line_user_id as string,
-      [{ type: "text", text: formatBookingRescheduledMessage(notice) }],
+      [
+        buildShopNotificationFlex({
+          altText: formatBookingRescheduledMessage(notice),
+          heading: HEADING_RESCHEDULED,
+          accentColor: ACCENT_WARNING,
+          customerName: notice.customerName,
+          rows: rescheduleDetailRows(notice),
+          cta: shopDashboardCta(),
+        }),
+      ],
       { kind: "booking_rescheduled" },
     );
   } catch (err) {

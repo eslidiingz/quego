@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
 import { Chip } from "@/components/ui/Chip";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { CustomerBottomNav } from "@/components/layout/CustomerBottomNav";
 import { LandingFooter } from "@/components/landing/LandingFooter";
+import { shouldShowCustomerBottomNav } from "@/lib/auth/customer-bottom-nav";
 import {
   getBookingById,
   getBookingQueueStatus,
@@ -39,9 +42,10 @@ export default async function BookingDetailPage({
 }) {
   const { id } = await params;
   const { notice } = await searchParams;
-  const [booking, queue] = await Promise.all([
+  const [booking, queue, showCustomerNav] = await Promise.all([
     getBookingById(id),
     getBookingQueueStatus(id),
+    shouldShowCustomerBottomNav(),
   ]);
   if (!booking) notFound();
 
@@ -54,7 +58,13 @@ export default async function BookingDetailPage({
       : null;
 
   return (
-    <main className="min-h-screen bg-background flex flex-col">
+    <main
+      className={cn(
+        "min-h-screen bg-background flex flex-col",
+        showCustomerNav &&
+          "pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0",
+      )}
+    >
       <SiteHeader />
 
       <div className="max-w-2xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
@@ -227,6 +237,8 @@ export default async function BookingDetailPage({
       </div>
 
       <LandingFooter />
+
+      {showCustomerNav ? <CustomerBottomNav /> : null}
     </main>
   );
 }

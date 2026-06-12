@@ -48,6 +48,7 @@ export function BookingForm({
   defaultPhone = "",
   prefill,
   lineConnected,
+  showCustomerNav = false,
 }: {
   context: BookingContext;
   /** Pre-fills the booker fields for a signed-in customer (still editable, so
@@ -60,6 +61,9 @@ export function BookingForm({
   /** Whether the signed-in customer has LINE connected — drives the waitlist
    *  panel's "connect LINE" hint. Undefined for anonymous visitors. */
   lineConnected?: boolean;
+  /** When the customer bottom tab bar is showing (signed-in customer on mobile),
+   *  lift the sticky submit bar above it so the CTA isn't hidden behind it. */
+  showCustomerNav?: boolean;
 }) {
   // Show the service step only when there's a real choice to make: more than
   // one service, or a single *named* one (carries a price worth surfacing).
@@ -556,7 +560,14 @@ export function BookingForm({
       {/* On a full day the actionable CTA is the waitlist join inside
           WaitlistPanel, so the permanently-disabled booking submit is hidden. */}
       {selectedDay?.status === "full" ? null : (
-        <div className="sticky bottom-0 -mx-4 md:mx-0 px-4 md:px-0 py-4 bg-background/95 backdrop-blur border-t border-outline-variant md:bg-transparent md:border-0 md:backdrop-blur-0 md:py-0">
+        <div
+          className={cn(
+            "sticky bottom-0 -mx-4 md:mx-0 px-4 md:px-0 py-4 bg-background/95 backdrop-blur border-t border-outline-variant md:bg-transparent md:border-0 md:backdrop-blur-0 md:py-0",
+            // Lift above the mobile customer tab bar (sm:hidden) when present.
+            showCustomerNav &&
+              "bottom-[calc(4rem+env(safe-area-inset-bottom))] sm:bottom-0",
+          )}
+        >
           <Button
             type="submit"
             size="xl"

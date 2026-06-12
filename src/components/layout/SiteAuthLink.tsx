@@ -2,6 +2,9 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { getCustomerSession } from "@/lib/auth/customer-session-server";
 import { getShopSession } from "@/lib/auth/shop-session-server";
+import { SignOutButton } from "@/app/me/SignOutButton";
+import { signOutCustomer } from "@/app/me/actions";
+import { signOutShop } from "@/app/shop/actions";
 
 /**
  * Auth-aware nav link for the public site chrome. Reads the active session
@@ -16,9 +19,10 @@ import { getShopSession } from "@/lib/auth/shop-session-server";
  * httpOnly cookies, so checking shop first is the only thing distinguishing
  * an owner who also happens to hold a customer session.
  *
- * SRP: render the right entry point for the current session — nothing else.
- * Shared across every public page header (and the home footer) so the
- * logged-in/out state can never drift between them.
+ * SRP: render the right entry point for the current session (plus, in the
+ * header, a sign-out control when signed in) — nothing else. Shared across
+ * every public page header (and the home footer) so the logged-in/out state
+ * can never drift between them.
  *
  * OCP: `variant` selects presentation (header = pill with icon, footer = plain
  * text) without the component knowing about any specific page.
@@ -55,14 +59,32 @@ export async function SiteAuthLink({
     );
   }
 
+  // When signed in, the header mirrors the customer/shop area chrome: the
+  // shortcut into the authed area + a sign-out control wired to the matching
+  // persona action (shop takes precedence, same as the entry point above).
+  const onSignOut = shopSession ? signOutShop : signOutCustomer;
+
+  // For a signed-in customer the "คิวของฉัน" shortcut is redundant on mobile —
+  // the fixed bottom tab bar (CustomerBottomNav, sm:hidden) already carries it —
+  // so hide it below sm and keep it only on desktop, where there is no tab bar.
+  // Shop owners (no tab bar) and signed-out visitors keep their link on all sizes.
+  const entryHiddenOnMobile = Boolean(customerSession) && !shopSession;
+
   return (
-    <Link
-      href={href}
-      className="text-label-md text-primary font-semibold inline-flex items-center gap-1"
-    >
-      {icon ? <Icon name={icon} size={16} /> : null}
-      {label}
-      {icon ? null : <Icon name="chevron_right" size={16} />}
-    </Link>
+    <div className="flex items-center gap-1 sm:gap-2">
+      <Link
+        href={href}
+        className={`text-label-md text-primary font-semibold items-center gap-1 ${
+          entryHiddenOnMobile ? "hidden sm:inline-flex" : "inline-flex"
+        }`}
+      >
+        {icon ? <Icon name={icon} size={16} /> : null}
+        {label}
+        {icon ? null : <Icon name="chevron_right" size={16} />}
+      </Link>
+      {shopSession || customerSession ? (
+        <SignOutButton onSignOut={onSignOut} />
+      ) : null}
+    </div>
   );
 }
