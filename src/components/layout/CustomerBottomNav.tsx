@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import { ME_NAV_ITEMS } from "@/app/me/nav-items";
+import { WaitlistNavBadge } from "./WaitlistNavBadge";
 
 /**
  * Native-app-style bottom tab bar for the signed-in customer. Shown only on
@@ -46,7 +47,12 @@ export function CustomerBottomNav() {
                     : "text-on-surface-variant hover:text-on-surface",
                 )}
               >
-                <Icon name={item.icon} size={24} filled={active} />
+                <span className="relative">
+                  <Icon name={item.icon} size={24} filled={active} />
+                  {item.href === "/me/waitlist" ? (
+                    <WaitlistNavBadge className="absolute -top-1.5 -right-2.5" />
+                  ) : null}
+                </span>
                 <span
                   className={cn(
                     "text-label-sm leading-none",

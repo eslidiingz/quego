@@ -6,6 +6,7 @@ import { requireCustomerSession } from "@/lib/auth/customer-session-server";
 import { signOutCustomer } from "@/app/me/actions";
 import { SignOutButton } from "./SignOutButton";
 import { CustomerBottomNav } from "@/components/layout/CustomerBottomNav";
+import { WaitlistNavBadge } from "@/components/layout/WaitlistNavBadge";
 import { ME_NAV_ITEMS } from "./nav-items";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,7 @@ export default async function MeLayout({
                 >
                   <Icon name={item.icon} size={18} />
                   <span>{item.label}</span>
+                  {item.href === "/me/waitlist" ? <WaitlistNavBadge /> : null}
                 </Link>
               ))}
             </nav>

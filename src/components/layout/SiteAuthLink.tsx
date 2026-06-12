@@ -82,7 +82,7 @@ export async function SiteAuthLink({
         {label}
         {icon ? null : <Icon name="chevron_right" size={16} />}
       </Link>
-      {shopSession || customerSession ? (
+      {customerSession && !shopSession ? (
         <SignOutButton onSignOut={onSignOut} />
       ) : null}
     </div>
