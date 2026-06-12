@@ -127,13 +127,15 @@ export function BookingCard({ booking }: { booking: CustomerBookingItem }) {
             existing={booking.review}
           />
         ) : null}
-        <Link
-          href={`/bookings/${booking.id}`}
-          className="border-2 border-outline-variant rounded-full px-4 h-11 text-on-surface-variant hover:bg-surface-container-low transition-colors text-label-md font-semibold flex items-center justify-center gap-2"
-        >
-          ดูรายละเอียดการจอง
-          <Icon name="chevron_right" size={18} />
-        </Link>
+        {booking.status !== "cancelled" ? (
+          <Link
+            href={`/bookings/${booking.id}`}
+            className="border-2 border-outline-variant rounded-full px-4 h-11 text-on-surface-variant hover:bg-surface-container-low transition-colors text-label-md font-semibold flex items-center justify-center gap-2"
+          >
+            ดูรายละเอียดการจอง
+            <Icon name="chevron_right" size={18} />
+          </Link>
+        ) : null}
       </div>
     </article>
   );

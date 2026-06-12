@@ -21,7 +21,7 @@ export default async function MyWaitlistPage() {
       <PageHeader
         eyebrow="แจ้งเตือนคิวว่าง"
         title="รายการรอคิว"
-        description="ร้านที่คุณกำลังรอคิวว่างอยู่ เราจะแจ้งเตือนผ่าน LINE ทันทีที่มีคนยกเลิกและมีคิวเปิด"
+        description="ร้านที่คุณกำลังรอคิวว่างอยู่ เราจะแจ้งเตือนในแอป (และทาง LINE ถ้าเชื่อมต่อไว้) ทันทีที่มีคิวว่าง"
       />
 
       {entries.length === 0 ? (
@@ -90,17 +90,19 @@ function WaitlistCard({ entry }: { entry: WaitlistItem }) {
         วันที่ {formatBookingDate(entry.requestedDate)}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 pt-1">
+      <div className="flex items-center gap-2 pt-1">
         {isNotified ? (
           <Link
             href={entry.bookPath}
-            className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-full bg-primary text-on-primary font-bold text-label-md hover:opacity-90 transition-opacity"
+            className="flex-1 inline-flex items-center justify-center gap-2 h-11 px-4 rounded-full bg-primary text-on-primary font-bold text-label-md hover:opacity-90 transition-opacity"
           >
             <Icon name="event_available" size={18} />
             จองเลย
           </Link>
         ) : null}
-        <CancelWaitlistButton entryId={entry.id} />
+        <div className={isNotified ? "flex-1 flex" : "w-full flex"}>
+          <CancelWaitlistButton entryId={entry.id} />
+        </div>
       </div>
     </li>
   );

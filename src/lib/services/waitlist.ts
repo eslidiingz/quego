@@ -241,6 +241,30 @@ export async function listWaitlistForCustomer(
   }));
 }
 
+/**
+ * Count a customer's ACTIONABLE waitlist entries — ones where a slot has opened
+ * (`status = 'notified'`) for today or later — keyed by phone. Drives the live
+ * count badge on the รอคิว nav tab ({@link WaitlistNavBadge}). It counts open
+ * slots, not "unread" notices: the badge persists until the customer actually
+ * books or leaves the list (viewing the page doesn't clear it), because the
+ * count is an outstanding-action signal, not a since-last-seen one. Never throws
+ * — a read error returns 0 so the badge fails closed (hidden) rather than loud.
+ */
+export async function countOpenWaitlistSlots(phone: string): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const today = getBangkokToday();
+
+  const { count, error } = await supabase
+    .from("waitlist_entries")
+    .select("id", { count: "exact", head: true })
+    .eq("customer_phone", phone)
+    .eq("status", "notified")
+    .gte("requested_date", today);
+
+  if (error || count == null) return 0;
+  return count;
+}
+
 // ----- Cancel (leave the list) --------------------------------------------
 
 export type CancelWaitlistResult =
@@ -322,13 +346,14 @@ type OfferCandidateRow = {
  * waitlist. Fire-and-forget from the cancel/reschedule paths (mirrors the
  * cancel LINE pushes): never throws, off the response path.
  *
- * Picks the OLDEST eligible entry (see `isReofferable`) that (a) now has a
- * genuinely open slot for its service/staff and (b) has a bound LINE account,
- * marks it `notified`, and pushes the "slot opened" bubble with a one-tap deep
+ * Picks the OLDEST eligible entry (see `isReofferable`) that now has a genuinely
+ * open slot for its service/staff, marks it `notified`, and — if that customer
+ * has linked LINE — also pushes the "slot opened" bubble with a one-tap deep
  * link back into the booking form. Exactly one offer per freed slot; the rest
- * roll on to the next cancellation. A waitlister with no LINE binding is passed
- * over for the push (they keep their place and can still book from /me/waitlist),
- * so the offer is never wasted on someone who can't see it.
+ * roll on to the next cancellation. The `notified` flip happens regardless of
+ * LINE binding, so the in-app /me/waitlist card and the รอคิว nav badge surface
+ * the open slot via polling even for a customer who never linked LINE — the
+ * oldest waiter keeps their rightful place rather than being skipped.
  *
  * Best-effort by contract: on a simultaneous double-cancel two offers could in
  * principle go out, which is harmless (an extra nudge), so no heavy lock — in
@@ -373,17 +398,11 @@ export async function offerWaitlistForFreedSlot(
       });
       if (!open) continue;
 
-      // Resolve the LINE handle; skip (don't consume the offer) if unbound.
-      const { data: customer } = await supabase
-        .from("customers")
-        .select("line_user_id")
-        .eq("phone", entry.customer_phone)
-        .maybeSingle();
-      const lineUserId = customer?.line_user_id as string | undefined;
-      if (!lineUserId) continue;
-
-      // Mark notified BEFORE pushing so a concurrent free-event is less likely to
-      // double-offer. Conditional on the row still being active.
+      // Claim the offer for this entry by marking it notified BEFORE any push,
+      // so a concurrent free-event is less likely to double-offer. Conditional
+      // on the row still being active. This happens REGARDLESS of LINE binding:
+      // the in-app /me/waitlist card + the รอคิว nav badge surface the open slot
+      // via polling, so an unlinked customer still finds out.
       const { data: claimed } = await supabase
         .from("waitlist_entries")
         .update({ status: "notified", notified_at: new Date().toISOString() })
@@ -393,14 +412,25 @@ export async function offerWaitlistForFreedSlot(
         .maybeSingle();
       if (!claimed) continue; // lost a race; try the next candidate
 
-      await pushWaitlistSlotOpenToCustomer(lineUserId, {
-        shopId,
-        shopName: context.shop.name,
-        serviceName: entry.service_name,
-        serviceId: entry.service_id,
-        preferredStaffId: entry.preferred_staff_id,
-        date,
-      });
+      // LINE push is a bonus layer on top of the in-app signal — sent only when
+      // the customer has linked LINE. Fail-silent inside the helper, so a missing
+      // channel token (pre-go-live) never breaks the in-app flow above.
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("line_user_id")
+        .eq("phone", entry.customer_phone)
+        .maybeSingle();
+      const lineUserId = customer?.line_user_id as string | undefined;
+      if (lineUserId) {
+        await pushWaitlistSlotOpenToCustomer(lineUserId, {
+          shopId,
+          shopName: context.shop.name,
+          serviceName: entry.service_name,
+          serviceId: entry.service_id,
+          preferredStaffId: entry.preferred_staff_id,
+          date,
+        });
+      }
       return; // one offer per freed slot
     }
   } catch (err) {

@@ -15,7 +15,7 @@ export function CancelWaitlistButton({ entryId }: { entryId: string }) {
       trigger={
         <button
           type="button"
-          className="border-2 border-outline-variant rounded-full px-4 py-2 text-on-surface-variant hover:bg-surface-container-low transition-colors text-label-md font-semibold flex items-center justify-center gap-2"
+          className="w-full h-11 border-2 border-outline-variant rounded-full px-4 whitespace-nowrap text-on-surface-variant hover:bg-surface-container-low transition-colors text-label-md font-semibold flex items-center justify-center gap-2"
         >
           <Icon name="notifications_off" size={18} />
           ออกจากรายการรอ
