@@ -1,11 +1,14 @@
 import { notFound, redirect } from "next/navigation";
+import { cn } from "@/lib/cn";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { CustomerBottomNav } from "@/components/layout/CustomerBottomNav";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { Icon } from "@/components/ui/Icon";
 import {
   getBookingContext,
   getBookingForReschedule,
 } from "@/lib/services/bookings";
+import { shouldShowCustomerBottomNav } from "@/lib/auth/customer-bottom-nav";
 import { RescheduleForm } from "./RescheduleForm";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +36,16 @@ export default async function RescheduleBookingPage({
   const context = await getBookingContext(info.shopId, undefined, id);
   if (!context) notFound();
 
+  const showCustomerNav = await shouldShowCustomerBottomNav();
+
   return (
-    <main className="min-h-screen bg-background flex flex-col">
+    <main
+      className={cn(
+        "min-h-screen bg-background flex flex-col",
+        showCustomerNav &&
+          "pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0",
+      )}
+    >
       <SiteHeader />
 
       <div className="max-w-2xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
@@ -76,10 +87,13 @@ export default async function RescheduleBookingPage({
           staffName={info.staffName}
           currentDate={info.bookingDate}
           currentSlot={info.slotTime}
+          showCustomerNav={showCustomerNav}
         />
       </div>
 
       <LandingFooter />
+
+      {showCustomerNav ? <CustomerBottomNav /> : null}
     </main>
   );
 }

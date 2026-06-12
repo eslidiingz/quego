@@ -2,7 +2,7 @@ import type { IconProps } from "@/components/ui/Icon";
 
 /**
  * Customer-area primary destinations, shared by the desktop top-bar nav
- * (in {@link MeLayout}) and the mobile bottom tab bar ({@link MeBottomNav}) so
+ * (in {@link MeLayout}) and the mobile bottom tab bar ({@link CustomerBottomNav}) so
  * the two can never drift apart. Plain data module — no `"use client"` / no
  * `server-only` — so both the Server Component layout and the client bottom bar
  * can import it.

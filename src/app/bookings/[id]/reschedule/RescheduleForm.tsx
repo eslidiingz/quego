@@ -42,6 +42,7 @@ export function RescheduleForm({
   staffId,
   currentDate,
   currentSlot,
+  showCustomerNav = false,
 }: {
   bookingId: string;
   context: BookingContext;
@@ -52,6 +53,9 @@ export function RescheduleForm({
   staffName: string | null;
   currentDate: string;
   currentSlot: string;
+  /** When the customer bottom tab bar is showing (signed-in customer on mobile),
+   *  lift the sticky submit bar above it so the CTA isn't hidden behind it. */
+  showCustomerNav?: boolean;
 }) {
   const [now, setNow] = useState<ClockNow>(() => ({
     date: context.nowDate,
@@ -171,18 +175,23 @@ export function RescheduleForm({
       isToday: selectedDay.dateYmd === now.date,
       nowHHMM: now.timeHHMM,
       staffIdFilter: staffFilter,
-    }).map((s) => {
-      // The booking's own slot is excluded from busy intervals (so it isn't
-      // counted against the move), which would otherwise make it look free.
-      // A reschedule must land on a DIFFERENT time, so lock the original slot.
-      const isCurrent =
-        selectedDay.dateYmd === currentDate && s.time === currentSlot;
-      return {
-        time: s.time,
-        isAvailable: s.isAvailable && !isCurrent,
-        isCurrent,
-      };
-    });
+    })
+      // Past slots (today only) are hidden, not greyed out — you can't move a
+      // booking to a time that has already gone, so showing it adds noise.
+      // Mirrors the main booking form's slot grid.
+      .filter((s) => !s.isPast)
+      .map((s) => {
+        // The booking's own slot is excluded from busy intervals (so it isn't
+        // counted against the move), which would otherwise make it look free.
+        // A reschedule must land on a DIFFERENT time, so lock the original slot.
+        const isCurrent =
+          selectedDay.dateYmd === currentDate && s.time === currentSlot;
+        return {
+          time: s.time,
+          isAvailable: s.isAvailable && !isCurrent,
+          isCurrent,
+        };
+      });
   }, [selectedDay, context.hours, context.bookedIntervals, durationMinutes, capacity, staffFilter, now, currentDate, currentSlot]);
 
   const isUnchanged =
@@ -280,7 +289,14 @@ export function RescheduleForm({
 
       <div aria-hidden className="h-2 md:hidden" />
 
-      <div className="sticky bottom-0 -mx-4 md:mx-0 px-4 md:px-0 py-4 bg-background/95 backdrop-blur border-t border-outline-variant md:bg-transparent md:border-0 md:backdrop-blur-0 md:py-0">
+      <div
+        className={cn(
+          "sticky bottom-0 -mx-4 md:mx-0 px-4 md:px-0 py-4 bg-background/95 backdrop-blur border-t border-outline-variant md:bg-transparent md:border-0 md:backdrop-blur-0 md:py-0",
+          // Lift above the mobile customer tab bar (sm:hidden) when present.
+          showCustomerNav &&
+            "bottom-[calc(4rem+env(safe-area-inset-bottom))] sm:bottom-0",
+        )}
+      >
         <Button
           type="submit"
           size="xl"

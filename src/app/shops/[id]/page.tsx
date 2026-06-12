@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
 import { Button, buttonClassName } from "@/components/ui/Button";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { CustomerBottomNav } from "@/components/layout/CustomerBottomNav";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { Chip } from "@/components/ui/Chip";
 import { BusinessHoursPanel } from "@/components/booking/BusinessHoursPanel";
@@ -17,6 +18,7 @@ import {
 } from "@/lib/services/bookings";
 import { listShopReviews } from "@/lib/services/reviews";
 import { getBangkokNow } from "@/lib/time/bangkok";
+import { shouldShowCustomerBottomNav } from "@/lib/auth/customer-bottom-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -76,10 +78,11 @@ export default async function ShopDetailPage({
   params: RouteParams;
 }) {
   const { id } = await params;
-  const [shop, queueStatus, reviewData] = await Promise.all([
+  const [shop, queueStatus, reviewData, showCustomerNav] = await Promise.all([
     getPublicShopById(id),
     getShopPublicQueueStatus(id),
     listShopReviews(id),
+    shouldShowCustomerBottomNav(),
   ]);
   if (!shop) notFound();
 
@@ -116,16 +119,27 @@ export default async function ShopDetailPage({
   );
 
   // A shop is bookable only once it has at least one active service. When it is,
-  // mobile gets a sticky booking bar (below) — pad the page so the last content
-  // and footer clear the fixed bar instead of hiding behind it.
+  // the page gets a single floating booking bar (below) — pad the page so the
+  // last content and footer clear the fixed bar instead of hiding behind it.
   const isBookable = shop.services.length > 0;
+
+  // Bottom inset reserved for whatever floats over the page bottom on mobile:
+  // the booking bar (~5rem) and/or the customer tab bar (~4rem, sm:hidden). When
+  // both are present on mobile the bar stacks above the tab bar, so reserve 9rem;
+  // on sm:+ the tab bar is gone, so only the booking bar's 5rem remains.
+  const mainBottomInset = isBookable
+    ? showCustomerNav
+      ? "pb-[calc(env(safe-area-inset-bottom)+9rem)] sm:pb-[calc(env(safe-area-inset-bottom)+5rem)]"
+      : "pb-[calc(env(safe-area-inset-bottom)+5rem)]"
+    : showCustomerNav
+      ? "pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0"
+      : undefined;
 
   return (
     <main
       className={cn(
         "min-h-screen bg-background flex flex-col",
-        isBookable &&
-          "pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:pb-0",
+        mainBottomInset,
       )}
     >
       <SiteHeader />
@@ -207,27 +221,11 @@ export default async function ShopDetailPage({
           </div>
         </section>
 
-        {/* Decision zone — live queue status and the primary CTA share one card
-            so the status reads as direct support for the "book now" action. */}
+        {/* Decision zone — live queue status. The primary "book now" CTA lives in
+            the floating bar (below) as the page's single booking entry point, so
+            this card only carries the not-yet-bookable notice when applicable. */}
         <QueueStatusPanel status={queueStatus} shopId={shop.id} isOpen={isOpenNow}>
-          {isBookable ? (
-            <>
-              <Link
-                href={`/shops/${shop.id}/book`}
-                className={buttonClassName({
-                  size: "xl",
-                  fullWidth: true,
-                  className: "shadow-tinted",
-                })}
-              >
-                <Icon name="event_available" />
-                จองคิวร้านนี้
-              </Link>
-              <p className="text-label-sm text-on-surface-variant text-center">
-                จองล่วงหน้าได้ทันที โดยไม่ต้องสมัครสมาชิก
-              </p>
-            </>
-          ) : (
+          {!isBookable ? (
             <>
               <Button
                 type="button"
@@ -243,7 +241,7 @@ export default async function ShopDetailPage({
                 ร้านนี้ยังไม่ได้เพิ่มบริการที่เปิดให้จอง
               </p>
             </>
-          )}
+          ) : null}
         </QueueStatusPanel>
 
         {/* Services catalogue — the customer's main decision input, so it sits
@@ -325,26 +323,40 @@ export default async function ShopDetailPage({
         </section>
       </div>
 
-      {/* Mobile sticky booking bar — keeps the page's primary action reachable
-          without scrolling back to the decision card. Mobile only; on ≥sm the
-          in-card CTA stays in view well enough. Hidden when not bookable. */}
+      {/* Floating booking bar — the page's single, always-reachable booking
+          entry point on every viewport. Coral (brand accent CTA) so it stands
+          out against the teal hero/surface. Hidden when not bookable. */}
       {isBookable ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-outline-variant bg-surface/95 backdrop-blur px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden">
-          <Link
-            href={`/shops/${shop.id}/book`}
-            className={buttonClassName({
-              size: "xl",
-              fullWidth: true,
-              className: "shadow-tinted",
-            })}
-          >
-            <Icon name="event_available" />
-            จองคิวร้านนี้
-          </Link>
+        <div
+          className={cn(
+            "fixed inset-x-0 z-40 border-t border-outline-variant bg-surface/95 backdrop-blur",
+            // On mobile, sit directly above the customer tab bar when shown;
+            // on sm:+ the tab bar is hidden so drop back to the viewport edge.
+            showCustomerNav
+              ? "bottom-[calc(4rem+env(safe-area-inset-bottom))] sm:bottom-0"
+              : "bottom-0",
+          )}
+        >
+          <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <Link
+              href={`/shops/${shop.id}/book`}
+              className={buttonClassName({
+                size: "xl",
+                fullWidth: true,
+                className:
+                  "bg-secondary text-on-secondary hover:bg-secondary/90 shadow-coral-glow hover:shadow-coral-glow sm:mx-auto sm:max-w-md",
+              })}
+            >
+              <Icon name="event_available" />
+              จองคิวร้านนี้
+            </Link>
+          </div>
         </div>
       ) : null}
 
       <LandingFooter />
+
+      {showCustomerNav ? <CustomerBottomNav /> : null}
     </main>
   );
 }

@@ -4,18 +4,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
-import { ME_NAV_ITEMS } from "./nav-items";
+import { ME_NAV_ITEMS } from "@/app/me/nav-items";
 
 /**
- * Native-app-style bottom tab bar for the customer area. Shown only on mobile
- * (`sm:hidden`); on tablet/desktop the same destinations live in the top bar
- * (see {@link MeLayout}). Fixed to the viewport bottom with an iOS safe-area
- * inset so it clears the home indicator.
+ * Native-app-style bottom tab bar for the signed-in customer. Shown only on
+ * mobile (`sm:hidden`); on tablet/desktop the same destinations live in the
+ * top bar (see {@link MeLayout}). Fixed to the viewport bottom with an iOS
+ * safe-area inset so it clears the home indicator.
+ *
+ * Used in two places, always for an authenticated customer:
+ * - The customer area layout ({@link MeLayout}) renders it unconditionally —
+ *   that subtree is already session-guarded.
+ * - Public pages render it gated behind {@link shouldShowCustomerBottomNav} so
+ *   a logged-in customer keeps app-style navigation while browsing the site.
  *
  * SRP: render + highlight the primary nav. The destination list is injected
- * from the shared {@link ME_NAV_ITEMS} so it can't drift from the desktop nav.
+ * from the shared {@link ME_NAV_ITEMS} so it can't drift from the desktop nav;
+ * the authentication decision lives entirely in the callers (DIP).
  */
-export function MeBottomNav() {
+export function CustomerBottomNav() {
   const pathname = usePathname();
 
   return (

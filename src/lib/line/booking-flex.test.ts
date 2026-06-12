@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   buildBookingConfirmationFlex,
   buildCancelConfirmFlex,
+  buildShopNotificationFlex,
+  bookingDetailRows,
 } from "@/lib/line/booking-flex";
 import { parseBookingPostback } from "@/lib/services/line-booking-actions";
 
@@ -14,6 +16,7 @@ type FlexAction = { type: string; label: string; data: string; uri: string };
 type FlexNode = {
   type: string;
   text: string;
+  color: string;
   contents: FlexNode[];
   action: FlexAction;
 };
@@ -84,7 +87,7 @@ describe("buildBookingConfirmationFlex", () => {
     expect(labels).toContain("บริการ");
     expect(labels).toContain("วันเวลา");
     const serviceRow = rows.find((r) => r.contents[0].text === "บริการ");
-    expect(serviceRow.contents[1].text).toBe("ตัดผมชาย");
+    expect(serviceRow?.contents[1].text).toBe("ตัดผมชาย");
   });
 
   it("omits the บริการ row when serviceName is null but always keeps วันเวลา", () => {
@@ -99,7 +102,7 @@ describe("buildBookingConfirmationFlex", () => {
   it("formats the วันเวลา row as DD/MM/YYYY HH:MM น.", () => {
     const rows = detailRows(buildBookingConfirmationFlex(input));
     const dateRow = rows.find((r) => r.contents[0].text === "วันเวลา");
-    expect(dateRow.contents[1].text).toBe("15/06/2026 14:30 น.");
+    expect(dateRow?.contents[1].text).toBe("15/06/2026 14:30 น.");
   });
 });
 
@@ -121,6 +124,82 @@ describe("buildCancelConfirmFlex", () => {
 
     expect(keep.action.label).toBe("เก็บคิวไว้");
     expect(keep.action.data).toBe("act=keep");
+  });
+});
+
+describe("bookingDetailRows", () => {
+  it("returns บริการ + วันเวลา rows when a service is given", () => {
+    const rows = bookingDetailRows("ตัดผมชาย", "2026-06-15", "14:30");
+    expect(rows).toEqual([
+      { label: "บริการ", value: "ตัดผมชาย" },
+      { label: "วันเวลา", value: "15/06/2026 14:30 น." },
+    ]);
+  });
+
+  it("omits the บริการ row when serviceName is null but keeps วันเวลา", () => {
+    const rows = bookingDetailRows(null, "2026-01-02", "09:00");
+    expect(rows).toEqual([{ label: "วันเวลา", value: "02/01/2026 09:00 น." }]);
+  });
+});
+
+describe("buildShopNotificationFlex", () => {
+  const base = {
+    altText: "🔔 มีการจองใหม่\nลูกค้า: สมชาย",
+    heading: "🔔 มีการจองใหม่",
+    accentColor: "#1F7A3D",
+    customerName: "สมชาย",
+    rows: [
+      { label: "บริการ", value: "ตัดผมชาย" },
+      { label: "วันเวลา", value: "15/06/2026 14:30 น." },
+    ],
+  };
+
+  /** [heading, identity, separator, detailBox] — the body's vertical contents. */
+  function body(msg: ReturnType<typeof buildShopNotificationFlex>): FlexNode[] {
+    return (msg.contents as unknown as FlexBubble).body.contents;
+  }
+
+  it("is a flex bubble carrying the supplied altText", () => {
+    const msg = buildShopNotificationFlex(base);
+    expect(msg.type).toBe("flex");
+    expect(msg.altText).toBe(base.altText);
+    expect((msg.contents as unknown as FlexBubble).type).toBe("bubble");
+  });
+
+  it("leads with the heading, then the customer name in the accent color", () => {
+    const [heading, identity] = body(buildShopNotificationFlex(base));
+    expect(heading.text).toBe("🔔 มีการจองใหม่");
+    expect(identity.text).toBe("สมชาย");
+    expect(identity.color).toBe("#1F7A3D");
+  });
+
+  it("falls back to ลูกค้า when the customer name is blank (flex rejects empty text)", () => {
+    const [, identity] = body(
+      buildShopNotificationFlex({ ...base, customerName: "   " }),
+    );
+    expect(identity.text).toBe("ลูกค้า");
+  });
+
+  it("renders each supplied row as a label/value detail line", () => {
+    const rows = detailRows(buildShopNotificationFlex(base));
+    const labels = rows.map((r) => r.contents[0].text);
+    const values = rows.map((r) => r.contents[1].text);
+    expect(labels).toEqual(["บริการ", "วันเวลา"]);
+    expect(values).toEqual(["ตัดผมชาย", "15/06/2026 14:30 น."]);
+  });
+
+  it("adds a single CTA uri button in the footer when a cta is given", () => {
+    const cta = { label: "จัดการคิว", uri: "https://example.test/shop" };
+    const buttons = footerButtons(buildShopNotificationFlex({ ...base, cta }));
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].action.type).toBe("uri");
+    expect(buttons[0].action.label).toBe("จัดการคิว");
+    expect(buttons[0].action.uri).toBe("https://example.test/shop");
+  });
+
+  it("omits the footer entirely when no cta is given", () => {
+    const msg = buildShopNotificationFlex(base);
+    expect((msg.contents as unknown as FlexBubble).footer).toBeUndefined();
   });
 });
 

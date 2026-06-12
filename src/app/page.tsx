@@ -5,7 +5,10 @@ import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingHero } from "@/components/landing/LandingHero";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { LandingFooter } from "@/components/landing/LandingFooter";
+import { CustomerBottomNav } from "@/components/layout/CustomerBottomNav";
 import { listPublicShopsByCategory } from "@/lib/services/shops";
+import { shouldShowCustomerBottomNav } from "@/lib/auth/customer-bottom-nav";
+import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +29,10 @@ export default async function HomePage({
     subdistrict?: string | string[];
   }>;
 }) {
-  const [groups, params] = await Promise.all([
+  const [groups, params, showCustomerNav] = await Promise.all([
     listPublicShopsByCategory(),
     searchParams,
+    shouldShowCustomerBottomNav(),
   ]);
 
   const first = (v?: string | string[]) => (Array.isArray(v) ? v[0] : v ?? "");
@@ -48,7 +52,14 @@ export default async function HomePage({
   const sectionTitle = initialProvince ? `ร้านใน ${areaLabel}` : "ร้านใกล้คุณ";
 
   return (
-    <main className="min-h-screen flex flex-col bg-background">
+    <main
+      className={cn(
+        "min-h-screen flex flex-col bg-background",
+        // Reserve room for the mobile customer tab bar (hidden on sm:+).
+        showCustomerNav &&
+          "pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0",
+      )}
+    >
       <LandingNav />
       <LandingHero
         shopCount={shopCount}
@@ -94,6 +105,8 @@ export default async function HomePage({
 
       <HowItWorks />
       <LandingFooter />
+
+      {showCustomerNav ? <CustomerBottomNav /> : null}
     </main>
   );
 }

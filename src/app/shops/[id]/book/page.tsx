@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { CustomerBottomNav } from "@/components/layout/CustomerBottomNav";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { getBookingContext } from "@/lib/services/bookings";
 import { getCustomerSession } from "@/lib/auth/customer-session-server";
+import { shouldShowCustomerBottomNav } from "@/lib/auth/customer-bottom-nav";
 import { getCustomerProfile } from "@/lib/services/customers";
 import { getLineLinkStatus } from "@/lib/services/line-linking";
 import { BookingForm } from "./BookingForm";
@@ -48,6 +51,8 @@ export default async function BookShopPage({
       ])
     : [null, null];
 
+  const showCustomerNav = await shouldShowCustomerBottomNav();
+
   // A shop is bookable only once it has at least one active service.
   const hasServices = context.services.length > 0;
   const serviceLabel =
@@ -58,7 +63,13 @@ export default async function BookShopPage({
         : "";
 
   return (
-    <main className="min-h-screen bg-background flex flex-col">
+    <main
+      className={cn(
+        "min-h-screen bg-background flex flex-col",
+        showCustomerNav &&
+          "pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0",
+      )}
+    >
       <SiteHeader />
 
       <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
@@ -89,6 +100,7 @@ export default async function BookShopPage({
             defaultPhone={profile?.phone ?? session?.phone ?? ""}
             prefill={{ serviceId: sp.serviceId, staffId: sp.staffId, date: sp.date }}
             lineConnected={lineStatus?.linked}
+            showCustomerNav={showCustomerNav}
           />
         ) : (
           <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 text-center space-y-3">
@@ -118,6 +130,8 @@ export default async function BookShopPage({
       </div>
 
       <LandingFooter />
+
+      {showCustomerNav ? <CustomerBottomNav /> : null}
     </main>
   );
 }
