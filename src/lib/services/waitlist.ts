@@ -4,6 +4,7 @@ import { getBangkokToday } from "@/lib/time/bangkok";
 import { getBookingContext } from "@/lib/services/bookings";
 import { hasOpenSlotForService, isReofferable } from "@/lib/waitlist/eligibility";
 import { pushWaitlistSlotOpenToCustomer } from "@/lib/services/line-linking";
+import { isValidThaiPhone } from "@/lib/validation/phone";
 
 /**
  * Waitlist service (OPP-05). When a (shop, service, date) is fully booked a
@@ -29,7 +30,6 @@ import { pushWaitlistSlotOpenToCustomer } from "@/lib/services/line-linking";
  *    whose service needs staff Y.
  */
 
-const PHONE_RE = /^[0-9]{9,10}$/u;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 
 const ACTIVE_STATUSES = ["waiting", "notified"] as const;
@@ -76,7 +76,7 @@ export async function joinWaitlist(
   const preferredStaffId = input.preferredStaffId?.trim() || null;
 
   if (
-    !PHONE_RE.test(phone) ||
+    !isValidThaiPhone(phone) ||
     !DATE_RE.test(input.requestedDate) ||
     name.length === 0 ||
     name.length > 100 ||

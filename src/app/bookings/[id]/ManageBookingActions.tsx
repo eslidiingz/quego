@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Icon } from "@/components/ui/Icon";
+import { isValidThaiPhone } from "@/lib/validation/phone";
 import { cancelBookingByLinkAction } from "./actions";
 
 /**
@@ -25,7 +26,7 @@ export function ManageBookingActions({ bookingId }: { bookingId: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const phoneValid = /^[0-9]{9,10}$/u.test(phone);
+  const phoneValid = isValidThaiPhone(phone);
 
   const close = () => {
     if (pending) return;

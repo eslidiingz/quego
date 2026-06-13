@@ -4,12 +4,11 @@ import { redirect } from "next/navigation";
 import { findApprovedShopByPhone } from "@/lib/services/shops";
 import { setShopLoginIntent } from "@/lib/auth/shop-session-server";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { isValidThaiPhone } from "@/lib/validation/phone";
 
 export type StartLoginState =
   | { ok: false; message: string; fieldErrors?: { phone?: string } }
   | null;
-
-const PHONE_RE = /^0\d{9}$/u;
 
 /**
  * Step 1 of shop login: verify the phone matches an APPROVED shop, then
@@ -36,7 +35,7 @@ export async function startShopLogin(
       fieldErrors: { phone: "กรุณากรอกเบอร์โทร" },
     };
   }
-  if (!PHONE_RE.test(phone)) {
+  if (!isValidThaiPhone(phone)) {
     return {
       ok: false,
       message: "เบอร์โทรไม่ถูกต้อง",

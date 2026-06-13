@@ -15,7 +15,7 @@
  */
 
 export const LOCKOUT_MAX_ATTEMPTS = 5;
-export const LOCKOUT_DURATION_MINUTES = 15;
+export const LOCKOUT_DURATION_MINUTES = 10;
 
 /**
  * Thai message shown when an account is temporarily locked. `N` is the number
@@ -25,4 +25,16 @@ export function lockedMessage(lockedUntil: Date): string {
   const msRemaining = lockedUntil.getTime() - Date.now();
   const minutesRemaining = Math.max(1, Math.ceil(msRemaining / 60_000));
   return `บัญชีถูกล็อกชั่วคราวจากการกรอกผิดหลายครั้ง กรุณาลองใหม่ในอีกประมาณ ${minutesRemaining} นาที`;
+}
+
+/**
+ * Returns a Thai warning with remaining attempts when `newAttempts` ≥ 3 and
+ * the account is not yet locked (< LOCKOUT_MAX_ATTEMPTS). Returns `null` on
+ * the first two failures so the UI stays quiet until the user is close to
+ * being locked out.
+ */
+export function remainingAttemptsMessage(newAttempts: number): string | null {
+  const remaining = LOCKOUT_MAX_ATTEMPTS - newAttempts;
+  if (remaining <= 0 || newAttempts < 3) return null;
+  return `เหลืออีก ${remaining} ครั้ง บัญชีจะถูกล็อกชั่วคราว`;
 }

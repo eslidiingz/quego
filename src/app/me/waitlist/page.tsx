@@ -19,22 +19,22 @@ export default async function MyWaitlistPage() {
   return (
     <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
       <PageHeader
-        eyebrow="แจ้งเตือนคิวว่าง"
-        title="รายการรอคิว"
-        description="ร้านที่คุณกำลังรอคิวว่างอยู่ เราจะแจ้งเตือนในแอป (และทาง LINE ถ้าเชื่อมต่อไว้) ทันทีที่มีคิวว่าง"
+        eyebrow="คิวรอ"
+        title="รอสล็อตว่าง"
+        description="รายการด้านล่างคือคิวที่คุณฝากรอไว้ เราจะแจ้งเตือนทันทีที่มีช่องว่าง — ในแอป และทาง LINE ถ้าเชื่อมต่อไว้"
       />
 
       {entries.length === 0 ? (
         <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-10 text-center space-y-3">
           <span className="inline-flex items-center justify-center size-14 rounded-full bg-surface-container mx-auto">
             <Icon
-              name="notifications_active"
+              name="manage_history"
               size={28}
               className="text-on-surface-variant"
             />
           </span>
           <h2 className="font-display text-headline-md text-on-surface">
-            ยังไม่มีรายการรอ
+            ยังไม่มีคิวรอ
           </h2>
           <p className="text-body-md text-on-surface-variant max-w-md mx-auto">
             ถ้าร้านไหนคิวเต็มในวันที่ต้องการ กด “แจ้งเตือนเมื่อมีคิวว่าง”
@@ -80,8 +80,8 @@ function WaitlistCard({ entry }: { entry: WaitlistItem }) {
               : "shrink-0 inline-flex items-center gap-1 rounded-full bg-surface-container-high text-on-surface-variant px-2.5 py-1 text-label-sm font-semibold"
           }
         >
-          <Icon name={isNotified ? "notifications_active" : "hourglass_empty"} size={14} />
-          {isNotified ? "มีคิวว่าง!" : "กำลังรอ"}
+          <Icon name={isNotified ? "event_available" : "hourglass_empty"} size={14} />
+          {isNotified ? "มีคิวว่าง" : "กำลังรอ"}
         </span>
       </div>
 

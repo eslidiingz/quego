@@ -3,6 +3,7 @@ import {
   LOCKOUT_MAX_ATTEMPTS,
   LOCKOUT_DURATION_MINUTES,
   lockedMessage,
+  remainingAttemptsMessage,
 } from "@/lib/auth/lockout";
 
 const PINNED_MS = new Date("2026-06-09T12:00:00.000Z").getTime();
@@ -22,8 +23,8 @@ describe("lockout constants", () => {
     expect(LOCKOUT_MAX_ATTEMPTS).toBe(5);
   });
 
-  it("locks accounts for 15 minutes", () => {
-    expect(LOCKOUT_DURATION_MINUTES).toBe(15);
+  it("locks accounts for 10 minutes", () => {
+    expect(LOCKOUT_DURATION_MINUTES).toBe(10);
   });
 });
 
@@ -33,9 +34,9 @@ describe("lockedMessage", () => {
     expect(msg).toContain(THAI_PREFIX);
   });
 
-  it("reports 15 minutes when the lock expires in exactly 15 minutes", () => {
-    const msg = lockedMessage(new Date(PINNED_MS + 15 * 60_000));
-    expect(msg).toContain("15 นาที");
+  it("reports 10 minutes when the lock expires in exactly 10 minutes", () => {
+    const msg = lockedMessage(new Date(PINNED_MS + 10 * 60_000));
+    expect(msg).toContain("10 นาที");
   });
 
   it("reports 1 minute when the lock expires in exactly 1 minute", () => {
@@ -59,7 +60,37 @@ describe("lockedMessage", () => {
   });
 
   it("composes the full message with prefix and remaining minutes", () => {
-    const msg = lockedMessage(new Date(PINNED_MS + 15 * 60_000));
-    expect(msg).toBe(`${THAI_PREFIX} 15 นาที`);
+    const msg = lockedMessage(new Date(PINNED_MS + 10 * 60_000));
+    expect(msg).toBe(`${THAI_PREFIX} 10 นาที`);
+  });
+});
+
+describe("remainingAttemptsMessage", () => {
+  it("returns null on the 1st wrong attempt", () => {
+    expect(remainingAttemptsMessage(1)).toBeNull();
+  });
+
+  it("returns null on the 2nd wrong attempt", () => {
+    expect(remainingAttemptsMessage(2)).toBeNull();
+  });
+
+  it("warns with 2 remaining on the 3rd wrong attempt", () => {
+    expect(remainingAttemptsMessage(3)).toBe(
+      "เหลืออีก 2 ครั้ง บัญชีจะถูกล็อกชั่วคราว",
+    );
+  });
+
+  it("warns with 1 remaining on the 4th wrong attempt", () => {
+    expect(remainingAttemptsMessage(4)).toBe(
+      "เหลืออีก 1 ครั้ง บัญชีจะถูกล็อกชั่วคราว",
+    );
+  });
+
+  it("returns null at the lockout threshold (attempt 5)", () => {
+    expect(remainingAttemptsMessage(5)).toBeNull();
+  });
+
+  it("returns null beyond the threshold", () => {
+    expect(remainingAttemptsMessage(6)).toBeNull();
   });
 });

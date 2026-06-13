@@ -7,8 +7,7 @@ import {
   isValidReferralCodeShape,
   normalizeReferralCode,
 } from "@/lib/loyalty/loyalty-credit";
-
-const PHONE_RE = /^0\d{9}$/u;
+import { isValidThaiPhone } from "@/lib/validation/phone";
 
 export type StartCustomerLoginState =
   | { ok: false; message: string; fieldErrors?: { phone?: string } }
@@ -33,7 +32,7 @@ export async function startCustomerLogin(
       fieldErrors: { phone: "กรุณากรอกเบอร์โทร" },
     };
   }
-  if (!PHONE_RE.test(phone)) {
+  if (!isValidThaiPhone(phone)) {
     return {
       ok: false,
       message: "เบอร์โทรไม่ถูกต้อง",

@@ -10,7 +10,7 @@ import type { LedgerEntry, LedgerKind } from "@/lib/services/loyalty";
 
 const KIND_LABEL: Record<LedgerKind, string> = {
   earn: "ใช้บริการเสร็จสิ้น",
-  referral: "เครดิตจากการแนะนำเพื่อน",
+  referral: "แต้มจากการแนะนำเพื่อน",
   adjust: "ปรับปรุงแต้ม",
 };
 

@@ -9,10 +9,10 @@
  * re-exports these via the service).
  */
 
+import { isValidThaiPhone } from "@/lib/validation/phone";
+
 /** DB CHECK length cap for a note (1..2000). */
 export const MAX_NOTE_LENGTH = 2000;
-
-const PHONE_RE = /^[0-9]{9,10}$/u;
 
 /**
  * Normalise a raw note string for persistence: trim, then collapse an
@@ -29,7 +29,7 @@ export function isNoteWithinLimit(note: string | null): boolean {
   return note === null || note.length <= MAX_NOTE_LENGTH;
 }
 
-/** Phone-shape guard: 9–10 digits, matching the booking identity key. */
+/** Phone-shape guard: exactly 10 digits (leading 0), the booking identity key. */
 export function isValidCustomerPhone(phone: string): boolean {
-  return PHONE_RE.test(phone);
+  return isValidThaiPhone(phone);
 }
