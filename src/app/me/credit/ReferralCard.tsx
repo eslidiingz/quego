@@ -49,7 +49,7 @@ export function ReferralCard({
       <div className="flex items-start gap-3 rounded-xl bg-tertiary-container text-on-tertiary-container px-4 py-3.5">
         <Icon name="schedule" size={20} className="shrink-0 mt-0.5" />
         <p className="text-label-md">
-          เครดิตจะเข้าหลังเพื่อนใช้บริการและครบ 3 วัน
+          แต้มจะเข้าหลังเพื่อนใช้บริการและครบ 3 วัน
         </p>
       </div>
     </section>

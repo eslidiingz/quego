@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
+import { isValidThaiPhone } from "@/lib/validation/phone";
 import {
   evaluateSlots,
   type BookingContext,
@@ -138,9 +139,9 @@ export function NewBookingDialog({
   }, [selectedDay, context, duration, effectiveCapacity, staffFilter]);
 
   // Phone is optional on the shop-side manual flow — but if any digits were
-  // typed, they must form a valid Thai phone (9-10 digits) so we don't
-  // silently store a half-typed number.
-  const phoneValid = phone.length === 0 || /^[0-9]{9,10}$/u.test(phone);
+  // typed, they must form a valid phone (exactly 10 digits, leading 0) so we
+  // don't silently store a half-typed number.
+  const phoneValid = phone.length === 0 || isValidThaiPhone(phone);
   const canSubmit =
     Boolean(selectedService) &&
     Boolean(selectedDate) &&

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Icon } from "@/components/ui/Icon";
+import { isValidThaiPhone } from "@/lib/validation/phone";
 import { joinWaitlistAction, type JoinWaitlistState } from "./actions";
 
 /**
@@ -52,7 +53,7 @@ export function WaitlistPanel({
   const [state, setState] = useState<JoinWaitlistState>(null);
   const [pending, startTransition] = useTransition();
 
-  const canSubmit = name.trim().length > 0 && /^[0-9]{9,10}$/u.test(phone);
+  const canSubmit = name.trim().length > 0 && isValidThaiPhone(phone);
 
   const submit = () => {
     const fd = new FormData();

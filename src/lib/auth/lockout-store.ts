@@ -34,12 +34,15 @@ const MAX_CAS_RETRIES = 8;
  * `knownAttempts` is the counter the caller already SELECTed (used for the first
  * CAS attempt). The caller MUST have checked the lock before calling — this
  * function only ever increments.
+ *
+ * Returns both the lock instant (non-null once locked) and the resulting attempt
+ * count so callers can show a "N attempts remaining" warning.
  */
 export async function registerFailedAttempt(
   target: LockTarget,
   id: string,
   knownAttempts: number,
-): Promise<Date | null> {
+): Promise<{ lockedUntil: Date | null; newAttempts: number }> {
   const supabase = getSupabaseAdmin();
   let attempts = knownAttempts;
 
@@ -66,12 +69,12 @@ export async function registerFailedAttempt(
       // A transient DB error must not silently drop the lock to "open"; report
       // the lock state we computed for this attempt.
       console.error("registerFailedAttempt error:", error);
-      return lockedUntil;
+      return { lockedUntil, newAttempts: next };
     }
 
     if (data && data.length > 0) {
       // Our increment landed.
-      return justLocked ? lockedUntil : null;
+      return { lockedUntil: justLocked ? lockedUntil : null, newAttempts: next };
     }
 
     // CAS lost to a concurrent attempt — re-read the live state and retry.
@@ -80,19 +83,23 @@ export async function registerFailedAttempt(
       .select(`${target.counter}, locked_until`)
       .eq("id", id)
       .maybeSingle();
-    if (!fresh) return lockedUntil; // row vanished — best-effort lock
+    if (!fresh) return { lockedUntil, newAttempts: next }; // row vanished — best-effort lock
     // `fresh` is a union of the two possible column shapes, so index it through
     // a record cast (the counter key is a trusted constant, not user input).
     const freshRow = fresh as Record<string, number | string | null>;
     const freshLock = freshRow.locked_until
       ? new Date(freshRow.locked_until as string)
       : null;
-    if (freshLock && freshLock.getTime() > Date.now()) return freshLock;
     attempts = (freshRow[target.counter] as number | null) ?? 0;
+    if (freshLock && freshLock.getTime() > Date.now())
+      return { lockedUntil: freshLock, newAttempts: attempts };
   }
 
   // Pathological contention — fail safe by locking.
-  return new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60_000);
+  return {
+    lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60_000),
+    newAttempts: LOCKOUT_MAX_ATTEMPTS,
+  };
 }
 
 /**

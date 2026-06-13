@@ -109,11 +109,18 @@ export async function verifyShopPinAction(
     };
   }
 
-  // Throttle PIN guessing per shop + per IP, ahead of the atomic lockout ceiling.
+  // The atomic lockout (5 wrong → 10-min lock) is the authoritative per-account
+  // ceiling and owns the user-facing flow; its message is clear and it resets
+  // cleanly after expiry. These rate limits are only a loose flood backstop, so
+  // the per-shop cap sits well ABOVE the lockout threshold — otherwise it trips
+  // first and masks the lockout message with the vague "too frequent" one. (The
+  // rate limiter counts every submission, including frustrated taps made while
+  // the account is already locked, so a tight per-shop cap fills up fast.)
+  // per-IP stays the cross-account flood control.
   const verifyIp = await getClientIp();
   if (
     !(await checkRateLimits([
-      { bucket: `shoppin:shop:${intent.shopId}`, limit: 10, windowSeconds: 600 },
+      { bucket: `shoppin:shop:${intent.shopId}`, limit: 20, windowSeconds: 600 },
       { bucket: `shoppin:ip:${verifyIp}`, limit: 30, windowSeconds: 600 },
     ]))
   ) {
@@ -125,17 +132,10 @@ export async function verifyShopPinAction(
 
   const result = await verifyShopPin(intent.shopId, pin);
   if (!result.ok) {
-    if (result.code === "locked") {
-      return {
-        ok: false,
-        message: result.message,
-        fieldErrors: { pin: result.message },
-      };
-    }
     return {
       ok: false,
-      message: "รหัส PIN ไม่ถูกต้อง",
-      fieldErrors: { pin: "รหัส PIN ไม่ถูกต้อง" },
+      message: result.message,
+      fieldErrors: { pin: result.message },
     };
   }
 

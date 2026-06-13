@@ -18,6 +18,7 @@ import {
   type SoonestSlot,
 } from "@/lib/booking/slot-math";
 import { getBangkokNow, getBangkokToday } from "@/lib/time/bangkok";
+import { isValidThaiPhone } from "@/lib/validation/phone";
 import { createBookingAction, type CreateBookingState } from "./actions";
 import { WaitlistPanel } from "./WaitlistPanel";
 
@@ -306,7 +307,7 @@ export function BookingForm({
     Boolean(selectedDate) &&
     Boolean(activeSlot) &&
     name.trim().length > 0 &&
-    /^[0-9]{9,10}$/u.test(phone);
+    isValidThaiPhone(phone);
 
   const staffSectionRef = useRef<HTMLDivElement>(null);
   const dateSectionRef = useRef<HTMLDivElement>(null);

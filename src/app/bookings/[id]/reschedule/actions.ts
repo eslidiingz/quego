@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { rescheduleBooking } from "@/lib/services/bookings";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { isValidThaiPhone } from "@/lib/validation/phone";
 
 export type RescheduleState = { ok: false; message: string } | null;
 
@@ -25,7 +26,7 @@ export async function rescheduleBookingAction(
   if (!bookingId || !date || !slotTime) {
     return { ok: false, message: "กรุณาเลือกวันและเวลาใหม่" };
   }
-  if (!/^[0-9]{9,10}$/u.test(phone)) {
+  if (!isValidThaiPhone(phone)) {
     return { ok: false, message: "กรุณายืนยันเบอร์โทรที่ใช้จอง" };
   }
 

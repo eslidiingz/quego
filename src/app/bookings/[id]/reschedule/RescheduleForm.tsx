@@ -11,6 +11,7 @@ import {
   type BookingContext,
 } from "@/lib/booking/slot-math";
 import { getBangkokNow, getBangkokToday } from "@/lib/time/bangkok";
+import { isValidThaiPhone } from "@/lib/validation/phone";
 import { rescheduleBookingAction, type RescheduleState } from "./actions";
 
 /**
@@ -199,7 +200,7 @@ export function RescheduleForm({
   const slotIsAvailable = slots.some(
     (s) => s.time === selectedSlot && s.isAvailable,
   );
-  const phoneValid = /^[0-9]{9,10}$/u.test(phone);
+  const phoneValid = isValidThaiPhone(phone);
   const canSubmit =
     Boolean(selectedDate) &&
     Boolean(selectedSlot) &&

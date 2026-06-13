@@ -13,6 +13,7 @@ import {
   isValidDistrict,
   isValidSubdistrict,
 } from "@/lib/location/thailand";
+import { isValidThaiPhone } from "@/lib/validation/phone";
 
 export type ShopFormFields = {
   name: string;
@@ -33,7 +34,6 @@ export type ShopFormFields = {
 
 export type ShopFormErrors = Partial<Record<keyof ShopFormFields, string>>;
 
-const PHONE_RE = /^0\d{9}$/u;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 
 export function parseShopFormData(formData: FormData): ShopFormFields {
@@ -108,11 +108,11 @@ export function validateShopForm(input: ShopFormFields): ShopFormErrors {
 
   if (!input.ownerPhone) {
     errors.ownerPhone = "กรุณากรอกเบอร์โทร";
-  } else if (!PHONE_RE.test(input.ownerPhone)) {
+  } else if (!isValidThaiPhone(input.ownerPhone)) {
     errors.ownerPhone = "เบอร์โทรไม่ถูกต้อง (10 หลัก ขึ้นต้นด้วย 0)";
   }
 
-  if (input.contactPhone && !PHONE_RE.test(input.contactPhone)) {
+  if (input.contactPhone && !isValidThaiPhone(input.contactPhone)) {
     errors.contactPhone = "เบอร์โทรร้านไม่ถูกต้อง (10 หลัก ขึ้นต้นด้วย 0)";
   }
 
@@ -172,7 +172,7 @@ export function validateStaffForm(input: StaffFormFields): StaffFormErrors {
   if (input.role && input.role.length > 60)
     errors.role = "ตำแหน่งต้องไม่เกิน 60 ตัวอักษร";
 
-  if (input.phone && !PHONE_RE.test(input.phone)) {
+  if (input.phone && !isValidThaiPhone(input.phone)) {
     errors.phone = "เบอร์โทรไม่ถูกต้อง (10 หลัก ขึ้นต้นด้วย 0)";
   }
 

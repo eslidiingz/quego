@@ -13,7 +13,7 @@ import { ReferralCard } from "./ReferralCard";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "เครดิตของฉัน · queva",
+  title: "แต้มสะสมของฉัน · queva",
 };
 
 export default async function MyCreditPage() {
@@ -32,8 +32,8 @@ export default async function MyCreditPage() {
   return (
     <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
       <PageHeader
-        eyebrow="คะแนนสะสม"
-        title="เครดิตของฉัน"
+        eyebrow="แต้มสะสม"
+        title="แต้มสะสมของฉัน"
         description="สะสมแต้มทุกครั้งที่ใช้บริการ และรับแต้มเพิ่มเมื่อชวนเพื่อนมาใช้ queva"
       />
 

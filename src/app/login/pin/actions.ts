@@ -118,13 +118,18 @@ export async function verifyCustomerPinAction(
     };
   }
 
-  // Throttle PIN guessing: per-phone is the strong key (not header-rotatable),
-  // per-IP is defence-in-depth. The atomic lockout is the deterministic ceiling;
-  // this caps the rate before it.
+  // The atomic lockout (5 wrong → 10-min lock) is the authoritative per-account
+  // ceiling and owns the user-facing flow; its message is clear and it resets
+  // cleanly after expiry. These rate limits are only a loose flood backstop, so
+  // the per-phone cap sits well ABOVE the lockout threshold — otherwise it trips
+  // first and masks the lockout message with the vague "too frequent" one. (The
+  // rate limiter counts every submission, including frustrated taps made while
+  // the account is already locked, so a tight per-phone cap fills up fast.)
+  // per-IP stays the cross-account flood control.
   const verifyIp = await getClientIp();
   if (
     !(await checkRateLimits([
-      { bucket: `custpin:phone:${intent.phone}`, limit: 10, windowSeconds: 600 },
+      { bucket: `custpin:phone:${intent.phone}`, limit: 20, windowSeconds: 600 },
       { bucket: `custpin:ip:${verifyIp}`, limit: 30, windowSeconds: 600 },
     ]))
   ) {
@@ -136,17 +141,10 @@ export async function verifyCustomerPinAction(
 
   const result = await verifyCustomerPin(intent.phone, pin);
   if (!result.ok) {
-    if (result.code === "locked") {
-      return {
-        ok: false,
-        message: result.message,
-        fieldErrors: { pin: result.message },
-      };
-    }
     return {
       ok: false,
-      message: "รหัส PIN ไม่ถูกต้อง",
-      fieldErrors: { pin: "รหัส PIN ไม่ถูกต้อง" },
+      message: result.message,
+      fieldErrors: { pin: result.message },
     };
   }
 

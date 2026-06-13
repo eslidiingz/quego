@@ -1,7 +1,7 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { lockedMessage } from "@/lib/auth/lockout";
+import { lockedMessage, remainingAttemptsMessage } from "@/lib/auth/lockout";
 import {
   registerFailedAttempt,
   clearFailedAttempts,
@@ -1105,11 +1105,16 @@ export async function verifyShopPin(
   } as const;
 
   // (a) Currently locked → reject before touching the PIN hash at all.
+  // If the lock has expired, reset the counter so the user gets a fresh 5
+  // attempts rather than re-locking immediately on the first wrong guess.
+  let knownAttempts = (data.failed_pin_attempts as number | null) ?? 0;
   if (data.locked_until) {
     const lockedUntil = new Date(data.locked_until as string);
     if (lockedUntil.getTime() > Date.now()) {
       return { ok: false, code: "locked", message: lockedMessage(lockedUntil) };
     }
+    await clearFailedAttempts(lockTarget, shopId);
+    knownAttempts = 0;
   }
 
   if (data.status !== "approved" || !data.pin_hash) {
@@ -1122,15 +1127,19 @@ export async function verifyShopPin(
   // (c) Wrong PIN → register the failed attempt atomically (compare-and-swap,
   // so concurrent guesses can't race past the lock).
   if (!ok) {
-    const lockedUntil = await registerFailedAttempt(
+    const { lockedUntil, newAttempts } = await registerFailedAttempt(
       lockTarget,
       shopId,
-      (data.failed_pin_attempts as number | null) ?? 0,
+      knownAttempts,
     );
     if (lockedUntil) {
       return { ok: false, code: "locked", message: lockedMessage(lockedUntil) };
     }
-    return { ok: false, code: "bad_pin", message: "รหัส PIN ไม่ถูกต้อง" };
+    const warning = remainingAttemptsMessage(newAttempts);
+    const message = warning
+      ? `รหัส PIN ไม่ถูกต้อง — ${warning}`
+      : "รหัส PIN ไม่ถูกต้อง";
+    return { ok: false, code: "bad_pin", message };
   }
 
   // (d) Success → clear the counter and any stale lock.
