@@ -54,8 +54,12 @@ describe("isValidCustomerPhone", () => {
     expect(isValidCustomerPhone("0812345678")).toBe(true);
   });
 
-  it("accepts a 9-digit phone", () => {
-    expect(isValidCustomerPhone("021234567")).toBe(true);
+  it("rejects a 9-digit phone (must be exactly 10)", () => {
+    expect(isValidCustomerPhone("021234567")).toBe(false);
+  });
+
+  it("rejects a 10-digit phone not starting with 0", () => {
+    expect(isValidCustomerPhone("8123456789")).toBe(false);
   });
 
   it("rejects an 8-digit phone", () => {

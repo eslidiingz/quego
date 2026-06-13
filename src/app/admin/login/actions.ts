@@ -4,12 +4,13 @@ import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { verifyPassword } from "@/lib/auth/password";
 import { createAdminSession } from "@/lib/auth/session-server";
-import { lockedMessage } from "@/lib/auth/lockout";
+import { lockedMessage, remainingAttemptsMessage } from "@/lib/auth/lockout";
 import {
   registerFailedAttempt,
   clearFailedAttempts,
 } from "@/lib/auth/lockout-store";
 import { checkRateLimits, getClientIp } from "@/lib/security/rate-limit";
+import { isValidThaiPhone } from "@/lib/validation/phone";
 
 export type SignInState = {
   ok: false;
@@ -26,7 +27,7 @@ export async function signInAdmin(
   const next = String(formData.get("next") ?? "");
 
   const fieldErrors: { phone?: string; password?: string } = {};
-  if (!/^0\d{9}$/u.test(phone)) {
+  if (!isValidThaiPhone(phone)) {
     fieldErrors.phone = "เบอร์โทรไม่ถูกต้อง (ขึ้นต้นด้วย 0 และ 10 หลัก)";
   }
   if (!password) {
@@ -70,34 +71,43 @@ export async function signInAdmin(
     return { ok: false, message: "เบอร์หรือรหัสผ่านไม่ถูกต้อง" };
   }
 
-  // Currently locked → reject before verifying the password. Surface the
-  // lock state to a real, active admin; unknown phones still fall through to
-  // the generic non-disclosing message above.
-  if (admin.locked_until) {
-    const lockedUntil = new Date(admin.locked_until as string);
-    if (lockedUntil.getTime() > Date.now()) {
-      return { ok: false, message: lockedMessage(lockedUntil) };
-    }
-  }
-
   const lockTarget = {
     table: "admins",
     counter: "failed_login_attempts",
   } as const;
 
+  // Currently locked → reject before verifying the password. Surface the
+  // lock state to a real, active admin; unknown phones still fall through to
+  // the generic non-disclosing message above.
+  // If the lock has expired, reset the counter so the admin gets a fresh 5
+  // attempts rather than re-locking immediately on the first wrong guess.
+  let knownAttempts = (admin.failed_login_attempts as number | null) ?? 0;
+  if (admin.locked_until) {
+    const lockedUntil = new Date(admin.locked_until as string);
+    if (lockedUntil.getTime() > Date.now()) {
+      return { ok: false, message: lockedMessage(lockedUntil) };
+    }
+    await clearFailedAttempts(lockTarget, admin.id);
+    knownAttempts = 0;
+  }
+
   const passwordOk = await verifyPassword(password, admin.password_hash);
   if (!passwordOk) {
     // Wrong password → register the failed attempt atomically (compare-and-swap,
     // so concurrent guesses can't race past the lock).
-    const lockedUntil = await registerFailedAttempt(
+    const { lockedUntil, newAttempts } = await registerFailedAttempt(
       lockTarget,
       admin.id,
-      (admin.failed_login_attempts as number | null) ?? 0,
+      knownAttempts,
     );
     if (lockedUntil) {
       return { ok: false, message: lockedMessage(lockedUntil) };
     }
-    return { ok: false, message: "เบอร์หรือรหัสผ่านไม่ถูกต้อง" };
+    const warning = remainingAttemptsMessage(newAttempts);
+    const message = warning
+      ? `เบอร์หรือรหัสผ่านไม่ถูกต้อง — ${warning}`
+      : "เบอร์หรือรหัสผ่านไม่ถูกต้อง";
+    return { ok: false, message };
   }
 
   // Success → clear the counter and any stale lock.
