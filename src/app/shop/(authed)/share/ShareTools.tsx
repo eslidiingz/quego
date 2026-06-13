@@ -35,19 +35,24 @@ export function ShareTools({
   shopUrl,
   bookingUrl,
   qrDataUrl,
+  walkInUrl,
+  walkInQrDataUrl,
   shopName,
   isApproved,
 }: {
   shopUrl: string;
   bookingUrl: string;
   qrDataUrl: string;
+  /** OPP-08: in-shop walk-in self-join deep link + its QR. */
+  walkInUrl: string;
+  walkInQrDataUrl: string;
   shopName: string;
   isApproved: boolean;
 }) {
-  const handleDownload = () => {
+  const downloadQr = (dataUrl: string, filename: string) => {
     const a = document.createElement("a");
-    a.href = qrDataUrl;
-    a.download = `queva-qr-${slugify(shopName)}.png`;
+    a.href = dataUrl;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -101,12 +106,57 @@ export function ShareTools({
           </div>
           <Button
             type="button"
-            onClick={handleDownload}
+            onClick={() =>
+              downloadQr(qrDataUrl, `queva-qr-${slugify(shopName)}.png`)
+            }
             iconLeft={<Icon name="download" size={18} />}
             className="w-full sm:w-auto"
           >
             ดาวน์โหลด QR
           </Button>
+        </div>
+      </section>
+
+      {/* OPP-08: in-shop walk-in QR — print and post at the counter so customers
+          self-join today's queue (phone + service, no login). */}
+      <section className={CARD}>
+        <h2 className="text-label-lg font-bold text-on-surface mb-1 flex items-center gap-2">
+          <Icon name="storefront" size={20} className="text-primary" />
+          QR เช็คอินหน้าร้าน
+        </h2>
+        <p className="text-label-md text-on-surface-variant mb-4">
+          พิมพ์แล้ววางไว้ที่หน้าร้าน ลูกค้าสแกนเพื่อเข้าคิวว่างที่เร็วที่สุดของวันนี้ได้เอง
+          โดยไม่ต้องเข้าสู่ระบบ
+        </p>
+        <div className="flex flex-col items-center gap-4">
+          <div className="rounded-xl border border-outline-variant bg-white p-4">
+            {/* Plain <img>: server-generated data-URL, so next/image
+                optimisation does not apply. Mirrors the shop QR above. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={walkInQrDataUrl}
+              alt={`QR เช็คอินหน้าร้านสำหรับ ${shopName}`}
+              width={200}
+              height={200}
+              className="size-[200px]"
+            />
+          </div>
+          <Button
+            type="button"
+            onClick={() =>
+              downloadQr(
+                walkInQrDataUrl,
+                `queva-walkin-${slugify(shopName)}.png`,
+              )
+            }
+            iconLeft={<Icon name="download" size={18} />}
+            className="w-full sm:w-auto"
+          >
+            ดาวน์โหลด QR เช็คอิน
+          </Button>
+        </div>
+        <div className="mt-4">
+          <CopyField value={walkInUrl} id="share-walkin-url" />
         </div>
       </section>
 

@@ -23,12 +23,22 @@ export default async function ShopSharePage() {
 
   const shopUrl = absoluteUrl(`/shops/${shop.id}`);
   const bookingUrl = absoluteUrl(`/shops/${shop.id}/book`);
-  // Server-side PNG data-URL; rendered as <img> and reused for the download.
-  const qrDataUrl = await QRCode.toDataURL(shopUrl, {
-    width: 512,
-    margin: 2,
-    errorCorrectionLevel: "M",
-  });
+  // OPP-08: the in-shop walk-in self-join deep link — printed and posted at the
+  // counter so customers scan to join today's queue themselves.
+  const walkInUrl = absoluteUrl(`/shops/${shop.id}/walk-in`);
+  // Server-side PNG data-URLs; rendered as <img> and reused for the download.
+  const [qrDataUrl, walkInQrDataUrl] = await Promise.all([
+    QRCode.toDataURL(shopUrl, {
+      width: 512,
+      margin: 2,
+      errorCorrectionLevel: "M",
+    }),
+    QRCode.toDataURL(walkInUrl, {
+      width: 512,
+      margin: 2,
+      errorCorrectionLevel: "M",
+    }),
+  ]);
 
   return (
     <div className="p-4 md:p-12 max-w-3xl mx-auto w-full space-y-stack-md">
@@ -49,6 +59,8 @@ export default async function ShopSharePage() {
         shopUrl={shopUrl}
         bookingUrl={bookingUrl}
         qrDataUrl={qrDataUrl}
+        walkInUrl={walkInUrl}
+        walkInQrDataUrl={walkInQrDataUrl}
         shopName={shop.name}
         isApproved={shop.status === "approved"}
       />

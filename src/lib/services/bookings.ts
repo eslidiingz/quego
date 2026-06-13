@@ -1,8 +1,10 @@
 import "server-only";
 import { after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { isValidThaiPhone } from "@/lib/validation/phone";
 import {
   DAYS_OF_WEEK,
+  findSoonestSlot,
   generateSlots,
   hhmmToMinutes,
   intervalsOverlap,
@@ -347,7 +349,6 @@ export async function getBookingContext(
 
 // ----- Write: create a booking -------------------------------------------
 
-const PHONE_RE = /^[0-9]{9,10}$/u;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]0$/u;
 
@@ -373,7 +374,7 @@ export async function createBooking(
   if (
     !DATE_RE.test(input.date) ||
     !TIME_RE.test(input.slotTime) ||
-    (phoneProvided && !PHONE_RE.test(phone)) ||
+    (phoneProvided && !isValidThaiPhone(phone)) ||
     name.length === 0 ||
     name.length > 100
   ) {
@@ -671,6 +672,163 @@ export async function createBooking(
 
   // Every free candidate lost a race — the slot filled up under us.
   return slotTaken;
+}
+
+// ----- OPP-08: walk-in self-join (scan QR → soonest slot today) -----------
+
+export type WalkInResult =
+  | { ok: true; bookingId: string }
+  | {
+      ok: false;
+      code:
+        | "shop_unavailable"
+        | "service_unavailable"
+        | "no_slot_today"
+        | "slot_taken"
+        | "invalid"
+        | "unknown";
+      message: string;
+    };
+
+/**
+ * Shown when there's nothing bookable left today (fully booked, or it's already
+ * past today's last slot). Paired in the form with an advance-booking link, so
+ * every "nothing left today" outcome routes to `no_slot_today` and offers it.
+ */
+const NO_SLOT_TODAY_MESSAGE =
+  "วันนี้ไม่มีคิวว่างแล้ว ลองสอบถามร้าน หรือจองคิวล่วงหน้าสำหรับวันถัดไป";
+
+/**
+ * Create a booking for a walk-in who scanned the shop's QR. A walk-in doesn't
+ * pick a date or time — they want the *soonest* opening **today**. We model
+ * that faithfully on the existing slot engine: scan only today's grid for the
+ * earliest still-bookable slot (any capable staff, so capacity = #staff), then
+ * hand that concrete (date, slotTime) to `createBooking` unchanged.
+ *
+ * This reuses every guarantee the normal flow already has — end-to-end slot
+ * re-validation, any-staff assignment, the GiST race backstop, and the LINE
+ * confirmation push — so a walk-in is just the public booking flow with the
+ * picker collapsed to one computed "join now" slot. It is NOT a separate queue
+ * concept: the resulting row is an ordinary confirmed booking dated today, so
+ * it surfaces on `/bookings/[id]` with a live queue position automatically.
+ *
+ * The any-staff capacity/filter math mirrors the booking form verbatim
+ * (single-queue → shop capacity, no filter; staffed → capacity = #capable
+ * staff, filtered to them) so the walk-in can never see an opening the picker
+ * wouldn't.
+ */
+export async function createWalkInBooking(input: {
+  shopId: string;
+  serviceId: string;
+  customerName: string;
+  customerPhone?: string;
+}): Promise<WalkInResult> {
+  const name = input.customerName.trim();
+  if (name.length === 0 || name.length > 100 || !input.serviceId) {
+    return { ok: false, code: "invalid", message: "ข้อมูลไม่ถูกต้อง" };
+  }
+
+  const context = await getBookingContext(input.shopId);
+  if (!context) {
+    return {
+      ok: false,
+      code: "shop_unavailable",
+      message: "ร้านนี้ยังไม่พร้อมรับการจอง",
+    };
+  }
+
+  const service = context.services.find((s) => s.id === input.serviceId);
+  if (!service) {
+    return {
+      ok: false,
+      code: "service_unavailable",
+      message: "ไม่พบบริการที่เลือก กรุณาลองใหม่",
+    };
+  }
+
+  // Any-staff math, identical to BookingForm: single-queue shops use the shop
+  // capacity with no filter; staffed shops use the count of staff who can do
+  // this service, filtered to exactly them.
+  const staffIdFilter = service.staffIds ? new Set(service.staffIds) : null;
+  const capacity = service.staffIds
+    ? Math.max(service.staffIds.length, 1)
+    : context.capacity;
+
+  // Distinguish "closed today" from "open but nothing free" so the message is
+  // accurate (a customer at the door on a closed day shouldn't read "fully
+  // booked"). Both keep `no_slot_today` so the form still offers book-ahead.
+  const todayDow = dayOfWeekFor(context.nowDate);
+  const todayHours = context.hours[todayDow];
+  if (!todayHours?.isOpen || !todayHours.openTime || !todayHours.closeTime) {
+    return {
+      ok: false,
+      code: "no_slot_today",
+      message: "วันนี้ร้านไม่เปิดให้บริการ ลองจองคิวล่วงหน้าสำหรับวันที่ร้านเปิด",
+    };
+  }
+
+  const soonest = findSoonestSlot({
+    days: [{ dateYmd: context.nowDate, dayOfWeek: todayDow }],
+    hours: context.hours,
+    durationMinutes: service.durationMinutes,
+    intervals: context.bookedIntervals,
+    capacity,
+    nowDate: context.nowDate,
+    nowHHMM: context.nowTimeHHMM,
+    staffIdFilter,
+  });
+
+  if (!soonest) {
+    return { ok: false, code: "no_slot_today", message: NO_SLOT_TODAY_MESSAGE };
+  }
+
+  // preferredStaffId omitted (null) so createBooking assigns any free capable
+  // staff — exactly what "soonest" was computed against.
+  const result = await createBooking({
+    shopId: input.shopId,
+    serviceId: input.serviceId,
+    preferredStaffId: null,
+    date: soonest.date,
+    slotTime: soonest.time,
+    customerName: name,
+    customerPhone: input.customerPhone,
+  });
+
+  if (result.ok) return { ok: true, bookingId: result.bookingId };
+
+  // Lost the race between the read and the insert — the form re-submits and the
+  // next call re-reads context, advancing to the next free slot.
+  if (result.code === "slot_taken") {
+    return {
+      ok: false,
+      code: "slot_taken",
+      message: "คิวเพิ่งเต็มพอดี กรุณากดเข้าคิวอีกครั้ง",
+    };
+  }
+
+  // createBooking re-validates against a fresh clock, stricter than the slot we
+  // just computed. If the day closed out, the slot became invalid, or wall-clock
+  // crossed it (TOCTOU), all three mean "nothing usable left today" — route them
+  // to `no_slot_today` so the form shows the book-ahead link, not a dead end.
+  if (
+    result.code === "date_closed" ||
+    result.code === "slot_invalid" ||
+    result.code === "slot_past"
+  ) {
+    return { ok: false, code: "no_slot_today", message: NO_SLOT_TODAY_MESSAGE };
+  }
+
+  // Map any remaining createBooking failure onto a walk-in code, preserving its
+  // Thai message.
+  const code =
+    result.code === "service_unavailable"
+      ? "service_unavailable"
+      : result.code === "shop_unavailable"
+        ? "shop_unavailable"
+        : result.code === "invalid"
+          ? "invalid"
+          : "unknown";
+  return { ok: false, code, message: result.message };
 }
 
 // ----- Read: confirmation view --------------------------------------------
@@ -1205,7 +1363,7 @@ export async function cancelBookingByLink(
   bookingId: string,
   customerPhone: string,
 ): Promise<UpdateBookingStatusResult> {
-  if (!PHONE_RE.test(customerPhone)) {
+  if (!isValidThaiPhone(customerPhone)) {
     return { ok: false, code: "not_found", message: "เบอร์ไม่ตรงกับการจองนี้" };
   }
   return cancelOwnBooking(bookingId, customerPhone);
@@ -1336,7 +1494,7 @@ export async function rescheduleBooking(
   if (
     !DATE_RE.test(newDate) ||
     !TIME_RE.test(newSlotTime) ||
-    !PHONE_RE.test(customerPhone)
+    !isValidThaiPhone(customerPhone)
   ) {
     return { ok: false, code: "invalid", message: "ข้อมูลการจองไม่ถูกต้อง" };
   }
