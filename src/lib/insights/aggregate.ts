@@ -60,19 +60,13 @@ export type BusyHourBucket = {
   count: number;
 };
 
-/**
- * One staff member ranked by revenue. Merges the legacy utilization concept
- * with revenue so the staff section is a single richer list (revenue desc).
- */
+/** One staff member ranked by the revenue they brought the shop (revenue desc). */
 export type RevenueByStaff = {
   /** null for the synthetic single-queue line of a staffless shop. */
   staffId: string | null;
   name: string;
   revenue: number;
   bookingCount: number;
-  bookedMinutes: number;
-  /** 0–1, capped. Booked minutes ÷ one line's open minutes over the window. */
-  utilization: number;
 };
 
 /** One service ranked by the revenue it brought the shop (revenue desc). */
@@ -202,7 +196,6 @@ export function computeShopInsights(input: {
   let cancelled = 0;
   let revenue = 0;
   const hourCounts = new Array<number>(24).fill(0);
-  const staffMinutes = new Map<string | null, number>();
   const staffRevenue = new Map<string | null, number>();
   const staffCount = new Map<string | null, number>();
   const serviceRevenue = new Map<string | null, number>();
@@ -220,7 +213,6 @@ export function computeShopInsights(input: {
     const hour = Math.floor(hhmmToMinutes(b.slotTime) / 60);
     if (hour >= 0 && hour < 24) hourCounts[hour] += 1;
 
-    staffMinutes.set(b.staffId, (staffMinutes.get(b.staffId) ?? 0) + b.durationMinutes);
     staffCount.set(b.staffId, (staffCount.get(b.staffId) ?? 0) + 1);
     serviceCount.set(b.serviceId, (serviceCount.get(b.serviceId) ?? 0) + 1);
 
@@ -279,8 +271,6 @@ export function computeShopInsights(input: {
 
   const revenueByStaff = buildRevenueByStaff({
     staff,
-    lineMinutes,
-    staffMinutes,
     staffRevenue,
     staffCount,
     staffFilterSet,
@@ -315,64 +305,43 @@ export function computeShopInsights(input: {
 }
 
 /**
- * Per-staff rows ranked by revenue. Denominator for utilization = one line's
- * open minutes (each staff member is exactly one parallel line). Every current
+ * Per-staff rows ranked by the revenue they brought the shop. Every current
  * booking is assigned a concrete staff at creation time (`createBooking`
- * resolves "ใช้ร้านจัดให้"/any-staff to a real person before insert), so a
- * staffed shop's report shows ONLY real staff — historical null-staff bookings
- * (made before the shop added staff) are intentionally omitted from this
- * breakdown rather than surfaced as a "ไม่ระบุพนักงาน" row. A shop with no
- * staff at all still gets a single synthetic "คิวรวม" line. When a staff filter
- * is active, only the selected staff rows show.
+ * resolves "ใช้ร้านจัดให้"/any-staff to a real person before insert) and
+ * null-staff bookings are dropped upstream for staffed shops, so this lists ONLY
+ * real staff. A shop with no staff at all gets a single synthetic "คิวรวม" line.
+ * When a staff filter is active, only the selected staff rows show.
  */
 function buildRevenueByStaff({
   staff,
-  lineMinutes,
-  staffMinutes,
   staffRevenue,
   staffCount,
   staffFilterSet,
 }: {
   staff: InsightsStaff[];
-  lineMinutes: number;
-  staffMinutes: Map<string | null, number>;
   staffRevenue: Map<string | null, number>;
   staffCount: Map<string | null, number>;
   staffFilterSet: Set<string>;
 }): RevenueByStaff[] {
-  const utilFor = (mins: number) =>
-    lineMinutes > 0 ? Math.min(1, mins / lineMinutes) : 0;
-
   const rows: RevenueByStaff[] = [];
 
   if (staff.length > 0) {
     for (const s of staff) {
       // When a staff filter is active, only the selected staff are relevant.
       if (staffFilterSet.size > 0 && !staffFilterSet.has(s.id)) continue;
-      const mins = staffMinutes.get(s.id) ?? 0;
       rows.push({
         staffId: s.id,
         name: s.name,
         revenue: staffRevenue.get(s.id) ?? 0,
         bookingCount: staffCount.get(s.id) ?? 0,
-        bookedMinutes: mins,
-        utilization: utilFor(mins),
       });
     }
-
-    // Bookings made before the shop added staff carry staffId = null. They are
-    // deliberately NOT shown: a staffed shop assigns a concrete person to every
-    // booking at creation, so a "ไม่ระบุพนักงาน" row would only reflect stale
-    // pre-staff history and confuse the per-staff revenue ranking.
   } else {
-    const mins = staffMinutes.get(null) ?? 0;
     rows.push({
       staffId: null,
       name: "คิวรวม (ไม่ระบุพนักงาน)",
       revenue: staffRevenue.get(null) ?? 0,
       bookingCount: staffCount.get(null) ?? 0,
-      bookedMinutes: mins,
-      utilization: utilFor(mins),
     });
   }
 

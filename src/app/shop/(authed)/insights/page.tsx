@@ -117,7 +117,7 @@ export default async function ShopReportPage({
 
           <ReportSection
             title="รายได้ตามพนักงาน"
-            sub="เรียงตามรายได้สูงสุด · แถบคือสัดส่วนเวลาที่มีคิว"
+            sub="เรียงตามรายได้สูงสุด"
           >
             <RevenueByStaffList rows={insights.revenueByStaff} />
             {!hasStaff ? (

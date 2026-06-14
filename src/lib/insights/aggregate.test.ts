@@ -416,22 +416,8 @@ describe("computeShopInsights — revenueByStaff", () => {
       staff: [makeStaff("s1", "ช่างเอ"), makeStaff("s2", "ช่างบี")],
     });
     expect(result.revenueByStaff).toEqual([
-      {
-        staffId: "s1",
-        name: "ช่างเอ",
-        revenue: 900,
-        bookingCount: 1,
-        bookedMinutes: 120,
-        utilization: 0.25,
-      },
-      {
-        staffId: "s2",
-        name: "ช่างบี",
-        revenue: 300,
-        bookingCount: 1,
-        bookedMinutes: 360,
-        utilization: 0.75,
-      },
+      { staffId: "s1", name: "ช่างเอ", revenue: 900, bookingCount: 1 },
+      { staffId: "s2", name: "ช่างบี", revenue: 300, bookingCount: 1 },
     ]);
   });
 
@@ -498,8 +484,6 @@ describe("computeShopInsights — revenueByStaff", () => {
         name: "คิวรวม (ไม่ระบุพนักงาน)",
         revenue: 300,
         bookingCount: 2,
-        bookedMinutes: 240,
-        utilization: 0.5,
       },
     ]);
   });
@@ -518,7 +502,6 @@ describe("computeShopInsights — revenueByStaff", () => {
     expect(result.revenueByStaff[0]).toMatchObject({
       revenue: 500,
       bookingCount: 1,
-      bookedMinutes: 200,
     });
   });
 });
@@ -800,8 +783,6 @@ describe("computeShopInsights — hasData & window bounds", () => {
           name: "คิวรวม (ไม่ระบุพนักงาน)",
           revenue: 0,
           bookingCount: 0,
-          bookedMinutes: 0,
-          utilization: 0,
         },
       ],
       revenueByService: [],
