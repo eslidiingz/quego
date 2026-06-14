@@ -305,6 +305,35 @@ export function findSoonestSlot(params: {
   return null;
 }
 
+/**
+ * Count how many slot openings remain bookable TODAY, from "now" until the shop
+ * closes — the dashboard glance metric "ที่ว่างเหลือ {N} คิว" (OPP-21).
+ *
+ * Reuses `evaluateSlots` (the exact picker machinery) on today's hours at the
+ * shop's default service duration and full capacity, then counts the times that
+ * are neither full nor past. It is a glance-level approximation: each available
+ * time counts once (one open line is enough to take a booking), so it answers
+ * "how many more time-windows can I still fill today", consistent with the
+ * picker's notion of an available slot. Returns 0 when the shop is closed today
+ * or has no defined hours — never a misleading value.
+ */
+export function countOpenSlotsToday(ctx: BookingContext): number {
+  const today = ctx.nowDate;
+  const h = ctx.hours[dayOfWeekFor(today)];
+  if (!h?.isOpen || !h.openTime || !h.closeTime) return 0;
+  const avail = evaluateSlots({
+    openTime: h.openTime,
+    closeTime: h.closeTime,
+    durationMinutes: ctx.shop.serviceDurationMinutes,
+    date: today,
+    intervals: ctx.bookedIntervals,
+    capacity: ctx.capacity,
+    isToday: true,
+    nowHHMM: ctx.nowTimeHHMM,
+  });
+  return avail.reduce((n, s) => (s.isAvailable ? n + 1 : n), 0);
+}
+
 export function hhmmToMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;

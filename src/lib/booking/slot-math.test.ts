@@ -9,8 +9,11 @@ import {
   eachDateInWindow,
   findSoonestSlot,
   nextYmd,
+  countOpenSlotsToday,
+  DAYS_OF_WEEK,
   type BookedInterval,
   type BusinessHour,
+  type BookingContext,
 } from "./slot-math";
 
 describe("hhmmToMinutes", () => {
@@ -643,5 +646,65 @@ describe("findSoonestSlot", () => {
 
   it("returns null when the window is empty", () => {
     expect(findSoonestSlot({ ...base, hours: openHours(), days: [] })).toBeNull();
+  });
+});
+
+describe("countOpenSlotsToday", () => {
+  // Every weekday open 10:00–12:00 so the result is independent of which day
+  // "2026-06-14" falls on; at 30-min duration that grid is
+  // 10:00 / 10:30 / 11:00 / 11:30 = 4 candidate slots.
+  function ctx(overrides: Partial<BookingContext> = {}): BookingContext {
+    return {
+      shop: { id: "s1", name: "ร้านทดสอบ", serviceDurationMinutes: 30 },
+      services: [],
+      capacity: 1,
+      bookedIntervals: [],
+      hours: DAYS_OF_WEEK.map((dayOfWeek) => ({
+        dayOfWeek,
+        isOpen: true,
+        openTime: "10:00",
+        closeTime: "12:00",
+      })),
+      windowStart: "2026-06-14",
+      windowEnd: "2026-06-21",
+      nowDate: "2026-06-14",
+      nowTimeHHMM: "00:00",
+      staff: [],
+      ...overrides,
+    };
+  }
+
+  it("counts every fitting slot when the day is empty and nothing is past", () => {
+    expect(countOpenSlotsToday(ctx())).toBe(4);
+  });
+
+  it("excludes slots at or before now", () => {
+    // now = 11:00 → 10:00 / 10:30 / 11:00 are past, only 11:30 remains.
+    expect(countOpenSlotsToday(ctx({ nowTimeHHMM: "11:00" }))).toBe(1);
+  });
+
+  it("excludes a slot whose only line is fully booked", () => {
+    const booked: BookedInterval[] = [
+      { date: "2026-06-14", startMin: 600 /* 10:00 */, durationMin: 30, staffId: null },
+    ];
+    expect(countOpenSlotsToday(ctx({ bookedIntervals: booked }))).toBe(3);
+  });
+
+  it("returns 0 when the shop is closed today", () => {
+    const closed = DAYS_OF_WEEK.map((dayOfWeek) => ({
+      dayOfWeek,
+      isOpen: false,
+      openTime: null,
+      closeTime: null,
+    }));
+    expect(countOpenSlotsToday(ctx({ hours: closed }))).toBe(0);
+  });
+
+  it("keeps a slot open while capacity exceeds the booked lines", () => {
+    // capacity 2, one line booked at 10:00 → still one free line there.
+    const booked: BookedInterval[] = [
+      { date: "2026-06-14", startMin: 600, durationMin: 30, staffId: "a" },
+    ];
+    expect(countOpenSlotsToday(ctx({ capacity: 2, bookedIntervals: booked }))).toBe(4);
   });
 });
