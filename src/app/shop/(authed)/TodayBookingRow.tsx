@@ -5,6 +5,7 @@ import { Chip } from "@/components/ui/Chip";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
+import { hhmmToMinutes } from "@/lib/booking/slot-math";
 import type {
   BookingListItem,
   BookingStatus,
@@ -33,9 +34,27 @@ import {
  * SRP: presentation + action plumbing only. Status transitions + ownership
  * checks live in the server actions / service layer.
  */
-export function TodayBookingRow({ booking }: { booking: BookingListItem }) {
+export function TodayBookingRow({
+  booking,
+  now,
+  isNext,
+}: {
+  booking: BookingListItem;
+  /** "HH:MM" in Bangkok — drives the "เลยเวลา" badge. */
+  now: string;
+  /** True when this is the soonest upcoming confirmed queue (computed by the page). */
+  isNext: boolean;
+}) {
   const isConfirmed = booking.status === "confirmed";
   const chip = STATUS_CHIP[booking.status];
+  // How many minutes a confirmed queue is already past its slot (Q2). 0 when
+  // upcoming or not confirmed, so the badge only shows for genuinely late ones.
+  const overdueMin =
+    isConfirmed && booking.slotTime < now
+      ? hhmmToMinutes(now) - hhmmToMinutes(booking.slotTime)
+      : 0;
+  // The customer tapped "กำลังมา" in LINE (Q3) — only surfaced for a live queue.
+  const isComing = isConfirmed && booking.comingAckAt != null;
   // A cancelled booking surfaces WHO cancelled it (customer vs shop) so the
   // owner can read the dashboard at a glance; other statuses use the plain label.
   const chipLabel =
@@ -58,9 +77,11 @@ export function TodayBookingRow({ booking }: { booking: BookingListItem }) {
     <li
       className={cn(
         "rounded-2xl border p-3.5 sm:p-4 transition-colors",
-        isConfirmed
-          ? "border-outline-variant bg-surface-container-low/30"
-          : "border-outline-variant/50",
+        isNext
+          ? "border-primary/40 bg-primary/5 ring-1 ring-primary/30"
+          : isConfirmed
+            ? "border-outline-variant bg-surface-container-low/30"
+            : "border-outline-variant/50",
       )}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
@@ -104,13 +125,35 @@ export function TodayBookingRow({ booking }: { booking: BookingListItem }) {
               นาที
             </p>
 
-            {/* Staff chip (never overflows into the action zone). */}
-            {booking.staffName ? (
+            {/* Meta chips: next-queue / overdue / coming signals + staff. They
+                share one flex-wrap row so a narrow (414px) card wraps them
+                cleanly instead of overflowing into the action zone. */}
+            {isNext || overdueMin > 0 || isComing || booking.staffName ? (
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-primary-container/15 px-2 py-0.5 text-label-sm font-semibold text-primary">
-                  <Icon name="person" size={13} className="shrink-0" />
-                  <span className="truncate">{booking.staffName}</span>
-                </span>
+                {isNext ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-label-sm font-semibold text-on-primary">
+                    <Icon name="arrow_forward" size={13} className="shrink-0" />
+                    ถัดไป
+                  </span>
+                ) : null}
+                {overdueMin > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-error/10 px-2 py-0.5 text-label-sm font-semibold text-error">
+                    <Icon name="schedule" size={13} className="shrink-0" />
+                    เลยเวลา {overdueMin} นาที
+                  </span>
+                ) : null}
+                {isComing ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-label-sm font-semibold text-success">
+                    <Icon name="check_circle" size={13} className="shrink-0" />
+                    กำลังมา
+                  </span>
+                ) : null}
+                {booking.staffName ? (
+                  <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-primary-container/15 px-2 py-0.5 text-label-sm font-semibold text-primary">
+                    <Icon name="person" size={13} className="shrink-0" />
+                    <span className="truncate">{booking.staffName}</span>
+                  </span>
+                ) : null}
               </div>
             ) : null}
           </div>

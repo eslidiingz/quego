@@ -7,6 +7,8 @@ import {
   type BookingListItem,
   type BookingStatus,
 } from "@/lib/services/bookings";
+import { countWaitingForShopToday } from "@/lib/services/waitlist";
+import { countOpenSlotsToday } from "@/lib/booking/slot-math";
 import { cn } from "@/lib/cn";
 import { getBangkokNow } from "@/lib/time/bangkok";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -69,11 +71,12 @@ export default async function ShopHomePage({
     Number.isFinite(Number(rawShow)) ? Number(rawShow) : PREVIEW_LIMIT,
   );
 
-  // Today's bookings + the new-booking dialog's context are independent reads,
-  // so they fan out concurrently.
-  const [bookings, context] = await Promise.all([
+  // Today's bookings, the new-booking dialog's context, and the waitlist count
+  // are independent reads, so they fan out concurrently.
+  const [bookings, context, waitingCount] = await Promise.all([
     listBookingsByShop(session.shopId, "today"),
     getBookingContext(session.shopId),
+    countWaitingForShopToday(session.shopId),
   ]);
 
   const counts = {
@@ -85,6 +88,22 @@ export default async function ShopHomePage({
   // "Now" in Bangkok, as "HH:MM" — same fixed-width shape as slotTime, so a
   // plain string compare is already chronological.
   const now = getBangkokNow().timeHHMM;
+
+  // Glance metrics (Q1): today's earned revenue (completed only; null prices
+  // from walk-ins count as ฿0) + how many slots are still bookable until close.
+  const revenueToday = bookings.reduce(
+    (sum, b) => (b.status === "completed" ? sum + (b.servicePrice ?? 0) : sum),
+    0,
+  );
+  const remainingSlots = context ? countOpenSlotsToday(context) : null;
+
+  // The "next queue" (Q2): the soonest still-upcoming confirmed booking — gets
+  // the highlighted treatment in the list. null when every confirmed slot has
+  // already passed (no completed/cancelled row is ever picked as "next").
+  const nextQueueId =
+    bookings
+      .filter((b) => b.status === "confirmed" && b.slotTime >= now)
+      .sort((a, b) => a.slotTime.localeCompare(b.slotTime))[0]?.id ?? null;
 
   const visible = bookings
     .filter((b) => matchesFilter(b, filter))
@@ -116,6 +135,8 @@ export default async function ShopHomePage({
         description="ภาพรวมคิวและการจองของร้านวันนี้"
       />
 
+      {waitingCount > 0 ? <WaitlistCard count={waitingCount} /> : null}
+
       <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 space-y-stack-md">
         <header className="space-y-2">
           <div className="flex items-center justify-between gap-3">
@@ -138,6 +159,22 @@ export default async function ShopHomePage({
             ) : null}
           </div>
         </header>
+
+        {/* Glance stats (Q1): read-only — visually distinct from the filter
+            tiles below (no border/click affordance) so the owner never mistakes
+            them for a filter. */}
+        <div className="grid grid-cols-2 gap-3">
+          <GlanceStat
+            icon="payments"
+            label="ยอดวันนี้"
+            value={`฿${revenueToday.toLocaleString("th-TH")}`}
+          />
+          <GlanceStat
+            icon="event_available"
+            label="ที่ว่างเหลือ"
+            value={remainingSlots == null ? "—" : `${remainingSlots} คิว`}
+          />
+        </div>
 
         <nav
           className="grid grid-cols-3 gap-3"
@@ -173,7 +210,12 @@ export default async function ShopHomePage({
         ) : (
           <ul className="space-y-2.5">
             {preview.map((b) => (
-              <TodayBookingRow key={b.id} booking={b} />
+              <TodayBookingRow
+                key={b.id}
+                booking={b}
+                now={now}
+                isNext={b.id === nextQueueId}
+              />
             ))}
             {overflow > 0 ? (
               <li>
@@ -196,21 +238,26 @@ export default async function ShopHomePage({
 
 type Tone = "secondary" | "success" | "error";
 
+// Every tile carries a fixed 1px border (matching the parent card + booking
+// rows), so the three frames read as one set — corners and stroke weight never
+// shift between tiles or between active/inactive. The *active* state is signalled
+// by a tinted fill + a slightly stronger border colour, NOT by a thicker stroke,
+// so the geometry stays perfectly balanced.
 const TONE_STYLES: Record<
   Tone,
   { base: string; active: string }
 > = {
   secondary: {
-    base: "ring-1 ring-inset ring-secondary/40 text-secondary hover:ring-secondary",
-    active: "ring-2 ring-inset ring-secondary bg-secondary/10 text-secondary",
+    base: "border-secondary/30 text-secondary hover:border-secondary hover:bg-secondary/5",
+    active: "border-secondary bg-secondary/10 text-secondary",
   },
   success: {
-    base: "ring-1 ring-inset ring-success/40 text-success hover:ring-success",
-    active: "ring-2 ring-inset ring-success bg-success/10 text-success",
+    base: "border-success/30 text-success hover:border-success hover:bg-success/5",
+    active: "border-success bg-success/10 text-success",
   },
   error: {
-    base: "ring-1 ring-inset ring-error/40 text-error hover:ring-error",
-    active: "ring-2 ring-inset ring-error bg-error/10 text-error",
+    base: "border-error/30 text-error hover:border-error hover:bg-error/5",
+    active: "border-error bg-error/10 text-error",
   },
 };
 
@@ -237,14 +284,60 @@ function FilterTile({
       href={href}
       scroll={false}
       aria-pressed={isActive}
+      aria-label={`กรอง ${label} ${value} รายการ`}
       className={cn(
-        "block rounded-xl p-4 text-center transition-all focus:outline-none",
+        "block rounded-xl border p-4 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
         isActive ? styles.active : styles.base,
       )}
     >
       <p className="font-display text-display-sm leading-none">{value}</p>
       <p className="text-label-md mt-2 opacity-80">{label}</p>
     </Link>
+  );
+}
+
+// Read-only glance stat (Q1): a soft pill with an icon, label, and value. No
+// border or hover — deliberately unlike the clickable FilterTile so the owner
+// reads it as information, not a control.
+function GlanceStat({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-surface-container-low/60 px-3.5 py-3">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <Icon name={icon} size={20} />
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-label-sm text-on-surface-variant">{label}</p>
+        <p className="truncate font-display text-headline-sm font-bold text-on-surface">
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Waitlist glance card (Q4): surfaces how many customers are waiting for a slot
+// to free up today, so the owner can proactively cancel a no-show and let the
+// existing offer engine roll the slot on. Informational for now — a dedicated
+// /shop/waitlist list is a follow-up.
+function WaitlistCard({ count }: { count: number }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-secondary/30 bg-secondary/5 px-4 py-3.5">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary/15 text-secondary">
+        <Icon name="hourglass_top" size={20} />
+      </span>
+      <p className="text-body-md text-on-surface">
+        มี <span className="font-bold text-secondary">{count}</span>{" "}
+        คนรอคิวว่างวันนี้
+      </p>
+    </div>
   );
 }
 

@@ -145,6 +145,11 @@ export type BookingListItem = {
   status: BookingStatus;
   /** Who cancelled — only meaningful when status === "cancelled"; else null. */
   cancelledBy: CancelledBy | null;
+  /**
+   * When the customer tapped "กำลังมา" in LINE (OPP-03/04); null if they
+   * haven't acknowledged. Lets the shop dashboard flag who is on their way.
+   */
+  comingAckAt: string | null;
   createdAt: string;
 };
 
@@ -923,6 +928,7 @@ type BookingRowDb = {
   service_price: number | string | null;
   status: BookingStatus;
   cancelled_by: CancelledBy | null;
+  coming_ack_at: string | null;
   created_at: string;
   shop_staff: {
     name: string;
@@ -955,6 +961,7 @@ function mapRow(r: BookingRowDb): BookingListItem {
     staffRole: r.shop_staff?.role ?? null,
     status: r.status,
     cancelledBy: r.cancelled_by,
+    comingAckAt: r.coming_ack_at,
     createdAt: r.created_at,
   };
 }
@@ -989,7 +996,7 @@ export async function listBookingsByShop(
     .select(
       `id, customer_name, customer_phone, booking_date,
        slot_time, service_duration_minutes, service_name, service_price,
-       status, cancelled_by, created_at,
+       status, cancelled_by, coming_ack_at, created_at,
        shop_staff ( name, role )`,
     )
     .eq("shop_id", shopId);

@@ -265,6 +265,30 @@ export async function countOpenWaitlistSlots(phone: string): Promise<number> {
   return count;
 }
 
+/**
+ * Count how many customers are on a SHOP's waitlist for today — active entries
+ * (waiting/notified) whose `requested_date` is today. Drives the dashboard
+ * glance card "มี N คนรอคิวว่างวันนี้" (OPP-21), letting the owner proactively
+ * free a slot (e.g. cancel a no-show) so the existing offer engine can roll it
+ * on. Shop-keyed (mirrors `listBookingsByShop`): filters on `shop_id` from the
+ * verified session only, so it never leaks another shop's count. Never throws —
+ * a read error returns 0 so the card fails closed (hidden) rather than loud.
+ */
+export async function countWaitingForShopToday(shopId: string): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const today = getBangkokToday();
+
+  const { count, error } = await supabase
+    .from("waitlist_entries")
+    .select("id", { count: "exact", head: true })
+    .eq("shop_id", shopId)
+    .eq("requested_date", today)
+    .in("status", ACTIVE_STATUSES);
+
+  if (error || count == null) return 0;
+  return count;
+}
+
 // ----- Cancel (leave the list) --------------------------------------------
 
 export type CancelWaitlistResult =

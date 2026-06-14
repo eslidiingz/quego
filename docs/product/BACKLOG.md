@@ -72,6 +72,7 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
 
 | ID | ฟีเจอร์ | Persona | Impact | Effort | หมวด |
 |----|---------|---------|--------|--------|------|
+| OPP-21 | แถบสรุปสถานการณ์หน้า dashboard ร้าน (glance bar) | shop | high | M | ops-efficiency |
 | OPP-10 | Rich-menu / ลิงก์จองต่อร้าน + QR | shop | med | S | discovery |
 | OPP-18a | ค้นหา/กรอง/เรียงรายการร้าน (admin) | admin | med | M | ops-efficiency |
 | OPP-11a | ตัวเลือก "พนักงานคนไหนก็ได้ = เร็วกว่า" | customer | med | M | discovery |
@@ -379,6 +380,25 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
   multi-seat holds. Phase-2 LTV play on the existing catalogue.
 - **คู่แข่งอ้างอิง:** Hungry Hub fixed-price Party Pack; SimplyBook.me/Square group
   bookings with per-head pricing.
+
+### [OPP-21] แถบสรุปสถานการณ์หน้า dashboard ร้าน (at-a-glance bar)
+- **Persona:** shop · **Impact/Effort:** high · M · **หมวด:** ops-efficiency
+- **ปัญหา:** `/shop` เป็น "today list + complete/cancel" ที่ดี แต่ไม่ใช่ command
+  center — owner เปิดหน้าแรกแล้วยังตอบไม่ได้ว่า วันนี้ได้เงินเท่าไหร่/เต็มยัง/
+  เหลือที่ว่างกี่คิว, คิวถัดไปคือใคร+ใครเลยเวลา, ลูกค้ากด "กำลังมา" แล้วยัง, มีกี่คน
+  รอ waitlist วันนี้. ข้อมูลเกือบทั้งหมด **มีใน schema/service แล้ว** เป็นงาน assemble.
+- **ข้อเสนอ:** Q1 glance bar (ยอดเงินวันนี้จาก completed×servicePrice + ที่ว่าง
+  เหลือจาก BookingContext/slot-math) · Q2 ไฮไลต์ "คิวถัดไป" + ป้าย "เลยเวลา X นาที"
+  · Q3 ป้าย "กำลังมา ✓" จาก `coming_ack_at` (OPP-03/04) · Q4 การ์ด "มี N คนรอคิว
+  ว่างวันนี้" (OPP-05). **Out of scope:** VIP/บัมพ์คิว = OPP-13; now-serving จอ =
+  OPP-07; analytics เชิงลึก = OPP-19.
+- **Data flag:** ไม่ต้อง migration. ต้อง (a) select `coming_ack_at` เข้า
+  `listBookingsByShop` + `BookingListItem` (คอลัมน์มีแล้ว แต่ยังไม่ได้ select),
+  (b) เพิ่ม service shop-keyed `countWaitingForShopToday(shopId)` ใน `waitlist.ts`
+  (ของเดิม customer-keyed by phone เท่านั้น).
+- **คู่แข่งอ้างอิง:** QueQ/Fresha/GoWabi shop dashboard มาตรฐาน = คิวถัดไป+call-next,
+  ตัวนับรอ/เสร็จ, ยอดวันนี้, fill/ที่ว่าง at a glance.
+- **PRD:** `docs/product/prd/opp21-dashboard-glance-bar.md`
 
 ---
 
