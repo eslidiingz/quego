@@ -2,7 +2,10 @@ import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { pushLineMessage } from "@/lib/line/client";
 import { buildBookingMessage } from "@/lib/line/format";
-import { buildBookingConfirmationFlex } from "@/lib/line/booking-flex";
+import {
+  buildBookingConfirmationFlex,
+  buildBookingCancellationFlex,
+} from "@/lib/line/booking-flex";
 import {
   buildWaitlistSlotOpenFlex,
   type WaitlistSlotOpenFlexInput,
@@ -256,10 +259,13 @@ export async function pushBookingCancellationToCustomer(
     await pushLineMessage(
       customer.line_user_id as string,
       [
-        {
-          type: "text",
-          text: formatBookingCancellationMessage({ shopName, ...notice }),
-        },
+        buildBookingCancellationFlex({
+          shopName,
+          serviceName: notice.serviceName,
+          bookingDate: notice.bookingDate,
+          slotTime: notice.slotTime,
+          altText: formatBookingCancellationMessage({ shopName, ...notice }),
+        }),
       ],
       { kind: "booking_cancellation" },
     );

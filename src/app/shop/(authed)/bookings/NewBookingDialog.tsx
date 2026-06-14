@@ -707,12 +707,16 @@ function computeSlotsForDay(
     nowHHMM: context.nowTimeHHMM,
     staffIdFilter: staffFilter,
   });
-  return avail.map((s) => ({
-    time: s.time,
-    isTaken: s.isFull,
-    isPast: s.isPast,
-    isAvailable: s.isAvailable,
-  }));
+  return avail
+    // Hide times that have already passed today — the shop can only add a
+    // walk-in for now or later, never into the past.
+    .filter((s) => !s.isPast)
+    .map((s) => ({
+      time: s.time,
+      isTaken: s.isFull,
+      isPast: s.isPast,
+      isAvailable: s.isAvailable,
+    }));
 }
 
 const STATUS_LABEL: Record<DayStatus, string> = {

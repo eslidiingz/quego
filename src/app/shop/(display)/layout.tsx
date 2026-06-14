@@ -27,10 +27,11 @@ export default async function ShopDisplayLayout({
     <div className="relative min-h-screen bg-background">
       <Link
         href="/shop"
-        className="absolute right-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface/80 px-3 py-1.5 text-label-sm text-on-surface-variant backdrop-blur transition-colors hover:bg-surface-container-high"
+        aria-label="ออกจากโหมดจอแสดงผล"
+        title="ออกจากโหมดจอแสดงผล"
+        className="absolute right-4 top-4 z-10 inline-flex items-center justify-center rounded-full border border-outline-variant bg-surface/80 p-2 text-on-surface-variant backdrop-blur transition-colors hover:bg-surface-container-high"
       >
         <Icon name="close" size={18} />
-        ออกจากโหมดจอแสดงผล
       </Link>
       {children}
     </div>

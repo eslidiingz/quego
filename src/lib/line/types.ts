@@ -45,6 +45,14 @@ export type LinePostbackEvent = {
   postback: { data: string };
 };
 
+/** Fired when the OA is added to a group/multi-person chat — carries the
+ * groupId/roomId we need to push shop notifications there. */
+export type LineJoinEvent = {
+  type: "join";
+  replyToken: string;
+  source: LineSource;
+};
+
 /** Any event we don't model explicitly is tolerated and ignored. */
 export type LineUnknownEvent = { type: string; [key: string]: unknown };
 
@@ -53,6 +61,7 @@ export type LineWebhookEvent =
   | LineFollowEvent
   | LineUnfollowEvent
   | LinePostbackEvent
+  | LineJoinEvent
   | LineUnknownEvent;
 
 export type LineWebhookBody = {
