@@ -132,7 +132,7 @@ describe("computeShopInsights — lineMinutes & capacity", () => {
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
       hours: makeHours(),
-      bookings: [makeBooking({ durationMinutes: 240 })],
+      bookings: [makeBooking({ staffId: "s1", durationMinutes: 240 })],
       staff: [makeStaff("s1", "A"), makeStaff("s2", "B")],
     });
     expect(result.lineMinutes).toBe(480);
@@ -416,22 +416,8 @@ describe("computeShopInsights — revenueByStaff", () => {
       staff: [makeStaff("s1", "ช่างเอ"), makeStaff("s2", "ช่างบี")],
     });
     expect(result.revenueByStaff).toEqual([
-      {
-        staffId: "s1",
-        name: "ช่างเอ",
-        revenue: 900,
-        bookingCount: 1,
-        bookedMinutes: 120,
-        utilization: 0.25,
-      },
-      {
-        staffId: "s2",
-        name: "ช่างบี",
-        revenue: 300,
-        bookingCount: 1,
-        bookedMinutes: 360,
-        utilization: 0.75,
-      },
+      { staffId: "s1", name: "ช่างเอ", revenue: 900, bookingCount: 1 },
+      { staffId: "s2", name: "ช่างบี", revenue: 300, bookingCount: 1 },
     ]);
   });
 
@@ -452,21 +438,33 @@ describe("computeShopInsights — revenueByStaff", () => {
     });
   });
 
-  it("appends a 'ไม่ระบุพนักงาน' row only when null-staff bookings exist", () => {
+  it("excludes legacy null-staff bookings from the WHOLE report when the shop has staff", () => {
+    // A staffed shop assigns a concrete person to every new booking, so any
+    // null-staff rows are stale pre-staff history. They must drop out of every
+    // figure — total bookings, revenue, by-service — not just the staff card.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
       hours: makeHours(),
       bookings: [
-        makeBooking({ staffId: "s1", price: 600 }),
-        makeBooking({ staffId: null, price: 100 }),
+        makeBooking({ staffId: "s1", serviceId: "svc1", price: 600 }),
+        makeBooking({ staffId: null, serviceId: "svc2", price: 100 }),
       ],
       staff: [makeStaff("s1", "ช่างเอ")],
+      services: [
+        { id: "svc1", name: "ตัดผม" },
+        { id: "svc2", name: "สระ" },
+      ],
     });
-    const names = result.revenueByStaff.map((r) => r.name);
-    expect(names).toContain("ไม่ระบุพนักงาน");
-    const unassigned = result.revenueByStaff.find((r) => r.staffId === null);
-    expect(unassigned).toMatchObject({ revenue: 100, bookingCount: 1 });
+    // Headline totals count only the staffed booking.
+    expect(result.totalBookings).toBe(1);
+    expect(result.revenue).toBe(600);
+    // Per-staff card: only the real staff, no "ไม่ระบุพนักงาน" row.
+    expect(result.revenueByStaff.some((r) => r.staffId === null)).toBe(false);
+    expect(result.revenueByStaff).toHaveLength(1);
+    expect(result.revenueByStaff[0]).toMatchObject({ staffId: "s1", revenue: 600 });
+    // By-service: the null-staff booking's service is gone too.
+    expect(result.revenueByService.map((r) => r.serviceId)).toEqual(["svc1"]);
   });
 
   it("emits a single 'คิวรวม (ไม่ระบุพนักงาน)' row when there is no staff", () => {
@@ -486,8 +484,6 @@ describe("computeShopInsights — revenueByStaff", () => {
         name: "คิวรวม (ไม่ระบุพนักงาน)",
         revenue: 300,
         bookingCount: 2,
-        bookedMinutes: 240,
-        utilization: 0.5,
       },
     ]);
   });
@@ -506,7 +502,6 @@ describe("computeShopInsights — revenueByStaff", () => {
     expect(result.revenueByStaff[0]).toMatchObject({
       revenue: 500,
       bookingCount: 1,
-      bookedMinutes: 200,
     });
   });
 });
@@ -788,8 +783,6 @@ describe("computeShopInsights — hasData & window bounds", () => {
           name: "คิวรวม (ไม่ระบุพนักงาน)",
           revenue: 0,
           bookingCount: 0,
-          bookedMinutes: 0,
-          utilization: 0,
         },
       ],
       revenueByService: [],

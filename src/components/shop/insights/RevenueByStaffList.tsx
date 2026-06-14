@@ -1,45 +1,47 @@
 import { cn } from "@/lib/cn";
 import { formatBaht } from "@/lib/baht";
 import type { RevenueByStaff } from "@/lib/insights/aggregate";
-import { UtilizationBar } from "./UtilizationBar";
 
 /**
  * Ranked staff-revenue rows (revenue desc). Each row: a rank chip (#1 gets a
- * gold accent), the staff name, ฿ revenue on the right, and a utilization bar
- * + booking count underneath. Merges the old standalone utilization list with
- * revenue into one richer ranked view.
+ * gold accent) and the staff name on the left, with ฿ revenue and the booking
+ * count stacked on the right; thin dividers separate rows so the ranking scans
+ * top-to-bottom at a glance. The card is revenue-first — per-staff utilization is
+ * intentionally NOT shown: shops want to see each person's takings, not how much
+ * of the open day their queue happened to fill.
  *
  * Presentational: receives pre-sorted, pre-computed rows (DIP). Currency is
  * formatted via the shared `formatBaht`.
  */
 export function RevenueByStaffList({ rows }: { rows: RevenueByStaff[] }) {
-  // Numbered ranks count only real staff; the "ไม่ระบุพนักงาน" residual bucket
-  // (staffId === null) is not a person, so it gets a muted badge with no rank —
-  // and it can carry revenue, so we can't assume it sorts last. Computed purely
-  // (no render-time mutation): a real staff's rank is how many real staff appear
-  // up to and including it.
+  // Numbered ranks count only real staff; a staffless shop's single synthetic
+  // "คิวรวม" row (staffId === null) is not a person, so it gets a muted badge
+  // with no rank. Computed purely (no render-time mutation): a real staff's rank
+  // is how many real staff appear up to and including it.
   return (
-    <ul className="space-y-4">
+    <ul className="divide-y divide-outline-variant/60">
       {rows.map((s, i) => {
         const displayRank =
           s.staffId === null
             ? null
             : rows.slice(0, i + 1).filter((r) => r.staffId !== null).length;
         return (
-          <li key={s.staffId ?? "single-queue"} className="space-y-2">
-            <div className="flex items-center gap-3">
-              <RankBadge rank={displayRank} />
-              <span className="min-w-0 flex-1 truncate text-body-md text-on-surface">
-                {s.name}
-              </span>
-              <span className="shrink-0 font-display text-body-md tabular-nums text-on-surface">
+          <li
+            key={s.staffId ?? "single-queue"}
+            className="flex items-center gap-3 py-3.5 first:pt-0 last:pb-0"
+          >
+            <RankBadge rank={displayRank} />
+            <span className="min-w-0 flex-1 truncate text-body-md text-on-surface">
+              {s.name}
+            </span>
+            <div className="shrink-0 text-right">
+              <p className="font-display text-body-md tabular-nums text-on-surface">
                 {formatBaht(s.revenue)}
-              </span>
+              </p>
+              <p className="text-label-sm tabular-nums text-on-surface-variant">
+                {s.bookingCount} คิว
+              </p>
             </div>
-            <UtilizationBar utilization={s.utilization} />
-            <p className="text-label-sm tabular-nums text-on-surface-variant">
-              {Math.round(s.utilization * 100)}% · {s.bookingCount} คิว
-            </p>
           </li>
         );
       })}
@@ -47,7 +49,7 @@ export function RevenueByStaffList({ rows }: { rows: RevenueByStaff[] }) {
   );
 }
 
-/** #1 reads gold (vip), the rest neutral; the residual bucket shows a muted dash. */
+/** #1 reads gold (vip), the rest neutral; the single-queue row shows a muted dash. */
 function RankBadge({ rank }: { rank: number | null }) {
   return (
     <span
