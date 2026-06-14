@@ -4,8 +4,9 @@ import type { RevenueByStaff } from "@/lib/insights/aggregate";
 
 /**
  * Ranked staff-revenue rows (revenue desc). Each row: a rank chip (#1 gets a
- * gold accent), the staff name, ฿ revenue on the right, and the booking count
- * underneath. The card is revenue-first — per-staff time utilization is
+ * gold accent) and the staff name on the left, with ฿ revenue and the booking
+ * count stacked on the right; thin dividers separate rows so the ranking scans
+ * top-to-bottom at a glance. The card is revenue-first — per-staff utilization is
  * intentionally NOT shown: shops want to see each person's takings, not how much
  * of the open day their queue happened to fill.
  *
@@ -18,26 +19,29 @@ export function RevenueByStaffList({ rows }: { rows: RevenueByStaff[] }) {
   // with no rank. Computed purely (no render-time mutation): a real staff's rank
   // is how many real staff appear up to and including it.
   return (
-    <ul className="space-y-3.5">
+    <ul className="divide-y divide-outline-variant/60">
       {rows.map((s, i) => {
         const displayRank =
           s.staffId === null
             ? null
             : rows.slice(0, i + 1).filter((r) => r.staffId !== null).length;
         return (
-          <li key={s.staffId ?? "single-queue"} className="space-y-1.5">
-            <div className="flex items-center gap-3">
-              <RankBadge rank={displayRank} />
-              <span className="min-w-0 flex-1 truncate text-body-md text-on-surface">
-                {s.name}
-              </span>
-              <span className="shrink-0 font-display text-body-md tabular-nums text-on-surface">
+          <li
+            key={s.staffId ?? "single-queue"}
+            className="flex items-center gap-3 py-3.5 first:pt-0 last:pb-0"
+          >
+            <RankBadge rank={displayRank} />
+            <span className="min-w-0 flex-1 truncate text-body-md text-on-surface">
+              {s.name}
+            </span>
+            <div className="shrink-0 text-right">
+              <p className="font-display text-body-md tabular-nums text-on-surface">
                 {formatBaht(s.revenue)}
-              </span>
+              </p>
+              <p className="text-label-sm tabular-nums text-on-surface-variant">
+                {s.bookingCount} คิว
+              </p>
             </div>
-            <p className="pl-10 text-label-sm tabular-nums text-on-surface-variant">
-              {s.bookingCount} คิว
-            </p>
           </li>
         );
       })}
