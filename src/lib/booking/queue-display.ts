@@ -42,6 +42,14 @@ export type DisplayQueueRow = QueueLaneRow & {
 export type DisplayQueueSnapshot = {
   /** The booking shown big in the hero, or null when the queue is empty today. */
   nowServing: DisplayQueueRow | null;
+  /**
+   * True when `nowServing` has actually begun (slot <= now); false when it is
+   * merely the soonest upcoming booking shown before anyone is on the chair.
+   * The kiosk uses this to label the hero "กำลังเรียกคิว" (live) vs
+   * "คิวถัดไปที่จะเรียก" (not yet due) — so a future slot can't masquerade as
+   * in-progress. Always false on an empty queue.
+   */
+  nowServingStarted: boolean;
   /** Remaining confirmed bookings to show in the upcoming list, soonest first. */
   upcoming: DisplayQueueRow[];
   /** Id of the booking "เรียกคิวถัดไป" completes, or null when none remain. */
@@ -86,6 +94,7 @@ export function buildDisplayQueue(
 ): DisplayQueueSnapshot {
   const empty: DisplayQueueSnapshot = {
     nowServing: null,
+    nowServingStarted: false,
     upcoming: [],
     nextToCallBookingId: null,
     waitingCount: 0,
@@ -103,6 +112,10 @@ export function buildDisplayQueue(
   // are both just `.find` / `[0]`.
   const started = remaining.find((r) => hhmmToMinutes(r.slotTime) <= nowMin);
   const nowServing = started ?? remaining[0];
+  // Whether the hero booking is genuinely live (started) or just the soonest
+  // upcoming one shown pre-queue. Surfaced so the kiosk doesn't label a future
+  // slot "กำลังเรียกคิว"; the queue order itself is unchanged.
+  const nowServingStarted = Boolean(started);
 
   // The next booking the kiosk button advances is always the earliest remaining
   // one (sorted head). Once it is completed it leaves the confirmed set and the
@@ -111,6 +124,7 @@ export function buildDisplayQueue(
 
   return {
     nowServing,
+    nowServingStarted,
     // Everything except the now-serving booking, in queue order.
     upcoming: remaining.filter((r) => r.id !== nowServing.id),
     nextToCallBookingId: nextToCall.id,

@@ -42,6 +42,7 @@ type DisplayBookingRow = {
 
 const EMPTY_SNAPSHOT: ShopDisplaySnapshot = {
   nowServing: null,
+  nowServingStarted: false,
   upcoming: [],
   nextToCallBookingId: null,
   waitingCount: 0,

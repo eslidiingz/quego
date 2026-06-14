@@ -24,6 +24,7 @@ describe("buildDisplayQueue", () => {
     const snap = buildDisplayQueue([], "10:00");
     expect(snap).toEqual({
       nowServing: null,
+      nowServingStarted: false,
       upcoming: [],
       nextToCallBookingId: null,
       waitingCount: 0,
@@ -53,6 +54,8 @@ describe("buildDisplayQueue", () => {
     ];
     const snap = buildDisplayQueue(rows, "10:00");
     expect(snap.nowServing?.id).toBe("serving");
+    // The slot has arrived (10:00 <= now), so the hero is genuinely live.
+    expect(snap.nowServingStarted).toBe(true);
     // Upcoming excludes the now-serving row, sorted soonest first; the past
     // 09:30 slot is gone (matches the customer view's slot >= now cutoff).
     expect(snap.upcoming.map((r) => r.id)).toEqual(["next", "later"]);
@@ -69,6 +72,9 @@ describe("buildDisplayQueue", () => {
     const snap = buildDisplayQueue(rows, "10:00");
     // No slot <= 10:00, so the soonest upcoming (10:30) is shown serving.
     expect(snap.nowServing?.id).toBe("a");
+    // ...but it has NOT started — the kiosk must label it "คิวถัดไปที่จะเรียก",
+    // not "กำลังเรียกคิว", so a future slot can't masquerade as in-progress.
+    expect(snap.nowServingStarted).toBe(false);
     expect(snap.upcoming.map((r) => r.id)).toEqual(["b"]);
     expect(snap.nextToCallBookingId).toBe("a");
     expect(snap.waitingCount).toBe(2);

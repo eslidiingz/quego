@@ -95,6 +95,87 @@ export async function getShopLineStatus(
   return { linked: Boolean(data.line_user_id) };
 }
 
+// ----- Group binding (sender-match) ---------------------------------------
+
+export type BindShopLineGroupResult =
+  | { ok: true; shopName: string }
+  | {
+      ok: false;
+      code: "not_linked" | "group_taken" | "unknown";
+      message: string;
+    };
+
+/**
+ * Bind a LINE group to the shop OWNED by the message sender (sender-match). The
+ * groupId comes from a webhook event in the group; identity is proven not by a
+ * pairing code but by the sender's userId already being a shop's bound
+ * line_user_id (the owner linked their personal LINE in-app first). The target
+ * shopId is therefore DERIVED here from senderUserId — never trusted from input
+ * — mirroring the compound-filter ownership rule the other writes use. The
+ * partial-unique index on line_group_id is the 23505 backstop (one group, one
+ * shop).
+ */
+export async function bindShopLineGroupBySender(
+  senderUserId: string,
+  groupId: string,
+): Promise<BindShopLineGroupResult> {
+  const supabase = getSupabaseAdmin();
+  const { data: shop, error } = await supabase
+    .from("shops")
+    .select("id, name")
+    .eq("line_user_id", senderUserId)
+    .maybeSingle();
+  if (error) {
+    console.error("bindShopLineGroupBySender lookup error:", error);
+    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
+  }
+  if (!shop) {
+    return {
+      ok: false,
+      code: "not_linked",
+      message:
+        "บัญชี LINE ของคุณยังไม่ได้เชื่อมกับร้านใน queva — เปิดแอป queva ไปที่ " +
+        "โปรไฟล์ › การแจ้งเตือน แล้วกด “เชื่อมต่อ LINE” ก่อน แล้วลองใหม่",
+    };
+  }
+  const { error: upErr } = await supabase
+    .from("shops")
+    .update({ line_group_id: groupId })
+    .eq("id", shop.id);
+  if (upErr) {
+    if (upErr.code === "23505") {
+      return { ok: false, code: "group_taken", message: "กลุ่มนี้ถูกผูกกับร้านอื่นแล้ว" };
+    }
+    console.error("bindShopLineGroupBySender update error:", upErr);
+    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
+  }
+  return { ok: true, shopName: (shop.name as string) ?? "ร้านของคุณ" };
+}
+
+// ----- Outbound: notification recipient -----------------------------------
+
+/**
+ * Resolve where a shop's notifications go: the bound staff LINE group if set,
+ * else the owner's personal LINE account, else null (the fail-silent no-op).
+ * Single-sources the recipient decision for all four push* functions — pushing
+ * to the group reaches every staff member at once, and the owner is already in
+ * the group, so a bound group REPLACES the personal push (no double-billing).
+ */
+async function resolveShopNotifyTarget(shopId: string): Promise<string | null> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("shops")
+    .select("line_group_id, line_user_id")
+    .eq("id", shopId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return (
+    (data.line_group_id as string | null) ??
+    (data.line_user_id as string | null) ??
+    null
+  );
+}
+
 // ----- Outbound: new-booking notification ---------------------------------
 
 export type NewBookingNotice = {
@@ -118,7 +199,7 @@ const ACCENT_WARNING = "#B45309"; // amber
 
 const HEADING_NEW_BOOKING = "🔔 มีการจองใหม่";
 const HEADING_CANCELLED = "❌ ลูกค้ายกเลิกการจอง";
-const HEADING_ARRIVAL = "🚶 ลูกค้ากำลังมา";
+const HEADING_ARRIVAL = "🚗 ลูกค้ากำลังมา";
 const HEADING_RESCHEDULED = "🕓 ลูกค้าเลื่อนเวลา";
 
 /**
@@ -158,16 +239,11 @@ export async function pushNewBookingToShop(
   notice: NewBookingNotice,
 ): Promise<void> {
   try {
-    const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
-      .from("shops")
-      .select("line_user_id")
-      .eq("id", shopId)
-      .maybeSingle();
-    if (error || !data?.line_user_id) return;
+    const to = await resolveShopNotifyTarget(shopId);
+    if (!to) return;
 
     await pushLineMessage(
-      data.line_user_id as string,
+      to,
       [
         buildShopNotificationFlex({
           altText: formatNewBookingMessage(notice),
@@ -221,16 +297,11 @@ export async function pushBookingCancelledToShop(
   notice: NewBookingNotice,
 ): Promise<void> {
   try {
-    const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
-      .from("shops")
-      .select("line_user_id")
-      .eq("id", shopId)
-      .maybeSingle();
-    if (error || !data?.line_user_id) return;
+    const to = await resolveShopNotifyTarget(shopId);
+    if (!to) return;
 
     await pushLineMessage(
-      data.line_user_id as string,
+      to,
       [
         buildShopNotificationFlex({
           altText: formatBookingCancelledMessage(notice),
@@ -278,16 +349,11 @@ export async function pushCustomerArrivalToShop(
   notice: NewBookingNotice,
 ): Promise<void> {
   try {
-    const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
-      .from("shops")
-      .select("line_user_id")
-      .eq("id", shopId)
-      .maybeSingle();
-    if (error || !data?.line_user_id) return;
+    const to = await resolveShopNotifyTarget(shopId);
+    if (!to) return;
 
     await pushLineMessage(
-      data.line_user_id as string,
+      to,
       [
         buildShopNotificationFlex({
           altText: formatCustomerArrivalMessage(notice),
@@ -365,16 +431,11 @@ export async function pushBookingRescheduledToShop(
   notice: RescheduleNotice,
 ): Promise<void> {
   try {
-    const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
-      .from("shops")
-      .select("line_user_id")
-      .eq("id", shopId)
-      .maybeSingle();
-    if (error || !data?.line_user_id) return;
+    const to = await resolveShopNotifyTarget(shopId);
+    if (!to) return;
 
     await pushLineMessage(
-      data.line_user_id as string,
+      to,
       [
         buildShopNotificationFlex({
           altText: formatBookingRescheduledMessage(notice),

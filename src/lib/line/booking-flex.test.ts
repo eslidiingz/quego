@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildBookingConfirmationFlex,
+  buildBookingCancellationFlex,
   buildCancelConfirmFlex,
   buildShopNotificationFlex,
   bookingDetailRows,
@@ -61,7 +62,7 @@ describe("buildBookingConfirmationFlex", () => {
     const [coming, reschedule, cancel] = buttons;
 
     expect(coming.action.type).toBe("postback");
-    expect(coming.action.label).toBe("🚶 กำลังมา");
+    expect(coming.action.label).toBe("🚗 กำลังไป");
     expect(coming.action.data).toBe(`act=coming&b=${BOOKING_ID}`);
 
     expect(reschedule.action.type).toBe("uri");
@@ -103,6 +104,54 @@ describe("buildBookingConfirmationFlex", () => {
     const rows = detailRows(buildBookingConfirmationFlex(input));
     const dateRow = rows.find((r) => r.contents[0].text === "วันเวลา");
     expect(dateRow?.contents[1].text).toBe("15/06/2026 14:30 น.");
+  });
+});
+
+describe("buildBookingCancellationFlex", () => {
+  const input = {
+    shopName: "ร้านตัดผมโจ",
+    serviceName: "ตัดผมชาย" as string | null,
+    bookingDate: "2026-06-15",
+    slotTime: "14:30",
+    altText: "❌ ร้านยกเลิกการจอง\nร้าน: ร้านตัดผมโจ",
+  };
+
+  it("returns a flex bubble carrying the supplied altText", () => {
+    const msg = buildBookingCancellationFlex(input);
+    expect(msg.type).toBe("flex");
+    expect(msg.altText).toBe(input.altText);
+    expect((msg.contents as unknown as FlexBubble).type).toBe("bubble");
+  });
+
+  it("heads the bubble with ❌ ร้านยกเลิกการจอง and names the shop", () => {
+    const body = (
+      buildBookingCancellationFlex(input).contents as unknown as FlexBubble
+    ).body.contents;
+    expect(body[0].text).toBe("❌ ร้านยกเลิกการจอง");
+    expect(body[1].text).toBe("ร้านตัดผมโจ");
+  });
+
+  it("has no footer/action buttons — the booking is already gone", () => {
+    const bubble = buildBookingCancellationFlex(input)
+      .contents as unknown as FlexBubble;
+    expect(bubble.footer).toBeUndefined();
+  });
+
+  it("includes บริการ + วันเวลา rows formatted DD/MM/YYYY HH:MM น.", () => {
+    const rows = detailRows(buildBookingCancellationFlex(input));
+    const labels = rows.map((r) => r.contents[0].text);
+    expect(labels).toContain("บริการ");
+    const dateRow = rows.find((r) => r.contents[0].text === "วันเวลา");
+    expect(dateRow?.contents[1].text).toBe("15/06/2026 14:30 น.");
+  });
+
+  it("omits the บริการ row when serviceName is null", () => {
+    const rows = detailRows(
+      buildBookingCancellationFlex({ ...input, serviceName: null }),
+    );
+    const labels = rows.map((r) => r.contents[0].text);
+    expect(labels).not.toContain("บริการ");
+    expect(labels).toContain("วันเวลา");
   });
 });
 

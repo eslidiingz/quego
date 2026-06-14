@@ -115,9 +115,9 @@ export function buildBookingConfirmationFlex(
             color: BRAND,
             action: {
               type: "postback",
-              label: "🚶 กำลังมา",
+              label: "🚗 กำลังไป",
               data: `act=coming&b=${notice.bookingId}`,
-              displayText: "กำลังมาแล้ว",
+              displayText: "กำลังไป",
             },
           },
           {
@@ -137,6 +137,65 @@ export function buildBookingConfirmationFlex(
               displayText: "ขอยกเลิกคิว",
             },
           },
+        ],
+      },
+    },
+  };
+}
+
+// ----- Customer-facing shop-cancellation bubble ---------------------------
+
+export type BookingCancellationFlexInput = {
+  shopName: string;
+  serviceName: string | null;
+  bookingDate: string; // "YYYY-MM-DD"
+  slotTime: string; // "HH:MM"
+};
+
+/**
+ * The "❌ ร้านยกเลิกการจอง" bubble pushed to the customer when the shop cancels
+ * their booking. Visual twin of buildBookingConfirmationFlex (heading · shop
+ * identity line · separator · detail rows) but with a DANGER accent and no
+ * action buttons — the booking is already gone, there is nothing to act on. The
+ * plain-text formatBookingCancellationMessage rides along as altText so the
+ * notification preview and non-flex clients still read the same facts.
+ */
+export function buildBookingCancellationFlex(
+  notice: BookingCancellationFlexInput & { altText: string },
+): LineFlexMessage {
+  const detailRows: unknown[] = [];
+  if (notice.serviceName) detailRows.push(detailLine("บริการ", notice.serviceName));
+  detailRows.push(
+    detailLine("วันเวลา", `${formatBookingDate(notice.bookingDate)} ${notice.slotTime} น.`),
+  );
+
+  return {
+    type: "flex",
+    altText: notice.altText,
+    contents: {
+      type: "bubble",
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        contents: [
+          {
+            type: "text",
+            text: "❌ ร้านยกเลิกการจอง",
+            weight: "bold",
+            size: "lg",
+            color: TEXT_STRONG,
+          },
+          {
+            type: "text",
+            text: notice.shopName,
+            weight: "bold",
+            size: "md",
+            color: DANGER,
+            wrap: true,
+          },
+          { type: "separator", margin: "md" },
+          { type: "box", layout: "vertical", margin: "md", spacing: "sm", contents: detailRows },
         ],
       },
     },

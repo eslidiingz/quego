@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { cn } from "@/lib/cn";
 import type { ShopDisplaySnapshot } from "@/lib/services/shop-display";
 import type { DisplayQueueRow } from "@/lib/booking/queue-display";
 import { pollShopDisplayQueue, callNextQueueAction } from "./queue-actions";
@@ -85,7 +86,8 @@ export function ShopQueueDisplay({
     };
   }, []);
 
-  const { nowServing, upcoming, nextToCallBookingId, waitingCount } = snapshot;
+  const { nowServing, nowServingStarted, upcoming, nextToCallBookingId, waitingCount } =
+    snapshot;
 
   async function handleCallNext() {
     if (!nextToCallBookingId) return;
@@ -117,9 +119,10 @@ export function ShopQueueDisplay({
       {nowServing ? (
         <div className="mt-8 flex flex-1 flex-col">
           <section className="relative overflow-hidden rounded-3xl border border-primary/20 bg-primary-container/15 px-6 py-10 text-center md:px-10 md:py-14">
-            <p className="text-label-md uppercase tracking-[0.25em] text-primary md:text-body-md">
-              กำลังเรียกคิว
-            </p>
+            <HeroEyebrow
+              hasStarted={nowServingStarted}
+              slotTime={nowServing.slotTime}
+            />
             <p
               key={`serving-time-${rev}`}
               className="queva-fade-in mt-4 font-display text-[64px] font-bold leading-none text-primary tabular-nums md:text-[120px]"
@@ -213,8 +216,68 @@ export function ShopQueueDisplay({
 }
 
 /**
+ * Hero eyebrow + live indicator, varying by whether the shown booking has
+ * actually begun. `active` (slot has arrived) → solid teal label + the coral
+ * "live" pulse. `upcoming` (nothing started yet — the hero is just the soonest
+ * booking) → a calmer muted label, a quiet static dot, and a "ยังไม่ถึงเวลา ·
+ * เริ่ม HH:MM น." reframe so the giant future time can't read as in-progress.
+ * Copy is centralised here (string-map pattern) for one place to tune wording.
+ */
+const HERO_EYEBROW: Record<
+  "active" | "upcoming",
+  { label: string; className: string }
+> = {
+  active: { label: "กำลังเรียกคิว", className: "text-primary" },
+  upcoming: { label: "คิวถัดไปที่จะเรียก", className: "text-on-surface-variant" },
+};
+
+function HeroEyebrow({
+  hasStarted,
+  slotTime,
+}: {
+  hasStarted: boolean;
+  slotTime: string;
+}) {
+  const { label, className } = HERO_EYEBROW[hasStarted ? "active" : "upcoming"];
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <span
+        className={cn(
+          "inline-flex items-center gap-2 text-label-md uppercase tracking-[0.25em] md:text-body-md",
+          className,
+        )}
+      >
+        <span className="relative flex h-2 w-2">
+          {hasStarted ? (
+            <>
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-secondary opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-secondary" />
+            </>
+          ) : (
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-on-surface-variant/40" />
+          )}
+        </span>
+        {label}
+      </span>
+      {!hasStarted ? (
+        <span className="text-label-md text-on-surface-variant tabular-nums">
+          ยังไม่ถึงเวลา · เริ่ม {slotTime} น.
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * One upcoming row in the waiting-room list. Presentation only — kept small and
  * separate so the island stays focused on polling state (SRP).
+ *
+ * Layout: a fixed left anchor (position chip + big time) the room reads at a
+ * glance, then a flexible block with the masked name above a service · staff
+ * meta line. Service/staff each render only when present, so a single-lane
+ * ("ใครก็ได้") or serviceless booking degrades cleanly to what it has — and the
+ * staff name (the lane disambiguator) is no longer hidden behind a breakpoint,
+ * so two customers sharing a slot time never look like a duplicate.
  */
 function UpcomingRow({
   row,
@@ -223,23 +286,40 @@ function UpcomingRow({
   row: DisplayQueueRow;
   position: number;
 }) {
+  const hasMeta = row.serviceName || row.staffName;
   return (
     <li className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-low px-5 py-4">
       <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-container-high font-display text-label-md font-semibold text-on-surface-variant tabular-nums">
         {position}
       </span>
-      <span className="font-display text-headline-md font-semibold text-on-surface tabular-nums">
+      <span className="shrink-0 font-display text-headline-md font-semibold text-on-surface tabular-nums">
         {row.slotTime}
       </span>
-      <span className="min-w-0 flex-1 truncate text-body-md text-on-surface">
-        {row.customerName}
-      </span>
-      {row.staffName ? (
-        <span className="hidden shrink-0 items-center gap-1.5 text-label-md text-on-surface-variant sm:inline-flex">
-          <Icon name="person" size={18} className="text-tertiary" />
-          {row.staffName}
-        </span>
-      ) : null}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-body-md font-medium text-on-surface">
+          {row.customerName}
+        </p>
+        {hasMeta ? (
+          <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-label-md text-on-surface-variant">
+            {row.serviceName ? (
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <Icon
+                  name="content_cut"
+                  size={16}
+                  className="shrink-0 text-tertiary"
+                />
+                <span className="truncate">{row.serviceName}</span>
+              </span>
+            ) : null}
+            {row.staffName ? (
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <Icon name="person" size={16} className="shrink-0 text-tertiary" />
+                <span className="truncate">{row.staffName}</span>
+              </span>
+            ) : null}
+          </p>
+        ) : null}
+      </div>
     </li>
   );
 }
