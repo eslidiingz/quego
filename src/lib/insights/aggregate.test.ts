@@ -132,7 +132,7 @@ describe("computeShopInsights — lineMinutes & capacity", () => {
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
       hours: makeHours(),
-      bookings: [makeBooking({ durationMinutes: 240 })],
+      bookings: [makeBooking({ staffId: "s1", durationMinutes: 240 })],
       staff: [makeStaff("s1", "A"), makeStaff("s2", "B")],
     });
     expect(result.lineMinutes).toBe(480);
@@ -452,25 +452,33 @@ describe("computeShopInsights — revenueByStaff", () => {
     });
   });
 
-  it("omits the legacy null-staff bucket when the shop has staff", () => {
+  it("excludes legacy null-staff bookings from the WHOLE report when the shop has staff", () => {
     // A staffed shop assigns a concrete person to every new booking, so any
-    // null-staff rows are stale pre-staff history and must not appear in the
-    // per-staff revenue ranking (only real staff are listed).
+    // null-staff rows are stale pre-staff history. They must drop out of every
+    // figure — total bookings, revenue, by-service — not just the staff card.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
       hours: makeHours(),
       bookings: [
-        makeBooking({ staffId: "s1", price: 600 }),
-        makeBooking({ staffId: null, price: 100 }),
+        makeBooking({ staffId: "s1", serviceId: "svc1", price: 600 }),
+        makeBooking({ staffId: null, serviceId: "svc2", price: 100 }),
       ],
       staff: [makeStaff("s1", "ช่างเอ")],
+      services: [
+        { id: "svc1", name: "ตัดผม" },
+        { id: "svc2", name: "สระ" },
+      ],
     });
+    // Headline totals count only the staffed booking.
+    expect(result.totalBookings).toBe(1);
+    expect(result.revenue).toBe(600);
+    // Per-staff card: only the real staff, no "ไม่ระบุพนักงาน" row.
     expect(result.revenueByStaff.some((r) => r.staffId === null)).toBe(false);
-    const names = result.revenueByStaff.map((r) => r.name);
-    expect(names).not.toContain("ไม่ระบุพนักงาน");
     expect(result.revenueByStaff).toHaveLength(1);
     expect(result.revenueByStaff[0]).toMatchObject({ staffId: "s1", revenue: 600 });
+    // By-service: the null-staff booking's service is gone too.
+    expect(result.revenueByService.map((r) => r.serviceId)).toEqual(["svc1"]);
   });
 
   it("emits a single 'คิวรวม (ไม่ระบุพนักงาน)' row when there is no staff", () => {

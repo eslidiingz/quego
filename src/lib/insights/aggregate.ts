@@ -160,10 +160,19 @@ export function computeShopInsights(input: {
   const staffFilterSet = new Set(filterStaffIds);
   const serviceFilterSet = new Set(filterServiceIds);
 
+  // A staffed shop assigns a concrete staff to every booking at creation
+  // (`createBooking` resolves "ใช้ร้านจัดให้"/any-staff to a real person before
+  // insert), so null-staff rows are stale pre-staff history. Drop them from the
+  // WHOLE report — total bookings, revenue, fill rate, busy-hours, by-service —
+  // not just the per-staff card, so every figure reflects only bookings an
+  // actual staff member served. A staffless shop keeps its null-staff bookings:
+  // they ARE the shop's single queue.
+  const scoped = staff.length > 0 ? bookings.filter((b) => b.staffId != null) : bookings;
+
   // Apply the multi-select filters to the booking set used for every
-  // booking-derived metric. An empty group matches all. The unfiltered count
-  // drives `filteredToZero`.
-  const filtered = bookings.filter((b) => {
+  // booking-derived metric. An empty group matches all. The unfiltered (but
+  // staff-scoped) count drives `filteredToZero`.
+  const filtered = scoped.filter((b) => {
     if (staffFilterSet.size > 0 && (b.staffId == null || !staffFilterSet.has(b.staffId)))
       return false;
     if (
@@ -301,7 +310,7 @@ export function computeShopInsights(input: {
     hasData: totalAll > 0,
     hasFilter,
     // True only when the window genuinely has bookings but the filter hid them.
-    filteredToZero: hasFilter && bookings.length > 0 && filtered.length === 0,
+    filteredToZero: hasFilter && scoped.length > 0 && filtered.length === 0,
   };
 }
 
