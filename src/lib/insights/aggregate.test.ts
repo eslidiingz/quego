@@ -452,7 +452,10 @@ describe("computeShopInsights — revenueByStaff", () => {
     });
   });
 
-  it("appends a 'ไม่ระบุพนักงาน' row only when null-staff bookings exist", () => {
+  it("omits the legacy null-staff bucket when the shop has staff", () => {
+    // A staffed shop assigns a concrete person to every new booking, so any
+    // null-staff rows are stale pre-staff history and must not appear in the
+    // per-staff revenue ranking (only real staff are listed).
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
@@ -463,10 +466,11 @@ describe("computeShopInsights — revenueByStaff", () => {
       ],
       staff: [makeStaff("s1", "ช่างเอ")],
     });
+    expect(result.revenueByStaff.some((r) => r.staffId === null)).toBe(false);
     const names = result.revenueByStaff.map((r) => r.name);
-    expect(names).toContain("ไม่ระบุพนักงาน");
-    const unassigned = result.revenueByStaff.find((r) => r.staffId === null);
-    expect(unassigned).toMatchObject({ revenue: 100, bookingCount: 1 });
+    expect(names).not.toContain("ไม่ระบุพนักงาน");
+    expect(result.revenueByStaff).toHaveLength(1);
+    expect(result.revenueByStaff[0]).toMatchObject({ staffId: "s1", revenue: 600 });
   });
 
   it("emits a single 'คิวรวม (ไม่ระบุพนักงาน)' row when there is no staff", () => {

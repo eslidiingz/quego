@@ -307,10 +307,14 @@ export function computeShopInsights(input: {
 
 /**
  * Per-staff rows ranked by revenue. Denominator for utilization = one line's
- * open minutes (each staff member is exactly one parallel line). The legacy
- * null-staff bucket is surfaced as an explicit trailing row so per-staff bars
- * still reconcile with the overall fill rate for shops that adopted staff
- * mid-window. When a staff filter is active, only the selected staff rows show.
+ * open minutes (each staff member is exactly one parallel line). Every current
+ * booking is assigned a concrete staff at creation time (`createBooking`
+ * resolves "ใช้ร้านจัดให้"/any-staff to a real person before insert), so a
+ * staffed shop's report shows ONLY real staff — historical null-staff bookings
+ * (made before the shop added staff) are intentionally omitted from this
+ * breakdown rather than surfaced as a "ไม่ระบุพนักงาน" row. A shop with no
+ * staff at all still gets a single synthetic "คิวรวม" line. When a staff filter
+ * is active, only the selected staff rows show.
  */
 function buildRevenueByStaff({
   staff,
@@ -347,22 +351,10 @@ function buildRevenueByStaff({
       });
     }
 
-    // Bookings made before the shop added staff carry staffId = null. Only
-    // surface them when no specific staff filter is hiding them.
-    if (staffFilterSet.size === 0) {
-      const unassignedMin = staffMinutes.get(null) ?? 0;
-      const unassignedCount = staffCount.get(null) ?? 0;
-      if (unassignedMin > 0 || unassignedCount > 0) {
-        rows.push({
-          staffId: null,
-          name: "ไม่ระบุพนักงาน",
-          revenue: staffRevenue.get(null) ?? 0,
-          bookingCount: unassignedCount,
-          bookedMinutes: unassignedMin,
-          utilization: utilFor(unassignedMin),
-        });
-      }
-    }
+    // Bookings made before the shop added staff carry staffId = null. They are
+    // deliberately NOT shown: a staffed shop assigns a concrete person to every
+    // booking at creation, so a "ไม่ระบุพนักงาน" row would only reflect stale
+    // pre-staff history and confuse the per-staff revenue ranking.
   } else {
     const mins = staffMinutes.get(null) ?? 0;
     rows.push({
