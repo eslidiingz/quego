@@ -976,12 +976,11 @@ function mapRow(r: BookingRowDb): BookingListItem {
  *   - upcoming         → chronological (next service first)
  *   - past / all       → reverse chronological (most recent first)
  *
- * `includeCancelled` controls whether cancelled bookings appear:
- *   - the shop dashboard's today-overview keeps them (default true) so the
- *     "ยกเลิก" status tile has something to count;
- *   - the /shop/bookings management list passes false so a retracted booking
- *     drops out of the list entirely, staying consistent with the tab badges
- *     (`countBookingsByShop` also excludes cancelled).
+ * `includeCancelled` controls whether cancelled bookings appear (default true):
+ * both the dashboard today-overview AND the /shop/bookings management list keep
+ * them so cancellations stay visible as history (the list shows them with a
+ * status chip + "ลูกค้า/ร้านยกเลิก" label). `countBookingsByShop` counts
+ * cancelled too, so the tab badges always match the rendered list.
  */
 export async function listBookingsByShop(
   shopId: string,
@@ -1636,10 +1635,10 @@ export async function rescheduleBooking(
  * cheap because there's no realistic universe in which a single shop has
  * enough bookings to make this scan painful.
  *
- * Cancelled bookings are excluded: the tab badges report how many *active*
- * bookings each bucket holds, so a retracted booking must not inflate the
- * number shown to the shop. (Cancelled rows still appear in the list itself
- * via `listBookingsByShop` — they're history, just not counted.)
+ * Cancelled bookings ARE counted, so each tab badge matches exactly what the
+ * /shop/bookings list renders (the list shows cancelled rows as history). The
+ * per-card status chip distinguishes active vs. cancelled at a glance, and the
+ * dashboard glance bar — not these badges — is the "active workload" meter.
  */
 export async function countBookingsByShop(
   shopId: string,
@@ -1648,8 +1647,7 @@ export async function countBookingsByShop(
   const { data, error } = await supabase
     .from("bookings")
     .select("booking_date")
-    .eq("shop_id", shopId)
-    .neq("status", "cancelled");
+    .eq("shop_id", shopId);
 
   const counts: BookingsCounts = { today: 0, upcoming: 0, past: 0, all: 0 };
   if (error || !data) return counts;

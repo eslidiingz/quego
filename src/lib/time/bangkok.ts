@@ -123,3 +123,63 @@ export function getBangkokPastDates(
   }
   return out;
 }
+
+/** YYYY-MM-DD for a UTC-midnight timestamp (the canonical calendar-date shape). */
+function ymdFromUtc(ms: number): {
+  dateYmd: string;
+  dayOfWeek: BangkokNow["dayOfWeek"];
+} {
+  const day = new Date(ms);
+  const ymd = `${day.getUTCFullYear()}-${String(day.getUTCMonth() + 1).padStart(2, "0")}-${String(day.getUTCDate()).padStart(2, "0")}`;
+  return { dateYmd: ymd, dayOfWeek: day.getUTCDay() as BangkokNow["dayOfWeek"] };
+}
+
+/** Build an inclusive list of Bangkok calendar dates between two UTC-midnights. */
+function datesBetween(
+  startMs: number,
+  endMs: number,
+): { dateYmd: string; dayOfWeek: BangkokNow["dayOfWeek"] }[] {
+  const out: { dateYmd: string; dayOfWeek: BangkokNow["dayOfWeek"] }[] = [];
+  const dayMs = 24 * 60 * 60 * 1000;
+  for (let ms = startMs; ms <= endMs; ms += dayMs) {
+    out.push(ymdFromUtc(ms));
+  }
+  return out;
+}
+
+/**
+ * The current Bangkok calendar month from its 1st up to and including
+ * YESTERDAY (today is a partial day, excluded for consistency with the
+ * full-days analytics model). When today is the 1st the window is empty —
+ * returns `[]`, which callers must handle gracefully.
+ *
+ * Used by the shop report (รายงานร้าน) "เดือนนี้" preset.
+ */
+export function getBangkokMonthToYesterday(
+  at: Date = new Date(),
+): { dateYmd: string; dayOfWeek: BangkokNow["dayOfWeek"] }[] {
+  const today = getBangkokToday(at);
+  const [y, m, d] = today.split("-").map(Number);
+  if (d <= 1) return []; // today is the 1st → no full past days this month
+  const firstMs = Date.UTC(y, m - 1, 1);
+  const yesterdayMs = Date.UTC(y, m - 1, d - 1);
+  return datesBetween(firstMs, yesterdayMs);
+}
+
+/**
+ * The full PREVIOUS Bangkok calendar month (its 1st → its last day). Always a
+ * complete past month, so no partial-day handling is needed.
+ *
+ * Used by the shop report (รายงานร้าน) "เดือนก่อน" preset.
+ */
+export function getBangkokLastMonth(
+  at: Date = new Date(),
+): { dateYmd: string; dayOfWeek: BangkokNow["dayOfWeek"] }[] {
+  const today = getBangkokToday(at);
+  const [y, m] = today.split("-").map(Number);
+  // m is 1-based; Date.UTC handles month underflow (Jan → previous Dec).
+  const firstMs = Date.UTC(y, m - 2, 1);
+  // Day 0 of the current month = the last day of the previous month.
+  const lastMs = Date.UTC(y, m - 1, 0);
+  return datesBetween(firstMs, lastMs);
+}

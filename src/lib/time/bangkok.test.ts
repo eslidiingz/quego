@@ -5,6 +5,8 @@ import {
   dayOfWeekFor,
   getBangkokDateWindow,
   getBangkokPastDates,
+  getBangkokMonthToYesterday,
+  getBangkokLastMonth,
 } from "./bangkok";
 
 // Bangkok runs on ICT = UTC+7, no DST. Every assertion below feeds an explicit
@@ -213,6 +215,93 @@ describe("getBangkokPastDates", () => {
   it("keeps each entry's dayOfWeek consistent with dayOfWeekFor", () => {
     const past = getBangkokPastDates(10, new Date("2026-06-02T05:00:00Z"));
     for (const entry of past) {
+      expect(entry.dayOfWeek).toBe(dayOfWeekFor(entry.dateYmd));
+    }
+  });
+});
+
+describe("getBangkokMonthToYesterday", () => {
+  it("spans the 1st up to and including yesterday", () => {
+    // Bangkok 'today' = 2026-06-15 → window is 06-01 … 06-14 (14 days).
+    const window = getBangkokMonthToYesterday(new Date("2026-06-15T05:00:00Z"));
+    expect(window).toHaveLength(14);
+    expect(window[0].dateYmd).toBe("2026-06-01");
+    expect(window[window.length - 1].dateYmd).toBe("2026-06-14");
+  });
+
+  it("returns a single day (the 1st) when today is the 2nd", () => {
+    const window = getBangkokMonthToYesterday(new Date("2026-06-02T05:00:00Z"));
+    expect(window.map((d) => d.dateYmd)).toEqual(["2026-06-01"]);
+  });
+
+  it("returns an empty window when today is the 1st", () => {
+    const window = getBangkokMonthToYesterday(new Date("2026-06-01T05:00:00Z"));
+    expect(window).toEqual([]);
+  });
+
+  it("returns empty when the ICT offset rolls a late-UTC instant to the 1st", () => {
+    // 2026-05-31T18:00Z = 2026-06-01T01:00 ICT → Bangkok day is the 1st → empty.
+    const window = getBangkokMonthToYesterday(new Date("2026-05-31T18:00:00Z"));
+    expect(window).toEqual([]);
+  });
+
+  it("derives each entry's dayOfWeek consistently with dayOfWeekFor", () => {
+    const window = getBangkokMonthToYesterday(new Date("2026-06-15T05:00:00Z"));
+    for (const entry of window) {
+      expect(entry.dayOfWeek).toBe(dayOfWeekFor(entry.dateYmd));
+    }
+  });
+});
+
+describe("getBangkokLastMonth", () => {
+  it("spans the full previous calendar month (1st → last day)", () => {
+    // Bangkok 'today' in June → previous month = May (31 days).
+    const window = getBangkokLastMonth(new Date("2026-06-15T05:00:00Z"));
+    expect(window).toHaveLength(31);
+    expect(window[0].dateYmd).toBe("2026-05-01");
+    expect(window[window.length - 1].dateYmd).toBe("2026-05-31");
+  });
+
+  it("handles a 30-day previous month", () => {
+    // May → previous month = April (30 days).
+    const window = getBangkokLastMonth(new Date("2026-05-10T05:00:00Z"));
+    expect(window).toHaveLength(30);
+    expect(window[0].dateYmd).toBe("2026-04-01");
+    expect(window[window.length - 1].dateYmd).toBe("2026-04-30");
+  });
+
+  it("returns the full previous February in a leap year (29 days)", () => {
+    // 2024 is a leap year → March's previous month = Feb with 29 days.
+    const window = getBangkokLastMonth(new Date("2024-03-10T05:00:00Z"));
+    expect(window).toHaveLength(29);
+    expect(window[window.length - 1].dateYmd).toBe("2024-02-29");
+  });
+
+  it("returns 28 days for February in a non-leap year", () => {
+    const window = getBangkokLastMonth(new Date("2026-03-10T05:00:00Z"));
+    expect(window).toHaveLength(28);
+    expect(window[window.length - 1].dateYmd).toBe("2026-02-28");
+  });
+
+  it("crosses the year boundary: January's previous month is the prior December", () => {
+    const window = getBangkokLastMonth(new Date("2026-01-10T05:00:00Z"));
+    expect(window).toHaveLength(31);
+    expect(window[0].dateYmd).toBe("2025-12-01");
+    expect(window[window.length - 1].dateYmd).toBe("2025-12-31");
+  });
+
+  it("uses the ICT-projected month, not the raw UTC month", () => {
+    // 2026-06-30T18:00Z = 2026-07-01T01:00 ICT → 'today' is July 1 →
+    // previous month = June (30 days).
+    const window = getBangkokLastMonth(new Date("2026-06-30T18:00:00Z"));
+    expect(window).toHaveLength(30);
+    expect(window[0].dateYmd).toBe("2026-06-01");
+    expect(window[window.length - 1].dateYmd).toBe("2026-06-30");
+  });
+
+  it("derives each entry's dayOfWeek consistently with dayOfWeekFor", () => {
+    const window = getBangkokLastMonth(new Date("2026-06-15T05:00:00Z"));
+    for (const entry of window) {
       expect(entry.dayOfWeek).toBe(dayOfWeekFor(entry.dateYmd));
     }
   });

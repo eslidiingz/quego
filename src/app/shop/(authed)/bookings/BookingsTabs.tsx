@@ -43,7 +43,9 @@ export function BookingsTabs({
                 "min-w-6 px-1.5 h-5 inline-flex items-center justify-center rounded-full text-label-sm font-bold",
                 isActive
                   ? "bg-on-primary/20 text-on-primary"
-                  : "bg-surface-container-high text-on-surface-variant",
+                  : count === 0
+                    ? "bg-surface-container-high/50 text-on-surface-variant/40"
+                    : "bg-surface-container-high text-on-surface-variant",
               )}
             >
               {count}

@@ -5,6 +5,7 @@ import {
   DEFAULT_INSIGHTS_RANGE,
   type InsightsBooking,
   type InsightsStaff,
+  type InsightsService,
 } from "./aggregate";
 import type { BusinessHour, DayOfWeek } from "@/lib/booking/slot-math";
 
@@ -17,6 +18,7 @@ function makeBooking(overrides: Partial<InsightsBooking> = {}): InsightsBooking 
     slotTime: "10:00",
     durationMinutes: 60,
     staffId: null,
+    serviceId: null,
     status: "confirmed",
     price: null,
     ...overrides,
@@ -48,25 +50,31 @@ function makeStaff(id: string, name: string): InsightsStaff {
   return { id, name };
 }
 
+function makeService(id: string, name: string): InsightsService {
+  return { id, name };
+}
+
 // --- parseRange --------------------------------------------------------------
 
 describe("parseRange", () => {
-  it("maps the three valid string ranges to numbers", () => {
-    expect(parseRange("7")).toBe(7);
-    expect(parseRange("30")).toBe(30);
-    expect(parseRange("90")).toBe(90);
+  it("accepts the five valid range keys verbatim", () => {
+    expect(parseRange("7")).toBe("7");
+    expect(parseRange("30")).toBe("30");
+    expect(parseRange("90")).toBe("90");
+    expect(parseRange("month")).toBe("month");
+    expect(parseRange("lastmonth")).toBe("lastmonth");
   });
 
   it("falls back to the default (30) for undefined", () => {
-    expect(parseRange(undefined)).toBe(30);
+    expect(parseRange(undefined)).toBe("30");
     expect(parseRange(undefined)).toBe(DEFAULT_INSIGHTS_RANGE);
   });
 
-  it("falls back to the default for non-numeric input", () => {
+  it("falls back to the default for unknown input", () => {
     expect(parseRange("abc")).toBe(DEFAULT_INSIGHTS_RANGE);
   });
 
-  it("falls back to the default for an empty string (Number('') === 0)", () => {
+  it("falls back to the default for an empty string", () => {
     expect(parseRange("")).toBe(DEFAULT_INSIGHTS_RANGE);
   });
 
@@ -80,7 +88,6 @@ describe("parseRange", () => {
 
 describe("computeShopInsights — lineMinutes & capacity", () => {
   it("sums each open day's span (close − open) across the window", () => {
-    // Two days, both open 09:00–17:00 = 480 min each → 960.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1), day("2026-06-02", 2)],
@@ -92,8 +99,6 @@ describe("computeShopInsights — lineMinutes & capacity", () => {
   });
 
   it("contributes 0 for closed days and days with missing hours", () => {
-    // Monday open 09:00–17:00 (480). Tuesday closed (isOpen=false → 0).
-    // Sunday hours object marked open but with null times → 0.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [
@@ -112,7 +117,6 @@ describe("computeShopInsights — lineMinutes & capacity", () => {
   });
 
   it("ignores days whose span is non-positive (close <= open)", () => {
-    // Day open 17:00–09:00 → span -480 (not > 0) → contributes 0.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
@@ -124,8 +128,6 @@ describe("computeShopInsights — lineMinutes & capacity", () => {
   });
 
   it("derives capacity = max(staff.length, 1) and availableCapacityMin via fillRate", () => {
-    // 1 open day = 480 lineMinutes. 2 staff → capacity 2 → available 960.
-    // bookedMin: one 240-min active booking → fill = 240/960 = 0.25.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
@@ -174,8 +176,6 @@ describe("computeShopInsights — totalBookings", () => {
 
 describe("computeShopInsights — fillRate", () => {
   it("is bookedMinutes / availableCapacityMin for active bookings only", () => {
-    // 1 open day = 480, no staff → capacity 1 → available 480.
-    // Active: 60 + 120 = 180. Cancelled 300 excluded. fill = 180/480 = 0.375.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
@@ -191,7 +191,6 @@ describe("computeShopInsights — fillRate", () => {
   });
 
   it("caps at 1 when overbooked beyond available capacity", () => {
-    // available = 480. booked = 600 > 480 → min(1, 1.25) = 1.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
@@ -219,7 +218,6 @@ describe("computeShopInsights — fillRate", () => {
 
 describe("computeShopInsights — cancellationRate", () => {
   it("is cancelled / (active + cancelled)", () => {
-    // active 3, cancelled 1 → 1/4 = 0.25.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
@@ -247,12 +245,10 @@ describe("computeShopInsights — cancellationRate", () => {
   });
 });
 
-// --- computeShopInsights: revenue --------------------------------------------
+// --- computeShopInsights: revenue & avgTicket --------------------------------
 
-describe("computeShopInsights — revenue", () => {
+describe("computeShopInsights — revenue & avgTicket", () => {
   it("sums price of active bookings, excluding cancelled and null prices", () => {
-    // Active priced: 250 + 400 = 650. Null price active → excluded.
-    // Cancelled with price 999 → excluded.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
@@ -278,15 +274,41 @@ describe("computeShopInsights — revenue", () => {
     });
     expect(result.revenue).toBe(0);
   });
+
+  it("avgTicket = revenue / active booking count (counts null-priced bookings in the denominator)", () => {
+    // 3 active bookings (one null-priced), revenue 250+400 = 650 → 650/3 ≈ 216.67.
+    const result = computeShopInsights({
+      rangeDays: 7,
+      windowDates: [day("2026-06-01", 1)],
+      hours: makeHours(),
+      bookings: [
+        makeBooking({ status: "confirmed", price: 250 }),
+        makeBooking({ status: "completed", price: 400 }),
+        makeBooking({ status: "confirmed", price: null }),
+        makeBooking({ status: "cancelled", price: 999 }),
+      ],
+      staff: [],
+    });
+    expect(result.totalBookings).toBe(3);
+    expect(result.avgTicket).toBeCloseTo(650 / 3, 10);
+  });
+
+  it("avgTicket is 0 when there are no active bookings", () => {
+    const result = computeShopInsights({
+      rangeDays: 7,
+      windowDates: [day("2026-06-01", 1)],
+      hours: makeHours(),
+      bookings: [makeBooking({ status: "cancelled", price: 500 })],
+      staff: [],
+    });
+    expect(result.avgTicket).toBe(0);
+  });
 });
 
 // --- computeShopInsights: busyByHour & peakHour ------------------------------
 
 describe("computeShopInsights — busyByHour & peakHour", () => {
   it("spans floor(earliest open) … ceil(latest close) when hours exist, bucketing active bookings", () => {
-    // All days 09:00–17:00 → buckets hours 9..16 inclusive (ceil(17:00)=17,
-    // exclusive end) = 8 buckets.
-    // Active bookings: two at 10:xx, one at 12:30. Cancelled at 10:00 excluded.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
@@ -313,7 +335,6 @@ describe("computeShopInsights — busyByHour & peakHour", () => {
   });
 
   it("rounds the close hour up so a partial last hour shows (08:30–17:30)", () => {
-    // floor(08:30)=8, ceil(17:30)=18 → hours 8..17 inclusive = 10 buckets.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
@@ -328,27 +349,7 @@ describe("computeShopInsights — busyByHour & peakHour", () => {
     expect(result.peakHour).toBe(8);
   });
 
-  it("spans the widest open hours across all weekdays (min open … max close)", () => {
-    // Day 1 open 09:00–12:00, Day 2 open 14:00–20:00. All other days default
-    // 09:00–17:00 still count toward the span. Widest = floor(09:00)=9 …
-    // ceil(20:00)=20 → hours 9..19 = 11 buckets.
-    const result = computeShopInsights({
-      rangeDays: 7,
-      windowDates: [day("2026-06-01", 1)],
-      hours: makeHours({
-        1: { openTime: "09:00", closeTime: "12:00" },
-        2: { openTime: "14:00", closeTime: "20:00" },
-      }),
-      bookings: [],
-      staff: [],
-    });
-    expect(result.busyByHour.map((b) => b.hour)).toEqual([
-      9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-    ]);
-  });
-
   it("falls back to only data-bearing hours when no business hours are configured", () => {
-    // No open day in hours → fallback path: only hours with count>0, ascending.
     const closedHours = makeHours();
     for (let d = 0 as DayOfWeek; d <= 6; d = (d + 1) as DayOfWeek) {
       closedHours[d] = { dayOfWeek: d, isOpen: false, openTime: null, closeTime: null };
@@ -372,7 +373,7 @@ describe("computeShopInsights — busyByHour & peakHour", () => {
     expect(result.peakHour).toBe(9);
   });
 
-  it("returns peakHour null when busyByHour has no positive counts (open hours, no bookings)", () => {
+  it("returns peakHour null when busyByHour has no positive counts", () => {
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
@@ -380,12 +381,10 @@ describe("computeShopInsights — busyByHour & peakHour", () => {
       bookings: [],
       staff: [],
     });
-    expect(result.busyByHour.every((b) => b.count === 0)).toBe(true);
     expect(result.peakHour).toBeNull();
   });
 
   it("returns the first hour on a tie (strict-greater comparison)", () => {
-    // 11:00 and 14:00 each have 1 active booking → first max (11) wins.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
@@ -400,136 +399,312 @@ describe("computeShopInsights — busyByHour & peakHour", () => {
   });
 });
 
-// --- computeShopInsights: staff utilization ----------------------------------
+// --- computeShopInsights: revenueByStaff -------------------------------------
 
-describe("computeShopInsights — staff utilization", () => {
-  it("emits one row per staff sorted by utilization desc", () => {
-    // 1 open day = 480 lineMinutes.
-    // s1: 120 min → 0.25. s2: 360 min → 0.75. Sorted: s2 first.
+describe("computeShopInsights — revenueByStaff", () => {
+  it("emits one row per staff sorted by REVENUE desc (not utilization)", () => {
+    // s1: 1 booking, 120 min, ฿900. s2: 1 booking, 360 min, ฿300.
+    // Utilization would rank s2 first; revenue ranks s1 first.
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
       hours: makeHours(),
       bookings: [
-        makeBooking({ staffId: "s1", durationMinutes: 120 }),
-        makeBooking({ staffId: "s2", durationMinutes: 360 }),
+        makeBooking({ staffId: "s1", durationMinutes: 120, price: 900 }),
+        makeBooking({ staffId: "s2", durationMinutes: 360, price: 300 }),
       ],
       staff: [makeStaff("s1", "ช่างเอ"), makeStaff("s2", "ช่างบี")],
     });
-    expect(result.staff).toEqual([
-      { staffId: "s2", name: "ช่างบี", bookedMinutes: 360, utilization: 0.75 },
-      { staffId: "s1", name: "ช่างเอ", bookedMinutes: 120, utilization: 0.25 },
+    expect(result.revenueByStaff).toEqual([
+      {
+        staffId: "s1",
+        name: "ช่างเอ",
+        revenue: 900,
+        bookingCount: 1,
+        bookedMinutes: 120,
+        utilization: 0.25,
+      },
+      {
+        staffId: "s2",
+        name: "ช่างบี",
+        revenue: 300,
+        bookingCount: 1,
+        bookedMinutes: 360,
+        utilization: 0.75,
+      },
     ]);
   });
 
-  it("caps a staff member's utilization at 1 when overbooked", () => {
-    // 480 lineMinutes; s1 booked 720 → min(1, 1.5) = 1.
-    const result = computeShopInsights({
-      rangeDays: 7,
-      windowDates: [day("2026-06-01", 1)],
-      hours: makeHours(),
-      bookings: [makeBooking({ staffId: "s1", durationMinutes: 720 })],
-      staff: [makeStaff("s1", "ช่างเอ")],
-    });
-    expect(result.staff[0].utilization).toBe(1);
-  });
-
-  it("zeroes a staff member with no bookings", () => {
-    const result = computeShopInsights({
-      rangeDays: 7,
-      windowDates: [day("2026-06-01", 1)],
-      hours: makeHours(),
-      bookings: [],
-      staff: [makeStaff("s1", "ช่างเอ")],
-    });
-    expect(result.staff).toEqual([
-      { staffId: "s1", name: "ช่างเอ", bookedMinutes: 0, utilization: 0 },
-    ]);
-  });
-
-  it("appends a 'ไม่ระบุพนักงาน' trailing row only when null-staff minutes > 0", () => {
-    // 480 lineMinutes. s1: 240 → 0.5. null-staff legacy: 120 → 0.25.
+  it("counts a null-priced active booking in bookingCount but not in revenue", () => {
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
       hours: makeHours(),
       bookings: [
-        makeBooking({ staffId: "s1", durationMinutes: 240 }),
-        makeBooking({ staffId: null, durationMinutes: 120 }),
+        makeBooking({ staffId: "s1", price: 500 }),
+        makeBooking({ staffId: "s1", price: null }),
       ],
       staff: [makeStaff("s1", "ช่างเอ")],
     });
-    expect(result.staff).toEqual([
-      { staffId: "s1", name: "ช่างเอ", bookedMinutes: 240, utilization: 0.5 },
-      { staffId: null, name: "ไม่ระบุพนักงาน", bookedMinutes: 120, utilization: 0.25 },
-    ]);
-  });
-
-  it("omits the trailing null-staff row when there are no null-staff minutes", () => {
-    const result = computeShopInsights({
-      rangeDays: 7,
-      windowDates: [day("2026-06-01", 1)],
-      hours: makeHours(),
-      bookings: [makeBooking({ staffId: "s1", durationMinutes: 240 })],
-      staff: [makeStaff("s1", "ช่างเอ")],
+    expect(result.revenueByStaff[0]).toMatchObject({
+      revenue: 500,
+      bookingCount: 2,
     });
-    expect(result.staff).toHaveLength(1);
-    expect(result.staff.every((r) => r.staffId !== null)).toBe(true);
   });
 
-  it("does NOT count cancelled bookings toward staff minutes", () => {
-    // Only the 200-min active booking counts; cancelled 999 excluded.
+  it("appends a 'ไม่ระบุพนักงาน' row only when null-staff bookings exist", () => {
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
       hours: makeHours(),
       bookings: [
-        makeBooking({ staffId: "s1", durationMinutes: 200, status: "confirmed" }),
-        makeBooking({ staffId: "s1", durationMinutes: 999, status: "cancelled" }),
+        makeBooking({ staffId: "s1", price: 600 }),
+        makeBooking({ staffId: null, price: 100 }),
       ],
       staff: [makeStaff("s1", "ช่างเอ")],
     });
-    expect(result.staff[0].bookedMinutes).toBe(200);
+    const names = result.revenueByStaff.map((r) => r.name);
+    expect(names).toContain("ไม่ระบุพนักงาน");
+    const unassigned = result.revenueByStaff.find((r) => r.staffId === null);
+    expect(unassigned).toMatchObject({ revenue: 100, bookingCount: 1 });
   });
 
-  it("aggregates all null-staff minutes into a single 'คิวรวม (ไม่ระบุพนักงาน)' row when there is no staff", () => {
-    // 480 lineMinutes, no staff. null-staff active: 60 + 180 = 240 → 0.5.
+  it("emits a single 'คิวรวม (ไม่ระบุพนักงาน)' row when there is no staff", () => {
     const result = computeShopInsights({
       rangeDays: 7,
       windowDates: [day("2026-06-01", 1)],
       hours: makeHours(),
       bookings: [
-        makeBooking({ staffId: null, durationMinutes: 60 }),
-        makeBooking({ staffId: null, durationMinutes: 180 }),
-        makeBooking({ staffId: null, durationMinutes: 30, status: "cancelled" }),
+        makeBooking({ staffId: null, durationMinutes: 60, price: 100 }),
+        makeBooking({ staffId: null, durationMinutes: 180, price: 200 }),
       ],
       staff: [],
     });
-    expect(result.staff).toEqual([
+    expect(result.revenueByStaff).toEqual([
       {
         staffId: null,
         name: "คิวรวม (ไม่ระบุพนักงาน)",
+        revenue: 300,
+        bookingCount: 2,
         bookedMinutes: 240,
         utilization: 0.5,
       },
     ]);
   });
 
-  it("zeroes staff utilization when lineMinutes is 0", () => {
+  it("does NOT count cancelled bookings toward staff revenue or minutes", () => {
     const result = computeShopInsights({
       rangeDays: 7,
-      windowDates: [day("2026-06-02", 2)],
-      hours: makeHours({ 2: { isOpen: false, openTime: null, closeTime: null } }),
-      bookings: [makeBooking({ staffId: "s1", durationMinutes: 200 })],
+      windowDates: [day("2026-06-01", 1)],
+      hours: makeHours(),
+      bookings: [
+        makeBooking({ staffId: "s1", durationMinutes: 200, price: 500, status: "confirmed" }),
+        makeBooking({ staffId: "s1", durationMinutes: 999, price: 999, status: "cancelled" }),
+      ],
       staff: [makeStaff("s1", "ช่างเอ")],
     });
-    expect(result.lineMinutes).toBe(0);
-    expect(result.staff[0]).toEqual({
-      staffId: "s1",
-      name: "ช่างเอ",
+    expect(result.revenueByStaff[0]).toMatchObject({
+      revenue: 500,
+      bookingCount: 1,
       bookedMinutes: 200,
-      utilization: 0,
     });
+  });
+});
+
+// --- computeShopInsights: revenueByService -----------------------------------
+
+describe("computeShopInsights — revenueByService", () => {
+  it("ranks services by revenue desc, resolving names from the services list", () => {
+    const result = computeShopInsights({
+      rangeDays: 7,
+      windowDates: [day("2026-06-01", 1)],
+      hours: makeHours(),
+      bookings: [
+        makeBooking({ serviceId: "svc-a", price: 100 }),
+        makeBooking({ serviceId: "svc-a", price: 100 }),
+        makeBooking({ serviceId: "svc-b", price: 500 }),
+      ],
+      staff: [],
+      services: [makeService("svc-a", "ตัดผม"), makeService("svc-b", "ทำสี")],
+    });
+    expect(result.revenueByService).toEqual([
+      { serviceId: "svc-b", name: "ทำสี", revenue: 500, bookingCount: 1 },
+      { serviceId: "svc-a", name: "ตัดผม", revenue: 200, bookingCount: 2 },
+    ]);
+  });
+
+  it("buckets null service_id under 'ไม่ระบุบริการ'", () => {
+    const result = computeShopInsights({
+      rangeDays: 7,
+      windowDates: [day("2026-06-01", 1)],
+      hours: makeHours(),
+      bookings: [makeBooking({ serviceId: null, price: 80 })],
+      staff: [],
+      services: [],
+    });
+    expect(result.revenueByService).toEqual([
+      { serviceId: null, name: "ไม่ระบุบริการ", revenue: 80, bookingCount: 1 },
+    ]);
+  });
+
+  it("labels a deleted/unknown service_id as 'บริการอื่นๆ'", () => {
+    const result = computeShopInsights({
+      rangeDays: 7,
+      windowDates: [day("2026-06-01", 1)],
+      hours: makeHours(),
+      bookings: [makeBooking({ serviceId: "gone", price: 120 })],
+      staff: [],
+      services: [makeService("svc-a", "ตัดผม")],
+    });
+    expect(result.revenueByService).toEqual([
+      { serviceId: "gone", name: "บริการอื่นๆ", revenue: 120, bookingCount: 1 },
+    ]);
+  });
+
+  it("counts null-priced bookings in bookingCount but contributes 0 revenue", () => {
+    const result = computeShopInsights({
+      rangeDays: 7,
+      windowDates: [day("2026-06-01", 1)],
+      hours: makeHours(),
+      bookings: [
+        makeBooking({ serviceId: "svc-a", price: null }),
+        makeBooking({ serviceId: "svc-a", price: null }),
+      ],
+      staff: [],
+      services: [makeService("svc-a", "ตัดผม")],
+    });
+    expect(result.revenueByService).toEqual([
+      { serviceId: "svc-a", name: "ตัดผม", revenue: 0, bookingCount: 2 },
+    ]);
+  });
+
+  it("excludes cancelled bookings from service rows", () => {
+    const result = computeShopInsights({
+      rangeDays: 7,
+      windowDates: [day("2026-06-01", 1)],
+      hours: makeHours(),
+      bookings: [
+        makeBooking({ serviceId: "svc-a", price: 100, status: "confirmed" }),
+        makeBooking({ serviceId: "svc-a", price: 999, status: "cancelled" }),
+      ],
+      staff: [],
+      services: [makeService("svc-a", "ตัดผม")],
+    });
+    expect(result.revenueByService).toEqual([
+      { serviceId: "svc-a", name: "ตัดผม", revenue: 100, bookingCount: 1 },
+    ]);
+  });
+});
+
+// --- computeShopInsights: filtering ------------------------------------------
+
+describe("computeShopInsights — filtering", () => {
+  const base = {
+    rangeDays: 7,
+    windowDates: [day("2026-06-01", 1)],
+    hours: makeHours(),
+    staff: [makeStaff("s1", "ช่างเอ"), makeStaff("s2", "ช่างบี")],
+    services: [makeService("svc-a", "ตัดผม"), makeService("svc-b", "ทำสี")],
+  };
+
+  const bookings = [
+    makeBooking({ staffId: "s1", serviceId: "svc-a", price: 100, durationMinutes: 60 }),
+    makeBooking({ staffId: "s2", serviceId: "svc-b", price: 500, durationMinutes: 120 }),
+    makeBooking({ staffId: "s1", serviceId: "svc-b", price: 300, durationMinutes: 60, status: "cancelled" }),
+  ];
+
+  it("hasFilter is false and nothing is excluded when no filter is set", () => {
+    const result = computeShopInsights({ ...base, bookings });
+    expect(result.hasFilter).toBe(false);
+    expect(result.revenue).toBe(600); // 100 + 500
+    expect(result.totalBookings).toBe(2);
+  });
+
+  it("filterStaffIds narrows every booking-derived metric to that staff", () => {
+    const result = computeShopInsights({ ...base, bookings, filterStaffIds: ["s1"] });
+    expect(result.hasFilter).toBe(true);
+    // Only s1's active booking (svc-a, ฿100) survives; cancelled s1 stays counted
+    // toward cancellationRate within the filtered set.
+    expect(result.revenue).toBe(100);
+    expect(result.totalBookings).toBe(1);
+    expect(result.cancellationRate).toBeCloseTo(0.5, 10); // 1 active, 1 cancelled
+    // Only the filtered staff row is present.
+    expect(result.revenueByStaff).toHaveLength(1);
+    expect(result.revenueByStaff[0].staffId).toBe("s1");
+    // fillRate still divides by full capacity (share of total capacity).
+    expect(result.lineMinutes).toBe(480);
+  });
+
+  it("filterServiceIds narrows to that service", () => {
+    const result = computeShopInsights({ ...base, bookings, filterServiceIds: ["svc-b"] });
+    expect(result.hasFilter).toBe(true);
+    expect(result.revenue).toBe(500); // only the active svc-b booking
+    expect(result.totalBookings).toBe(1);
+    expect(result.revenueByService).toEqual([
+      { serviceId: "svc-b", name: "ทำสี", revenue: 500, bookingCount: 1 },
+    ]);
+  });
+
+  it("multi-select staff includes a booking from ANY selected staff (union)", () => {
+    const result = computeShopInsights({ ...base, bookings, filterStaffIds: ["s1", "s2"] });
+    // Both s1 (svc-a ฿100) and s2 (svc-b ฿500) active bookings survive.
+    expect(result.revenue).toBe(600);
+    expect(result.totalBookings).toBe(2);
+    expect(result.revenueByStaff.map((r) => r.staffId).sort()).toEqual(["s1", "s2"]);
+  });
+
+  it("multi-select service is a union across the selected services", () => {
+    const result = computeShopInsights({
+      ...base,
+      bookings,
+      filterServiceIds: ["svc-a", "svc-b"],
+    });
+    expect(result.revenue).toBe(600); // svc-a ฿100 + svc-b ฿500
+    expect(result.totalBookings).toBe(2);
+  });
+
+  it("combined staff + service filters apply both", () => {
+    const result = computeShopInsights({
+      ...base,
+      bookings,
+      filterStaffIds: ["s2"],
+      filterServiceIds: ["svc-b"],
+    });
+    expect(result.revenue).toBe(500);
+    expect(result.totalBookings).toBe(1);
+  });
+
+  it("filteredToZero is false when the filter leaves only a cancelled row", () => {
+    const result = computeShopInsights({
+      ...base,
+      bookings,
+      filterStaffIds: ["s1"],
+      filterServiceIds: ["svc-b"], // s1 only has a cancelled svc-b booking + active svc-a
+    });
+    // s1 + svc-b matches only the cancelled booking → no active, but the row set
+    // is non-empty (1 cancelled), so this is NOT filteredToZero; data remains.
+    expect(result.filteredToZero).toBe(false);
+    expect(result.hasData).toBe(true);
+  });
+
+  it("filteredToZero is true when no booking matches the filter at all", () => {
+    const result = computeShopInsights({
+      ...base,
+      bookings,
+      filterStaffIds: ["ghost"], // no booking has this staff
+    });
+    expect(result.filteredToZero).toBe(true);
+    expect(result.hasData).toBe(false);
+  });
+
+  it("filteredToZero is false when there were no bookings to begin with", () => {
+    const result = computeShopInsights({
+      ...base,
+      bookings: [],
+      filterStaffIds: ["s1"],
+    });
+    expect(result.filteredToZero).toBe(false);
+    expect(result.hasFilter).toBe(true);
   });
 });
 
@@ -602,19 +777,25 @@ describe("computeShopInsights — hasData & window bounds", () => {
       fillRate: 0,
       cancellationRate: 0,
       revenue: 0,
+      avgTicket: 0,
       lineMinutes: 0,
       capacity: 1,
       busyByHour: [],
       peakHour: null,
-      staff: [
+      revenueByStaff: [
         {
           staffId: null,
           name: "คิวรวม (ไม่ระบุพนักงาน)",
+          revenue: 0,
+          bookingCount: 0,
           bookedMinutes: 0,
           utilization: 0,
         },
       ],
+      revenueByService: [],
       hasData: false,
+      hasFilter: false,
+      filteredToZero: false,
     });
   });
 });

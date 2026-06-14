@@ -1,6 +1,10 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { getBangkokPastDates } from "@/lib/time/bangkok";
+import {
+  getBangkokPastDates,
+  getBangkokMonthToYesterday,
+  getBangkokLastMonth,
+} from "@/lib/time/bangkok";
 import {
   DAYS_OF_WEEK,
   type BusinessHour,
@@ -10,18 +14,47 @@ import {
   computeShopInsights,
   type InsightsBooking,
   type InsightsStaff,
+  type InsightsService,
+  type InsightsRange,
   type ShopInsights,
 } from "@/lib/insights/aggregate";
 
 /**
- * Shop insights service (OPP-19). Reads the data three aggregate queries need
- * over the service-role client (RLS deny-all), then defers ALL metric math to
- * the pure `computeShopInsights` helper so this module stays a thin I/O shim.
+ * Shop report service (รายงานร้าน, OPP-19 Phase 1). Reads the data the aggregate
+ * needs over the service-role client (RLS deny-all), then defers ALL metric
+ * math to the pure `computeShopInsights` helper so this module stays a thin
+ * I/O shim. It also runs the aggregate twice — current window + the
+ * immediately-preceding equal-length window — to derive period-over-period
+ * deltas, and returns the staff/service option lists the filter UI needs.
  *
- * SRP: fetch + shape rows. No metric logic, no UI concerns.
+ * SRP: fetch + shape rows + window arithmetic. No metric logic, no UI concerns.
  */
 
-export type { ShopInsights } from "@/lib/insights/aggregate";
+export type {
+  ShopInsights,
+  InsightsRange,
+} from "@/lib/insights/aggregate";
+
+/** Percent-change deltas vs the immediately-preceding equal-length window. */
+export type InsightsDeltas = {
+  /** Fractional change (0.12 = +12%). null when there's no prior-period base. */
+  revenue: number | null;
+  totalBookings: number | null;
+  avgTicket: number | null;
+};
+
+/** A selectable option for the filter sheet. */
+export type FilterOption = { id: string; name: string };
+
+/** Everything the report page renders: metrics + comparison + filter options. */
+export type ShopReport = {
+  insights: ShopInsights;
+  deltas: InsightsDeltas;
+  staffOptions: FilterOption[];
+  serviceOptions: FilterOption[];
+};
+
+type WindowDate = { dateYmd: string; dayOfWeek: DayOfWeek };
 
 /** Booking statuses the analytics model understands; others are skipped. */
 const VALID_BOOKING_STATUSES = new Set<string>([
@@ -38,34 +71,93 @@ function priceFromDb(value: number | string | null): number | null {
 }
 
 /**
- * Aggregate one shop's bookings over the last `rangeDays` full days (the window
- * ends yesterday — today is partial and would skew fill rate). All reads are
- * scoped by `shopId`, which MUST come from the caller's verified session.
+ * Resolve a range key to its current window dates (oldest→newest, excluding
+ * today). Calendar windows ("month"/"lastmonth") read the Bangkok clock here;
+ * the pure aggregate stays clock-free.
  */
-export async function getShopInsights(
+function resolveWindow(range: InsightsRange): WindowDate[] {
+  switch (range) {
+    case "7":
+      return getBangkokPastDates(7);
+    case "90":
+      return getBangkokPastDates(90);
+    case "month":
+      return getBangkokMonthToYesterday();
+    case "lastmonth":
+      return getBangkokLastMonth();
+    case "30":
+    default:
+      return getBangkokPastDates(30);
+  }
+}
+
+/**
+ * The immediately-preceding window of the SAME length, ending the day before
+ * `current` starts. Used for period-over-period deltas. Empty when the current
+ * window is empty (e.g. "month" on the 1st) — deltas then report null.
+ */
+function precedingWindow(current: WindowDate[]): WindowDate[] {
+  if (current.length === 0) return [];
+  const len = current.length;
+  const [sy, sm, sd] = current[0].dateYmd.split("-").map(Number);
+  const startMs = Date.UTC(sy, sm - 1, sd);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const out: WindowDate[] = [];
+  // Fill backwards then we already produce oldest→newest by counting down.
+  for (let i = len; i >= 1; i -= 1) {
+    const ms = startMs - i * dayMs;
+    const day = new Date(ms);
+    const ymd = `${day.getUTCFullYear()}-${String(day.getUTCMonth() + 1).padStart(2, "0")}-${String(day.getUTCDate()).padStart(2, "0")}`;
+    out.push({ dateYmd: ymd, dayOfWeek: day.getUTCDay() as DayOfWeek });
+  }
+  return out;
+}
+
+/** Fractional change current vs prior; null when prior is 0 (no meaningful base). */
+function delta(current: number, prior: number): number | null {
+  if (prior <= 0) return null;
+  return (current - prior) / prior;
+}
+
+/**
+ * Aggregate one shop's bookings over the selected window into the full report.
+ * All reads are scoped by `shopId`, which MUST come from the caller's verified
+ * session. `filterStaffIds` / `filterServiceIds` (multi-select; empty = no
+ * filter) narrow the booking-derived metrics for BOTH the current and the
+ * comparison window.
+ */
+export async function getShopReport(
   shopId: string,
-  rangeDays: number,
-): Promise<ShopInsights> {
+  range: InsightsRange,
+  opts: { filterStaffIds?: string[]; filterServiceIds?: string[] } = {},
+): Promise<ShopReport> {
+  const { filterStaffIds = [], filterServiceIds = [] } = opts;
   const supabase = getSupabaseAdmin();
 
-  const windowDates = getBangkokPastDates(rangeDays);
-  const windowStart = windowDates[0].dateYmd;
-  const windowEnd = windowDates[windowDates.length - 1].dateYmd;
+  const currentWindow = resolveWindow(range);
+  const compareWindow = precedingWindow(currentWindow);
+
+  // Fetch bookings across BOTH windows in one query, then partition in memory.
+  const allDates = [...compareWindow, ...currentWindow];
+  const queryStart = allDates.length > 0 ? allDates[0].dateYmd : "9999-12-31";
+  const queryEnd =
+    allDates.length > 0 ? allDates[allDates.length - 1].dateYmd : "0001-01-01";
 
   const [
     { data: bookingsData, error: bookingsError },
     { data: hoursData, error: hoursError },
     { data: staffData, error: staffError },
+    { data: servicesData, error: servicesError },
   ] = await Promise.all([
     // ALL statuses — cancelled rows are needed for the cancellation rate.
     supabase
       .from("bookings")
       .select(
-        "booking_date, slot_time, service_duration_minutes, staff_id, status, service_price",
+        "booking_date, slot_time, service_duration_minutes, staff_id, service_id, status, service_price",
       )
       .eq("shop_id", shopId)
-      .gte("booking_date", windowStart)
-      .lte("booking_date", windowEnd),
+      .gte("booking_date", queryStart)
+      .lte("booking_date", queryEnd),
     supabase
       .from("shop_business_hours")
       .select("day_of_week, is_open, open_time, close_time")
@@ -79,12 +171,19 @@ export async function getShopInsights(
       .eq("provides_service", true)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
+    // All services (active or not) → resolve revenue-by-service names + filter
+    // options. Inactive ones still own historical bookings in the window.
+    supabase
+      .from("shop_services")
+      .select("id, name")
+      .eq("shop_id", shopId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
   ]);
 
   // Surface query failures loudly. Without this, the `?? []` fallbacks below
   // would turn any failed query into an all-zero "no data" dashboard — a silent
   // wrong answer the owner can't distinguish from a genuinely quiet period.
-  // Mirrors the throw-convention in getBookingContext (services/bookings.ts).
   if (bookingsError) {
     throw new Error(`insights: bookings query failed: ${bookingsError.message}`);
   }
@@ -94,8 +193,11 @@ export async function getShopInsights(
   if (staffError) {
     throw new Error(`insights: staff query failed: ${staffError.message}`);
   }
+  if (servicesError) {
+    throw new Error(`insights: services query failed: ${servicesError.message}`);
+  }
 
-  const bookings: InsightsBooking[] = (bookingsData ?? []).flatMap((b) => {
+  const allBookings: InsightsBooking[] = (bookingsData ?? []).flatMap((b) => {
     // Validate the DB status BEFORE narrowing it to the analytics union: an
     // unrecognised status (e.g. a future one) must not fall through and be
     // counted as an active booking, which would silently inflate every metric.
@@ -107,6 +209,7 @@ export async function getShopInsights(
         slotTime: (b.slot_time as string).slice(0, 5),
         durationMinutes: b.service_duration_minutes as number,
         staffId: (b.staff_id as string | null) ?? null,
+        serviceId: (b.service_id as string | null) ?? null,
         status: status as InsightsBooking["status"],
         price: priceFromDb(b.service_price as number | string | null),
       },
@@ -139,5 +242,50 @@ export async function getShopInsights(
     name: s.name as string,
   }));
 
-  return computeShopInsights({ rangeDays, windowDates, hours, bookings, staff });
+  const services: InsightsService[] = (servicesData ?? []).map((s) => ({
+    id: s.id as string,
+    name: s.name as string,
+  }));
+
+  // Partition bookings into the two windows by date membership.
+  const currentDateSet = new Set(currentWindow.map((d) => d.dateYmd));
+  const compareDateSet = new Set(compareWindow.map((d) => d.dateYmd));
+  const currentBookings = allBookings.filter((b) => currentDateSet.has(b.bookingDate));
+  const compareBookings = allBookings.filter((b) => compareDateSet.has(b.bookingDate));
+
+  const insights = computeShopInsights({
+    rangeDays: currentWindow.length,
+    windowDates: currentWindow,
+    hours,
+    bookings: currentBookings,
+    staff,
+    services,
+    filterStaffIds,
+    filterServiceIds,
+  });
+
+  // Comparison window: same filters, so deltas reflect like-for-like.
+  const prior = computeShopInsights({
+    rangeDays: compareWindow.length,
+    windowDates: compareWindow,
+    hours,
+    bookings: compareBookings,
+    staff,
+    services,
+    filterStaffIds,
+    filterServiceIds,
+  });
+
+  const deltas: InsightsDeltas = {
+    revenue: delta(insights.revenue, prior.revenue),
+    totalBookings: delta(insights.totalBookings, prior.totalBookings),
+    avgTicket: delta(insights.avgTicket, prior.avgTicket),
+  };
+
+  return {
+    insights,
+    deltas,
+    staffOptions: staff.map((s) => ({ id: s.id, name: s.name })),
+    serviceOptions: services.map((s) => ({ id: s.id, name: s.name })),
+  };
 }
