@@ -2,6 +2,8 @@
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
+import { cn } from "@/lib/cn";
+import { ACTION_BASE, COMPLETE_STYLE } from "./bookingPresentation";
 import { markBookingCompleted } from "./actions";
 
 /**
@@ -26,10 +28,11 @@ export function CompleteBookingByShopButton({
       trigger={
         <button
           type="button"
-          className="w-full sm:w-auto whitespace-nowrap rounded-full border-2 border-transparent bg-success text-on-success px-3 sm:px-4 py-2 text-label-sm sm:text-label-md font-semibold flex items-center justify-center gap-1.5 hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 transition-opacity"
+          aria-label={`ทำเครื่องหมายว่าเสร็จสิ้น ${customerName}`}
+          className={cn(ACTION_BASE, COMPLETE_STYLE)}
         >
           <Icon name="check" size={18} />
-          เสร็จสิ้น
+          <span>เสร็จสิ้น</span>
         </button>
       }
       title="ยืนยันเสร็จสิ้น?"

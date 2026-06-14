@@ -3,56 +3,94 @@ import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import { formatBaht } from "@/lib/baht";
-import type { BookingListItem, BookingStatus } from "@/lib/services/bookings";
+import { hhmmToMinutes } from "@/lib/booking/slot-math";
+import type { BookingListItem } from "@/lib/services/bookings";
 import { CancelBookingByShopButton } from "./CancelBookingByShopButton";
 import { CompleteBookingByShopButton } from "./CompleteBookingByShopButton";
+import {
+  STATUS_ACCENT,
+  STATUS_META,
+  cancelChipLabel,
+  formatThaiDateFull,
+} from "./bookingPresentation";
 
-const STATUS_MAP: Record<
-  BookingStatus,
-  { label: string; variant: "confirmed" | "success" | "danger" }
-> = {
-  confirmed: { label: "รอรับบริการ", variant: "confirmed" },
-  completed: { label: "เสร็จสิ้น", variant: "success" },
-  cancelled: { label: "ยกเลิก", variant: "danger" },
-};
-
-export function BookingRow({ booking }: { booking: BookingListItem }) {
-  const status = STATUS_MAP[booking.status];
+/**
+ * Booking card for the /shop/bookings management list.
+ *
+ * Speaks the same visual language as the dashboard's TodayBookingRow — a time
+ * block on the left, a status accent on the card's left edge, and live-signal
+ * chips — but covers every tab. The per-card date is intentionally omitted: the
+ * today tab needs none (all rows are today) and the other tabs group rows under
+ * a date header in page.tsx. `now` is supplied ONLY on the today tab so the
+ * "ถัดไป / เลยเวลา / กำลังมา" signals surface for the live working queue.
+ *
+ * SRP: presentation only. Status transitions + ownership checks live in the
+ * server actions / service layer (reached through the two action buttons).
+ */
+export function BookingRow({
+  booking,
+  now,
+  isNext = false,
+}: {
+  booking: BookingListItem;
+  /** "HH:MM" in Bangkok — present only on the today tab (enables live signals). */
+  now?: string;
+  /** True for the soonest still-upcoming confirmed queue today. */
+  isNext?: boolean;
+}) {
+  const meta = STATUS_META[booking.status];
+  const isConfirmed = booking.status === "confirmed";
   const muted = booking.status === "cancelled";
   const code = booking.id.slice(0, 8).toUpperCase();
+
+  // Live signals only make sense on today's working queue (now supplied).
+  const overdueMin =
+    now != null && isConfirmed && booking.slotTime < now
+      ? hhmmToMinutes(now) - hhmmToMinutes(booking.slotTime)
+      : 0;
+  const isComing = now != null && isConfirmed && booking.comingAckAt != null;
+  const showNext = now != null && isNext && isConfirmed;
+
+  // Cancelled rows surface WHO cancelled (customer vs shop); other statuses
+  // use the plain status label.
+  const chipLabel = muted ? cancelChipLabel(booking.cancelledBy) : meta.label;
 
   return (
     <article
       className={cn(
-        "bg-surface-container-lowest border border-outline-variant rounded-xl p-5 md:p-6 hover:shadow-tinted transition-shadow flex flex-col gap-4",
+        "bg-surface-container-lowest border border-outline-variant border-l-4 rounded-xl p-4 md:p-5 hover:shadow-tinted transition-shadow flex flex-col gap-3.5",
+        STATUS_ACCENT[booking.status],
         muted && "opacity-70",
       )}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1 space-y-2">
-          <TimeBadge time={booking.slotTime} />
-          <div className="flex items-center gap-2 flex-wrap">
+      {/* ── Top zone: time block + customer/service/staff/signals ──────── */}
+      <div className="flex items-start gap-3">
+        <TimeBlock time={booking.slotTime} />
+
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="flex items-start justify-between gap-2">
             {booking.customerPhone ? (
               <Link
                 href={`/shop/customers/${booking.customerPhone}`}
-                className="group inline-flex items-center gap-1 font-display text-headline-md text-on-surface hover:text-primary"
+                className="group inline-flex min-w-0 items-center gap-1 text-body-md font-bold text-on-surface hover:text-primary"
               >
-                <span>{booking.customerName}</span>
+                <span className="truncate">{booking.customerName}</span>
                 <Icon
                   name="chevron_right"
-                  size={18}
-                  className="text-on-surface-variant group-hover:text-primary"
+                  size={16}
+                  className="shrink-0 text-on-surface-variant group-hover:text-primary"
                 />
               </Link>
             ) : (
-              <h3 className="font-display text-headline-md text-on-surface">
+              <p className="truncate text-body-md font-bold text-on-surface">
                 {booking.customerName}
-              </h3>
+              </p>
             )}
-            <Chip variant={status.variant} size="sm">
-              {status.label}
+            <Chip variant={meta.variant} size="sm" className="shrink-0">
+              {chipLabel}
             </Chip>
           </div>
+
           {booking.serviceName ? (
             <p className="flex items-center gap-1.5 text-label-md text-on-surface-variant">
               <Icon name="design_services" size={16} className="shrink-0" />
@@ -64,6 +102,7 @@ export function BookingRow({ booking }: { booking: BookingListItem }) {
               </span>
             </p>
           ) : null}
+
           {booking.staffName ? (
             <p className="flex items-center gap-1.5 text-label-md text-on-surface-variant">
               <Icon name="person" size={16} className="shrink-0" />
@@ -73,18 +112,41 @@ export function BookingRow({ booking }: { booking: BookingListItem }) {
               </span>
             </p>
           ) : null}
-          <p className="text-label-sm text-on-surface-variant uppercase tracking-widest">
-            รหัสการจอง <span className="font-mono normal-case tracking-normal">{code}</span>
-          </p>
+
+          {showNext || overdueMin > 0 || isComing ? (
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              {showNext ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-label-sm font-semibold text-on-primary">
+                  <Icon name="arrow_forward" size={13} className="shrink-0" />
+                  ถัดไป
+                </span>
+              ) : null}
+              {overdueMin > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-error/10 px-2 py-0.5 text-label-sm font-semibold text-error">
+                  <Icon name="schedule" size={13} className="shrink-0" />
+                  เลยเวลา {overdueMin} นาที
+                </span>
+              ) : null}
+              {isComing ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-label-sm font-semibold text-success">
+                  <Icon name="check_circle" size={13} className="shrink-0" />
+                  กำลังมา
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-        <DateBadge dateYmd={booking.bookingDate} />
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 sm:flex-1">
+      {/* ── Bottom zone: phone + (confirmed) actions ───────────────────── */}
+      <div className="flex flex-col gap-3 border-t border-outline-variant/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3 sm:flex-1">
           <PhoneRow phone={booking.customerPhone} />
+          <span className="hidden text-label-sm text-on-surface-variant/70 sm:inline">
+            #<span className="font-mono">{code}</span>
+          </span>
         </div>
-        {booking.status === "confirmed" ? (
+        {isConfirmed ? (
           <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2 sm:shrink-0">
             <CompleteBookingByShopButton
               bookingId={booking.id}
@@ -101,109 +163,58 @@ export function BookingRow({ booking }: { booking: BookingListItem }) {
       </div>
 
       <p className="sr-only">
-        {formatThaiDate(booking.bookingDate)} เวลา {booking.slotTime} น.
+        {formatThaiDateFull(booking.bookingDate)} เวลา {booking.slotTime} น.
+        รหัสการจอง {code}
       </p>
     </article>
   );
 }
 
 /**
- * Calendar-style date badge — mirrors the visual of the date chip in the
- * customer / manual booking picker so the shop owner reads the date the
- * same way across the app. Non-interactive (no click target needed —
- * the date is already locked in).
+ * Time block — the scan anchor on the left of every row. Mirrors the dashboard
+ * TodayBookingRow block (saturated Sora numerals on a soft primary tint) so the
+ * shop owner reads the slot time the same way across both surfaces.
  */
-function DateBadge({ dateYmd }: { dateYmd: string }) {
-  const [y, m, d] = dateYmd.split("-").map(Number);
-  const dayOfWeek = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+function TimeBlock({ time }: { time: string }) {
   return (
     <div
       aria-hidden="true"
-      className="flex flex-col items-center gap-0.5 rounded-xl bg-surface-container-low py-2.5 px-3 text-center w-20"
+      className="flex shrink-0 min-w-[3.5rem] flex-col items-center justify-center rounded-lg bg-primary/10 px-2.5 py-2 leading-none"
     >
-      <span className="text-label-sm font-bold uppercase tracking-widest text-on-surface-variant">
-        {THAI_DAY_SHORT[dayOfWeek]}
-      </span>
-      <span className="font-display text-headline-md leading-none text-on-surface">
-        {d}
-      </span>
-      <span className="text-label-sm text-on-surface-variant">
-        {THAI_MONTH_SHORT[m - 1]}
-      </span>
-    </div>
-  );
-}
-
-/**
- * Inline time pill — placed below the booking code on the left column.
- * Bigger and more saturated than the surrounding metadata so the slot
- * time is the second thing the shop owner sees after the customer name.
- */
-function TimeBadge({ time }: { time: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary-container/15 text-primary"
-    >
-      <Icon name="schedule" size={16} />
-      <span className="font-display text-headline-sm leading-none">
+      <span className="font-display text-headline-md font-bold text-primary">
         {time}
       </span>
-      <span className="text-label-md">น.</span>
-    </span>
-  );
-}
-
-/**
- * Specialised phone row: the icon doubles as a tap-to-call button so the
- * shop owner can dial the customer with one tap on mobile. Icon sized to
- * span both the "เบอร์โทร" label and the number for visual balance.
- */
-function PhoneRow({ phone }: { phone: string | null }) {
-  const Label = (
-    <>
-      <dt className="text-label-sm uppercase tracking-widest text-on-surface-variant">
-        เบอร์โทร
-      </dt>
-      <dd className="text-body-md text-on-surface break-words">
-        {phone ? formatPhone(phone) : (
-          <span className="text-on-surface-variant">ไม่ระบุ</span>
-        )}
-      </dd>
-    </>
-  );
-
-  if (phone) {
-    return (
-      <div className="flex items-center gap-3">
-        <a
-          href={`tel:${phone}`}
-          aria-label={`โทรหาลูกค้า ${formatPhone(phone)}`}
-          className="flex items-center justify-center w-11 h-11 rounded-full bg-primary-container/15 text-primary hover:bg-primary-container/25 active:bg-primary-container/35 transition-colors shrink-0"
-        >
-          <Icon name="phone" size={22} />
-        </a>
-        <div className="min-w-0">{Label}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-3">
-      <span className="flex items-center justify-center w-11 h-11 rounded-full bg-surface-container-low text-on-surface-variant shrink-0">
-        <Icon name="phone" size={22} />
-      </span>
-      <div className="min-w-0">{Label}</div>
+      <span className="mt-1 text-label-sm text-primary/60">น.</span>
     </div>
   );
 }
 
-function formatThaiDate(ymd: string): string {
-  const [y, m, d] = ymd.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  const dayLabel = THAI_DAY_LONG[dt.getUTCDay()];
-  const monthLabel = THAI_MONTH_SHORT[m - 1];
-  return `วัน${dayLabel}ที่ ${d} ${monthLabel} ${y + 543}`;
+/**
+ * Slim phone affordance: a single tap-to-call line (small icon + number) rather
+ * than the old heavy round button + "เบอร์โทร" label — calling is a secondary
+ * action, so it stays quiet. The whole row keeps a ≥44px tap target on mobile.
+ */
+function PhoneRow({ phone }: { phone: string | null }) {
+  if (!phone) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-label-md text-on-surface-variant">
+        <Icon name="phone_disabled" size={16} className="shrink-0" />
+        ไม่ระบุเบอร์
+      </span>
+    );
+  }
+  return (
+    <a
+      href={`tel:${phone}`}
+      aria-label={`โทรหาลูกค้า ${formatPhone(phone)}`}
+      className="inline-flex min-h-[44px] items-center gap-2 text-on-surface transition-colors hover:text-primary"
+    >
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <Icon name="phone" size={16} />
+      </span>
+      <span className="text-body-md font-medium">{formatPhone(phone)}</span>
+    </a>
+  );
 }
 
 function formatPhone(raw: string): string {
@@ -212,30 +223,3 @@ function formatPhone(raw: string): string {
   }
   return raw;
 }
-
-const THAI_DAY_LONG = [
-  "อาทิตย์",
-  "จันทร์",
-  "อังคาร",
-  "พุธ",
-  "พฤหัสบดี",
-  "ศุกร์",
-  "เสาร์",
-];
-
-const THAI_DAY_SHORT = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
-
-const THAI_MONTH_SHORT = [
-  "ม.ค.",
-  "ก.พ.",
-  "มี.ค.",
-  "เม.ย.",
-  "พ.ค.",
-  "มิ.ย.",
-  "ก.ค.",
-  "ส.ค.",
-  "ก.ย.",
-  "ต.ค.",
-  "พ.ย.",
-  "ธ.ค.",
-];

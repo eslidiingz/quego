@@ -1,5 +1,6 @@
 /**
- * Pure (browser-safe) aggregation for the shop insights dashboard (OPP-19).
+ * Pure (browser-safe) aggregation for the shop report dashboard (รายงานร้าน,
+ * OPP-19 Phase 1).
  *
  * Lives in `lib/insights/` (no `server-only` marker) so the metric math is a
  * single source of truth, unit-testable and SSR-safe — the server service
@@ -17,16 +18,20 @@ import {
   type DayOfWeek,
 } from "@/lib/booking/slot-math";
 
-/** Selectable lookback windows, in days. */
-export const INSIGHTS_RANGES = [7, 30, 90] as const;
+/**
+ * Selectable lookback windows. The rolling-day windows (7/30/90) keep their
+ * numeric meaning; the calendar windows ("month" = this month, "lastmonth" =
+ * previous full month) are resolved to concrete dates by the service layer, so
+ * the pure aggregate never reads a clock.
+ */
+export const INSIGHTS_RANGES = ["7", "30", "90", "month", "lastmonth"] as const;
 export type InsightsRange = (typeof INSIGHTS_RANGES)[number];
-export const DEFAULT_INSIGHTS_RANGE: InsightsRange = 30;
+export const DEFAULT_INSIGHTS_RANGE: InsightsRange = "30";
 
-/** Coerce a `?range=` query value to a valid window, falling back to default. */
+/** Coerce a `?range=` query value to a valid window key, default = 30 days. */
 export function parseRange(raw: string | undefined): InsightsRange {
-  const n = Number(raw);
-  return (INSIGHTS_RANGES as readonly number[]).includes(n)
-    ? (n as InsightsRange)
+  return (INSIGHTS_RANGES as readonly string[]).includes(raw ?? "")
+    ? (raw as InsightsRange)
     : DEFAULT_INSIGHTS_RANGE;
 }
 
@@ -36,6 +41,7 @@ export type InsightsBooking = {
   slotTime: string; // HH:MM
   durationMinutes: number;
   staffId: string | null;
+  serviceId: string | null;
   status: "confirmed" | "cancelled" | "completed";
   /** Snapshotted service price; null when unknown. */
   price: number | null;
@@ -44,6 +50,9 @@ export type InsightsBooking = {
 /** An active, service-providing staff member to break utilization down by. */
 export type InsightsStaff = { id: string; name: string };
 
+/** A shop service, for resolving revenue-by-service names. */
+export type InsightsService = { id: string; name: string };
+
 export type BusyHourBucket = {
   /** Hour of day, 0–23. */
   hour: number;
@@ -51,16 +60,31 @@ export type BusyHourBucket = {
   count: number;
 };
 
-export type StaffUtilization = {
+/**
+ * One staff member ranked by revenue. Merges the legacy utilization concept
+ * with revenue so the staff section is a single richer list (revenue desc).
+ */
+export type RevenueByStaff = {
   /** null for the synthetic single-queue line of a staffless shop. */
   staffId: string | null;
   name: string;
+  revenue: number;
+  bookingCount: number;
   bookedMinutes: number;
   /** 0–1, capped. Booked minutes ÷ one line's open minutes over the window. */
   utilization: number;
 };
 
+/** One service ranked by the revenue it brought the shop (revenue desc). */
+export type RevenueByService = {
+  serviceId: string | null;
+  name: string;
+  revenue: number;
+  bookingCount: number;
+};
+
 export type ShopInsights = {
+  /** Length of the window in days (informational; calendar windows vary). */
   rangeDays: number;
   /** Oldest date in window (YYYY-MM-DD). */
   windowStart: string;
@@ -74,6 +98,8 @@ export type ShopInsights = {
   cancellationRate: number;
   /** Estimated revenue (฿) from served (non-cancelled) bookings with a known price. */
   revenue: number;
+  /** Revenue ÷ active booking count; 0 when there are no active bookings. */
+  avgTicket: number;
   /** Total open minutes of a single service line across the window. */
   lineMinutes: number;
   /** Parallel service lines = max(active staff, 1). */
@@ -81,14 +107,29 @@ export type ShopInsights = {
   busyByHour: BusyHourBucket[];
   /** The hour with the most bookings (null when the window is empty). */
   peakHour: number | null;
-  staff: StaffUtilization[];
-  /** False when there were no bookings at all (active or cancelled). */
+  /** Per-staff rows ranked by revenue desc (replaces the old utilization list). */
+  revenueByStaff: RevenueByStaff[];
+  /** Per-service rows ranked by revenue desc. */
+  revenueByService: RevenueByService[];
+  /** False when there were no bookings at all (active or cancelled) in the window. */
   hasData: boolean;
+  /** True when a staff/service filter is currently applied. */
+  hasFilter: boolean;
+  /** True when the unfiltered window has data but the filter excludes everything. */
+  filteredToZero: boolean;
 };
 
 /**
  * Compute every dashboard metric from raw rows. Pure — no I/O, no clock reads
  * (the caller supplies `windowDates` so the result is deterministic per input).
+ *
+ * Optional `filterStaffIds` / `filterServiceIds` narrow the booking set used
+ * for ALL booking-derived metrics. Both are multi-select: a booking passes when
+ * its staff is in `filterStaffIds` (or that list is empty = all) AND its service
+ * is in `filterServiceIds` (or empty = all). Fill-rate & utilization still
+ * divide by the shop's capacity/line-minutes, so under a filter they read as
+ * "share of total capacity for the current selection". Empty/undefined = no
+ * filter for that group.
  */
 export function computeShopInsights(input: {
   rangeDays: number;
@@ -99,8 +140,39 @@ export function computeShopInsights(input: {
   bookings: InsightsBooking[];
   /** Active, service-providing staff. Empty ⇒ single-queue shop. */
   staff: InsightsStaff[];
+  /** All shop services (active or not) for revenue-by-service name resolution. */
+  services?: InsightsService[];
+  filterStaffIds?: string[];
+  filterServiceIds?: string[];
 }): ShopInsights {
-  const { rangeDays, windowDates, hours, bookings, staff } = input;
+  const {
+    rangeDays,
+    windowDates,
+    hours,
+    bookings,
+    staff,
+    services = [],
+    filterStaffIds = [],
+    filterServiceIds = [],
+  } = input;
+
+  const hasFilter = filterStaffIds.length > 0 || filterServiceIds.length > 0;
+  const staffFilterSet = new Set(filterStaffIds);
+  const serviceFilterSet = new Set(filterServiceIds);
+
+  // Apply the multi-select filters to the booking set used for every
+  // booking-derived metric. An empty group matches all. The unfiltered count
+  // drives `filteredToZero`.
+  const filtered = bookings.filter((b) => {
+    if (staffFilterSet.size > 0 && (b.staffId == null || !staffFilterSet.has(b.staffId)))
+      return false;
+    if (
+      serviceFilterSet.size > 0 &&
+      (b.serviceId == null || !serviceFilterSet.has(b.serviceId))
+    )
+      return false;
+    return true;
+  });
 
   // --- Available open-minutes of one service line across the window. ---
   let lineMinutes = 0;
@@ -115,15 +187,19 @@ export function computeShopInsights(input: {
   const capacity = Math.max(staff.length, 1);
   const availableCapacityMin = lineMinutes * capacity;
 
-  // --- Single pass over bookings: counts, minutes, hour + staff buckets. ---
+  // --- Single pass over filtered bookings: counts, minutes, hour + buckets. ---
   let bookedMin = 0;
   let totalBookings = 0;
   let cancelled = 0;
   let revenue = 0;
   const hourCounts = new Array<number>(24).fill(0);
   const staffMinutes = new Map<string | null, number>();
+  const staffRevenue = new Map<string | null, number>();
+  const staffCount = new Map<string | null, number>();
+  const serviceRevenue = new Map<string | null, number>();
+  const serviceCount = new Map<string | null, number>();
 
-  for (const b of bookings) {
+  for (const b of filtered) {
     if (b.status === "cancelled") {
       cancelled += 1;
       continue;
@@ -135,23 +211,28 @@ export function computeShopInsights(input: {
     const hour = Math.floor(hhmmToMinutes(b.slotTime) / 60);
     if (hour >= 0 && hour < 24) hourCounts[hour] += 1;
 
-    staffMinutes.set(
-      b.staffId,
-      (staffMinutes.get(b.staffId) ?? 0) + b.durationMinutes,
-    );
+    staffMinutes.set(b.staffId, (staffMinutes.get(b.staffId) ?? 0) + b.durationMinutes);
+    staffCount.set(b.staffId, (staffCount.get(b.staffId) ?? 0) + 1);
+    serviceCount.set(b.serviceId, (serviceCount.get(b.serviceId) ?? 0) + 1);
 
     // The window is always past dates, so any non-cancelled booking was served
     // (no-show is folded into cancelled). Count revenue across all active
     // bookings — not just those a shop bothered to mark "completed" — so the
     // figure tracks `totalBookings`/fill-rate instead of reading ฿0 whenever
-    // completion isn't diligently recorded.
-    if (b.price != null) revenue += b.price;
+    // completion isn't diligently recorded. Skip null prices for revenue but
+    // still count the booking above.
+    if (b.price != null) {
+      revenue += b.price;
+      staffRevenue.set(b.staffId, (staffRevenue.get(b.staffId) ?? 0) + b.price);
+      serviceRevenue.set(b.serviceId, (serviceRevenue.get(b.serviceId) ?? 0) + b.price);
+    }
   }
 
   const totalAll = totalBookings + cancelled;
   const fillRate =
     availableCapacityMin > 0 ? Math.min(1, bookedMin / availableCapacityMin) : 0;
   const cancellationRate = totalAll > 0 ? cancelled / totalAll : 0;
+  const avgTicket = totalBookings > 0 ? revenue / totalBookings : 0;
 
   // --- Busy-by-hour: span the shop's open hours across the week so the chart
   //     is compact (earliest open hour … latest close hour). Falls back to
@@ -187,47 +268,20 @@ export function computeShopInsights(input: {
     }
   }
 
-  // --- Per-staff utilization. Denominator = one line's open minutes (each
-  //     staff member is exactly one parallel line). null-staff (legacy
-  //     single-queue) minutes are only surfaced when the shop has no staff. ---
-  let staffUtil: StaffUtilization[];
-  if (staff.length > 0) {
-    staffUtil = staff
-      .map((s) => {
-        const mins = staffMinutes.get(s.id) ?? 0;
-        return {
-          staffId: s.id,
-          name: s.name,
-          bookedMinutes: mins,
-          utilization: lineMinutes > 0 ? Math.min(1, mins / lineMinutes) : 0,
-        };
-      })
-      .sort((a, b) => b.utilization - a.utilization);
+  const revenueByStaff = buildRevenueByStaff({
+    staff,
+    lineMinutes,
+    staffMinutes,
+    staffRevenue,
+    staffCount,
+    staffFilterSet,
+  });
 
-    // Bookings made before the shop added staff carry staffId = null. Their
-    // minutes still count toward bookedMin/fillRate, so surface them as an
-    // explicit trailing row — otherwise the per-staff bars silently fail to add
-    // up to the overall fill rate for shops that adopted staff mid-window.
-    const unassignedMin = staffMinutes.get(null) ?? 0;
-    if (unassignedMin > 0) {
-      staffUtil.push({
-        staffId: null,
-        name: "ไม่ระบุพนักงาน",
-        bookedMinutes: unassignedMin,
-        utilization: lineMinutes > 0 ? Math.min(1, unassignedMin / lineMinutes) : 0,
-      });
-    }
-  } else {
-    const mins = staffMinutes.get(null) ?? 0;
-    staffUtil = [
-      {
-        staffId: null,
-        name: "คิวรวม (ไม่ระบุพนักงาน)",
-        bookedMinutes: mins,
-        utilization: lineMinutes > 0 ? Math.min(1, mins / lineMinutes) : 0,
-      },
-    ];
-  }
+  const revenueByService = buildRevenueByService({
+    services,
+    serviceRevenue,
+    serviceCount,
+  });
 
   return {
     rangeDays,
@@ -237,11 +291,123 @@ export function computeShopInsights(input: {
     fillRate,
     cancellationRate,
     revenue,
+    avgTicket,
     lineMinutes,
     capacity,
     busyByHour,
     peakHour,
-    staff: staffUtil,
+    revenueByStaff,
+    revenueByService,
     hasData: totalAll > 0,
+    hasFilter,
+    // True only when the window genuinely has bookings but the filter hid them.
+    filteredToZero: hasFilter && bookings.length > 0 && filtered.length === 0,
   };
+}
+
+/**
+ * Per-staff rows ranked by revenue. Denominator for utilization = one line's
+ * open minutes (each staff member is exactly one parallel line). The legacy
+ * null-staff bucket is surfaced as an explicit trailing row so per-staff bars
+ * still reconcile with the overall fill rate for shops that adopted staff
+ * mid-window. When a staff filter is active, only the selected staff rows show.
+ */
+function buildRevenueByStaff({
+  staff,
+  lineMinutes,
+  staffMinutes,
+  staffRevenue,
+  staffCount,
+  staffFilterSet,
+}: {
+  staff: InsightsStaff[];
+  lineMinutes: number;
+  staffMinutes: Map<string | null, number>;
+  staffRevenue: Map<string | null, number>;
+  staffCount: Map<string | null, number>;
+  staffFilterSet: Set<string>;
+}): RevenueByStaff[] {
+  const utilFor = (mins: number) =>
+    lineMinutes > 0 ? Math.min(1, mins / lineMinutes) : 0;
+
+  const rows: RevenueByStaff[] = [];
+
+  if (staff.length > 0) {
+    for (const s of staff) {
+      // When a staff filter is active, only the selected staff are relevant.
+      if (staffFilterSet.size > 0 && !staffFilterSet.has(s.id)) continue;
+      const mins = staffMinutes.get(s.id) ?? 0;
+      rows.push({
+        staffId: s.id,
+        name: s.name,
+        revenue: staffRevenue.get(s.id) ?? 0,
+        bookingCount: staffCount.get(s.id) ?? 0,
+        bookedMinutes: mins,
+        utilization: utilFor(mins),
+      });
+    }
+
+    // Bookings made before the shop added staff carry staffId = null. Only
+    // surface them when no specific staff filter is hiding them.
+    if (staffFilterSet.size === 0) {
+      const unassignedMin = staffMinutes.get(null) ?? 0;
+      const unassignedCount = staffCount.get(null) ?? 0;
+      if (unassignedMin > 0 || unassignedCount > 0) {
+        rows.push({
+          staffId: null,
+          name: "ไม่ระบุพนักงาน",
+          revenue: staffRevenue.get(null) ?? 0,
+          bookingCount: unassignedCount,
+          bookedMinutes: unassignedMin,
+          utilization: utilFor(unassignedMin),
+        });
+      }
+    }
+  } else {
+    const mins = staffMinutes.get(null) ?? 0;
+    rows.push({
+      staffId: null,
+      name: "คิวรวม (ไม่ระบุพนักงาน)",
+      revenue: staffRevenue.get(null) ?? 0,
+      bookingCount: staffCount.get(null) ?? 0,
+      bookedMinutes: mins,
+      utilization: utilFor(mins),
+    });
+  }
+
+  return rows.sort((a, b) => b.revenue - a.revenue);
+}
+
+/**
+ * Per-service rows ranked by revenue. Resolves service id→name from the shop's
+ * service list; null service_id → "ไม่ระบุบริการ"; a service_id with no match
+ * (deleted service) → "บริการอื่นๆ". Only services that actually appear in the
+ * (filtered) bookings are returned.
+ */
+function buildRevenueByService({
+  services,
+  serviceRevenue,
+  serviceCount,
+}: {
+  services: InsightsService[];
+  serviceRevenue: Map<string | null, number>;
+  serviceCount: Map<string | null, number>;
+}): RevenueByService[] {
+  const nameById = new Map(services.map((s) => [s.id, s.name]));
+
+  const rows: RevenueByService[] = [];
+  for (const [serviceId, count] of serviceCount) {
+    const name =
+      serviceId == null
+        ? "ไม่ระบุบริการ"
+        : (nameById.get(serviceId) ?? "บริการอื่นๆ");
+    rows.push({
+      serviceId,
+      name,
+      revenue: serviceRevenue.get(serviceId) ?? 0,
+      bookingCount: count,
+    });
+  }
+
+  return rows.sort((a, b) => b.revenue - a.revenue);
 }

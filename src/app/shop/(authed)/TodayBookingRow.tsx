@@ -6,15 +6,18 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import { hhmmToMinutes } from "@/lib/booking/slot-math";
-import type {
-  BookingListItem,
-  BookingStatus,
-  CancelledBy,
-} from "@/lib/services/bookings";
+import type { BookingListItem } from "@/lib/services/bookings";
 import {
   cancelBookingByShopAction,
   markBookingCompleted,
 } from "./bookings/actions";
+import {
+  ACTION_BASE,
+  CANCEL_STYLE,
+  COMPLETE_STYLE,
+  STATUS_META,
+  cancelChipLabel,
+} from "./bookings/bookingPresentation";
 
 /**
  * Booking card used by the shop dashboard's "การจองวันนี้" list.
@@ -46,7 +49,7 @@ export function TodayBookingRow({
   isNext: boolean;
 }) {
   const isConfirmed = booking.status === "confirmed";
-  const chip = STATUS_CHIP[booking.status];
+  const chip = STATUS_META[booking.status];
   // How many minutes a confirmed queue is already past its slot (Q2). 0 when
   // upcoming or not confirmed, so the badge only shows for genuinely late ones.
   const overdueMin =
@@ -87,7 +90,7 @@ export function TodayBookingRow({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         {/* ── Content zone ─────────────────────────────────────────── */}
         <div className="flex min-w-0 flex-1 items-start gap-3">
-          <div className="flex shrink-0 min-w-[3.5rem] flex-col items-center justify-center rounded-xl bg-primary/10 px-2.5 py-2 leading-none">
+          <div className="flex shrink-0 min-w-[3.5rem] flex-col items-center justify-center rounded-lg bg-primary/10 px-2.5 py-2 leading-none">
             <span className="font-display text-headline-md font-bold text-primary">
               {booking.slotTime}
             </span>
@@ -220,30 +223,3 @@ export function TodayBookingRow({
   );
 }
 
-const ACTION_BASE =
-  "inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-3 text-label-md font-semibold transition-all active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
-
-const COMPLETE_STYLE =
-  "bg-success text-on-success hover:opacity-90 focus-visible:ring-success";
-
-const CANCEL_STYLE =
-  "border-2 border-outline-variant text-on-surface-variant hover:border-error hover:bg-error/5 hover:text-error focus-visible:ring-error";
-
-const STATUS_CHIP: Record<
-  BookingStatus,
-  { label: string; variant: "confirmed" | "success" | "danger" }
-> = {
-  confirmed: { label: "รอรับบริการ", variant: "confirmed" },
-  completed: { label: "เสร็จสิ้น", variant: "success" },
-  cancelled: { label: "ยกเลิก", variant: "danger" },
-};
-
-/**
- * Cancelled-status chip label, specialised by who cancelled. Legacy rows with
- * an unknown source (cancelled_by = null) fall back to the plain "ยกเลิก".
- */
-function cancelChipLabel(by: CancelledBy | null): string {
-  if (by === "customer") return "ลูกค้ายกเลิก";
-  if (by === "shop") return "ร้านยกเลิก";
-  return "ยกเลิก";
-}

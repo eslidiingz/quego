@@ -2,6 +2,8 @@
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
+import { cn } from "@/lib/cn";
+import { ACTION_BASE, CANCEL_STYLE } from "./bookingPresentation";
 import { cancelBookingByShopAction } from "./actions";
 
 /**
@@ -26,10 +28,11 @@ export function CancelBookingByShopButton({
       trigger={
         <button
           type="button"
-          className="w-full sm:w-auto whitespace-nowrap border-2 border-outline-variant rounded-full px-3 sm:px-4 py-2 text-on-surface-variant hover:bg-error/5 hover:border-error/40 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-2 transition-colors text-label-sm sm:text-label-md font-semibold flex items-center justify-center gap-1.5"
+          aria-label={`ยกเลิกการจองของ ${customerName}`}
+          className={cn(ACTION_BASE, CANCEL_STYLE)}
         >
           <Icon name="cancel" size={18} />
-          ยกเลิก
+          <span>ยกเลิก</span>
         </button>
       }
       title="ยกเลิกการจองหรือไม่?"
