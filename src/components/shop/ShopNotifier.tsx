@@ -32,9 +32,9 @@ type ToastState = { id: number; message: string } | null;
  * surface first as a new booking and later as a cancellation, and both deserve a
  * ping.
  *
- * Read model (mirrors the admin's `PendingShopsNotifier`): each notice carries a
- * `read` flag. Opening the bell does NOT clear the badge — the count is the
- * number of *unread* notices and only drops when the shop opens a notice
+ * Read model: each notice carries a `read` flag. Opening the bell does NOT
+ * clear the badge — the count is the number of *unread* notices and only drops
+ * when the shop opens a notice
  * (navigating to the bookings list) or taps "อ่านทั้งหมด".
  *
  * SRP: owns all notification + read state and renders its own bell + dropdown +

@@ -48,8 +48,8 @@ const PIN_RE = /^\d{6}$/u;
 
 /**
  * Look up a customer by phone. Returns null if no row exists — distinct
- * from `findApprovedShopByPhone`, which also returns null for the "exists
- * but not approved" case (no analogous moderation gate for customers).
+ * from `findShopByOwnerPhone`, which also returns null for the "exists
+ * but not approved" case (a legacy-row guard with no analogue for customers).
  */
 export async function findCustomerByPhone(
   phone: string,
@@ -100,11 +100,15 @@ export async function createOrSetCustomerPin(
   }
 
   const pinHash = await hashPassword(pin);
+  // Audit stamp: the caller (setupCustomerPin) has already proven phone
+  // ownership via OTP before reaching here. UTC ISO is correct for a
+  // timestamptz column; this is a record-of-fact, not a business date.
+  const phoneVerifiedAt = new Date().toISOString();
 
   if (existing) {
     const { error } = await supabase
       .from("customers")
-      .update({ pin_hash: pinHash })
+      .update({ pin_hash: pinHash, phone_verified_at: phoneVerifiedAt })
       .eq("id", existing.id);
     if (error) {
       // Log the real DB detail server-side; keep the client message generic so
@@ -121,7 +125,7 @@ export async function createOrSetCustomerPin(
 
   const { data, error } = await supabase
     .from("customers")
-    .insert({ phone, pin_hash: pinHash })
+    .insert({ phone, pin_hash: pinHash, phone_verified_at: phoneVerifiedAt })
     .select("id")
     .single();
 

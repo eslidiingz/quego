@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
-import { Chip } from "@/components/ui/Chip";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { countShopsByStatus } from "@/lib/services/shops";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +11,7 @@ export default async function AdminHomePage() {
     { count: categoryCount },
     { count: activeCategoryCount },
     { count: presetCount },
-    shopCounts,
+    { count: approvedShops },
   ] = await Promise.all([
     supabase.from("shop_categories").select("*", { count: "exact", head: true }),
     supabase
@@ -23,11 +21,13 @@ export default async function AdminHomePage() {
     supabase
       .from("category_service_presets")
       .select("*", { count: "exact", head: true }),
-    countShopsByStatus(),
+    // Self-serve registration: every live shop is `approved`, so the live shop
+    // count is just the approved rows.
+    supabase
+      .from("shops")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "approved"),
   ]);
-
-  const approvedShops = shopCounts.approved;
-  const pendingShops = shopCounts.pending;
 
   return (
     <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full space-y-stack-md">
@@ -39,25 +39,11 @@ export default async function AdminHomePage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <DashboardCard
-          href="/admin/shops?status=pending"
-          icon="hourglass_top"
-          tone="secondary"
-          value={pendingShops}
-          label="ร้านรออนุมัติ"
-          accent={
-            pendingShops > 0 ? (
-              <Chip variant="waiting" size="sm" pulse>
-                ต้องดำเนินการ
-              </Chip>
-            ) : null
-          }
-        />
-        <DashboardCard
           href="/admin/shops?status=approved"
           icon="storefront"
           tone="primary"
-          value={approvedShops}
-          label="ร้านที่อนุมัติแล้ว"
+          value={approvedShops ?? 0}
+          label="ร้านที่เปิดให้บริการ"
         />
         <DashboardCard
           href="/admin/categories"

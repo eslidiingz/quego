@@ -47,10 +47,9 @@ export function noticeKey(notice: { kind: ShopNotice["kind"]; id: string }): str
  * exercised in isolation and so the notifier stays focused on data + behaviour.
  *
  * Renders a mixed feed: new bookings and customer-initiated cancellations,
- * distinguished per item by `kind` (see KIND_STYLES). Read model (mirrors the
- * admin's `PendingShopsPanel`): opening the bell does NOT mark anything read. A
- * notice clears only when the shop opens it (navigates to the bookings list) or
- * uses "อ่านทั้งหมด".
+ * distinguished per item by `kind` (see KIND_STYLES). Read model: opening the
+ * bell does NOT mark anything read. A notice clears only when the shop opens it
+ * (navigates to the bookings list) or uses "อ่านทั้งหมด".
  */
 export function NotificationPanel({
   items,

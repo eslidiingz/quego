@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { findApprovedShopByPhone } from "@/lib/services/shops";
+import { findShopByOwnerPhone } from "@/lib/services/shops";
 import { setShopLoginIntent } from "@/lib/auth/shop-session-server";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { isValidThaiPhone } from "@/lib/validation/phone";
@@ -43,13 +43,11 @@ export async function startShopLogin(
     };
   }
 
-  const shop = await findApprovedShopByPhone(phone);
+  const shop = await findShopByOwnerPhone(phone);
   if (!shop) {
-    // Don't disclose which condition failed (not registered vs not approved).
     return {
       ok: false,
-      message:
-        "ไม่พบร้านที่ใช้เบอร์นี้ในระบบ หรือยังไม่ผ่านการอนุมัติจากทีมงาน",
+      message: "ไม่พบร้านที่ใช้เบอร์นี้ในระบบ",
     };
   }
 

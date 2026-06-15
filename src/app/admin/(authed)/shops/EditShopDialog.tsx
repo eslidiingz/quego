@@ -17,8 +17,8 @@ import { updateShop, type UpdateShopState } from "./actions";
  * as the public registration form (shared in src/lib/validation/shop.ts) so
  * the server-side rules stay consistent.
  *
- * SRP: collects + submits; status changes belong to ApproveShopDialog /
- * RejectShopDialog and are intentionally not exposed here.
+ * SRP: collects + submits profile fields only. The shop's `status` is not
+ * editable — registration is self-serve and there is no moderation flow.
  */
 export function EditShopDialog({
   open,

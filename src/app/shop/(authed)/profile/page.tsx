@@ -64,11 +64,7 @@ export default async function ShopProfilePage({
       <PageHeader
         eyebrow="จัดการร้าน"
         title="ข้อมูลร้าน"
-        badge={
-          shop.status === "approved" ? (
-            <Chip variant="premium" size="sm">เปิดให้บริการ</Chip>
-          ) : null
-        }
+        badge={<Chip variant="premium" size="sm">เปิดให้บริการ</Chip>}
         description={TAB_DESCRIPTIONS[tab]}
       />
 

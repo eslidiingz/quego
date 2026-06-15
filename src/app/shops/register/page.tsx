@@ -42,8 +42,8 @@ export default async function ShopRegisterPage() {
             สมัครเป็นร้านใน queva
           </h1>
           <p className="text-body-md text-on-surface-variant max-w-xl mx-auto">
-            กรอกข้อมูลด้านล่างเพื่อให้ทีมงานตรวจสอบ
-            เราจะติดต่อกลับภายใน 1–2 วันทำการเพื่อยืนยันร้านของคุณ
+            กรอกข้อมูลด้านล่าง ยืนยันเบอร์โทร แล้วตั้งรหัส PIN
+            เพื่อเริ่มจัดการคิวของร้านได้ทันที ไม่ต้องรออนุมัติ
           </p>
         </div>
 

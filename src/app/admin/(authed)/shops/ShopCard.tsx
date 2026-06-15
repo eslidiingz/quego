@@ -5,32 +5,30 @@ import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import type { ShopListItem, ShopStatus } from "@/lib/services/shops";
 
+// Registration is self-serve, so new shops are always `approved`. The only
+// other value here is a legacy `rejected` tombstone from the old moderation
+// era — rendered (read-only) so the admin can still recognise such rows.
 const statusMap: Record<
   ShopStatus,
-  { label: string; variant: "waiting" | "premium" | "danger" | "delayed" }
+  { label: string; variant: "premium" | "danger" }
 > = {
-  pending: { label: "รออนุมัติ", variant: "waiting" },
   approved: { label: "อนุมัติแล้ว", variant: "premium" },
-  rejected: { label: "ปฏิเสธ", variant: "danger" },
-  suspended: { label: "ระงับชั่วคราว", variant: "delayed" },
+  rejected: { label: "ปฏิเสธ (เลิกใช้แล้ว)", variant: "danger" },
 };
 
 /**
- * SRP: render one shop application card and dispatch approve/reject callbacks.
- * Knows nothing about Supabase, server actions, or status transitions —
- * those are upstream. Tests can mount this with mock data only.
+ * SRP: render one shop card and dispatch edit / impersonate callbacks. There is
+ * no moderation — registration is self-serve — so the admin can only view,
+ * edit, or impersonate. Knows nothing about Supabase or server actions; tests
+ * can mount this with mock data only.
  */
 export function ShopApplicationCard({
   shop,
-  onApprove,
-  onReject,
   onEdit,
   onImpersonate,
   pending,
 }: {
   shop: ShopListItem;
-  onApprove: (shop: ShopListItem) => void;
-  onReject: (shop: ShopListItem) => void;
   onEdit: (shop: ShopListItem) => void;
   onImpersonate: (shop: ShopListItem) => void;
   pending: boolean;
@@ -38,17 +36,14 @@ export function ShopApplicationCard({
   const status = statusMap[shop.status];
   const submitted = formatDate(shop.created_at);
   const reviewed = shop.reviewed_at ? formatDate(shop.reviewed_at) : null;
-  const canApprove = shop.status !== "approved";
-  // Once a shop is approved it stays in good standing — to take it down,
-  // use a separate suspend flow rather than the reject path.
-  const canReject = shop.status === "pending" || shop.status === "suspended";
+  // Only approved shops can be impersonated (matches the login guard).
   const canImpersonate = shop.status === "approved";
 
   return (
     <article
       id={`shop-${shop.id}`}
-      // Deep-link target from the admin bell: `?status=pending#shop-<id>`
-      // scrolls here (offset for the sticky header) and briefly rings the card.
+      // `#shop-<id>` anchor target: a deep link scrolls here (offset for the
+      // sticky header) and briefly rings the card via the :target ring.
       className="scroll-mt-24 target:ring-2 target:ring-primary target:ring-offset-2 target:ring-offset-background bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm hover:shadow-tinted transition-shadow space-y-4"
     >
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -96,17 +91,6 @@ export function ShopApplicationCard({
         ) : null}
       </dl>
 
-      {shop.status === "rejected" && shop.rejection_reason ? (
-        <div className="bg-error-container/30 border border-error/20 text-on-error-container rounded-lg p-3">
-          <p className="text-label-sm uppercase tracking-widest font-bold mb-1">
-            เหตุผลที่ปฏิเสธ
-          </p>
-          <p className="text-body-md whitespace-pre-line">
-            {shop.rejection_reason}
-          </p>
-        </div>
-      ) : null}
-
       <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap sm:justify-end gap-3 pt-2">
         {canImpersonate ? (
           <Button
@@ -128,27 +112,6 @@ export function ShopApplicationCard({
         >
           แก้ไขข้อมูล
         </Button>
-        {canReject ? (
-          <Button
-            variant="outline"
-            rounded="full"
-            disabled={pending}
-            onClick={() => onReject(shop)}
-            iconLeft={<Icon name="block" />}
-          >
-            ปฏิเสธ
-          </Button>
-        ) : null}
-        {canApprove ? (
-          <Button
-            rounded="full"
-            disabled={pending}
-            onClick={() => onApprove(shop)}
-            iconLeft={<Icon name="check_circle" />}
-          >
-            {shop.status === "pending" ? "อนุมัติ" : "อนุมัติอีกครั้ง"}
-          </Button>
-        ) : null}
       </div>
     </article>
   );

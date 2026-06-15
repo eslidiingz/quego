@@ -32,6 +32,9 @@ export function CustomerLoginForm({
         errorText={state?.fieldErrors?.phone}
         disabled={pending}
       />
+      <p className="text-label-sm text-on-surface-variant -mt-2">
+        ยังไม่เคยใช้? ระบบจะสร้างบัญชีให้อัตโนมัติ
+      </p>
       {state && !state.fieldErrors ? (
         <div
           role="alert"
@@ -54,7 +57,7 @@ export function CustomerLoginForm({
           )
         }
       >
-        {pending ? "กำลังตรวจสอบ..." : "เข้าสู่ระบบ"}
+        {pending ? "กำลังส่ง OTP..." : "เข้าสู่ระบบ"}
       </Button>
     </form>
   );

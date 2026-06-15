@@ -7,6 +7,10 @@ import {
   getCustomerLoginIntent,
 } from "@/lib/auth/customer-session-server";
 import {
+  clearPhoneVerified,
+  isPhoneVerified,
+} from "@/lib/auth/phone-verification-server";
+import {
   createOrSetCustomerPin,
   verifyCustomerPin,
 } from "@/lib/services/customers";
@@ -66,6 +70,17 @@ export async function setupCustomerPin(
     };
   }
 
+  // Hard gate: signup (first PIN setup) requires proven phone ownership. The
+  // OTP UI ordering is only UX — THIS server-side cookie check is the trust
+  // boundary, so a verify-one-number/register-another swap can't slip through.
+  if (!(await isPhoneVerified(intent.phone))) {
+    return {
+      ok: false,
+      message: "กรุณายืนยันเบอร์โทรด้วย OTP ก่อนตั้ง PIN",
+      fieldErrors: { pin: "กรุณายืนยันเบอร์โทรด้วย OTP ก่อนตั้ง PIN" },
+    };
+  }
+
   const result = await createOrSetCustomerPin(intent.phone, pin);
   if (!result.ok) {
     if (result.code === "pin_already_set" || result.code === "duplicate") {
@@ -93,6 +108,9 @@ export async function setupCustomerPin(
     await ensureReferralForNewCustomer(intent.phone, intent.referralCode);
   }
 
+  // Account created — consume the OTP proof so it can't be replayed for another
+  // signup, then drop the login intent.
+  await clearPhoneVerified();
   await clearCustomerLoginIntent();
   redirect("/me/bookings");
 }

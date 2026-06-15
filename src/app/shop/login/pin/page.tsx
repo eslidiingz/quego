@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthHeroShell } from "@/components/auth/AuthHeroShell";
-import { findApprovedShopByPhone } from "@/lib/services/shops";
+import { findShopByOwnerPhone } from "@/lib/services/shops";
 import { getShopLoginIntent } from "@/lib/auth/shop-session-server";
 import { SetupPinForm } from "./SetupPinForm";
 import { VerifyPinForm } from "./VerifyPinForm";
@@ -24,7 +24,7 @@ export default async function ShopPinPage() {
     redirect("/login?tab=shop&notice=session-expired");
   }
 
-  const shop = await findApprovedShopByPhone(intent.phone);
+  const shop = await findShopByOwnerPhone(intent.phone);
   if (!shop) {
     redirect("/login?tab=shop&notice=session-expired");
   }

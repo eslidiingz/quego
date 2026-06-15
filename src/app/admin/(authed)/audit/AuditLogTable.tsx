@@ -19,8 +19,6 @@ import {
  */
 
 const ACTION_FILTERS: { value: AuditAction; label: string }[] = [
-  { value: "shop.approve", label: "อนุมัติร้าน" },
-  { value: "shop.reject", label: "ปฏิเสธร้าน" },
   { value: "shop.update", label: "แก้ไขร้าน" },
   { value: "shop.impersonate", label: "เข้าระบบแทนร้าน" },
   { value: "category.create", label: "เพิ่มหมวดหมู่" },

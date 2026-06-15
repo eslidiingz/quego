@@ -15,8 +15,6 @@ export const metadata = {
 
 /** Action codes the filter UI may select — validated against the page input. */
 const KNOWN_ACTIONS: readonly AuditAction[] = [
-  "shop.approve",
-  "shop.reject",
   "shop.update",
   "shop.impersonate",
   "category.create",
@@ -66,7 +64,7 @@ export default async function AuditLogPage({
       <PageHeader
         eyebrow="การตรวจสอบ"
         title="บันทึกการกระทำ"
-        description="ประวัติการอนุมัติ แก้ไข และจัดการของผู้ดูแลระบบ แสดงล่าสุด 200 รายการ"
+        description="ประวัติการแก้ไขและจัดการของผู้ดูแลระบบ แสดงล่าสุด 200 รายการ"
       />
       <AuditLogTable
         entries={entries}
