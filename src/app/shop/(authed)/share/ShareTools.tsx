@@ -38,7 +38,6 @@ export function ShareTools({
   walkInUrl,
   walkInQrDataUrl,
   shopName,
-  isApproved,
 }: {
   shopUrl: string;
   bookingUrl: string;
@@ -47,7 +46,6 @@ export function ShareTools({
   walkInUrl: string;
   walkInQrDataUrl: string;
   shopName: string;
-  isApproved: boolean;
 }) {
   const downloadQr = (dataUrl: string, filename: string) => {
     const a = document.createElement("a");
@@ -60,16 +58,6 @@ export function ShareTools({
 
   return (
     <div className="space-y-stack-md">
-      {!isApproved ? (
-        <div className="flex items-start gap-3 rounded-xl bg-tertiary-container text-on-tertiary-container px-4 py-3.5">
-          <Icon name="info" size={20} className="shrink-0 mt-0.5" />
-          <p className="text-label-md">
-            ลิงก์และ QR ของร้านจะใช้งานได้เมื่อร้านได้รับการอนุมัติแล้ว
-            ระหว่างนี้คุณเตรียมลิงก์ไว้ก่อนได้
-          </p>
-        </div>
-      ) : null}
-
       {/* Shop link — primary share target */}
       <section className={CARD}>
         <h2 className="text-label-lg font-bold text-on-surface mb-1 flex items-center gap-2">

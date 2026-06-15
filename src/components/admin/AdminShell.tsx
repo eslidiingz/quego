@@ -8,7 +8,6 @@ import { Icon } from "@/components/ui/Icon";
 import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { PendingShopsNotifier } from "@/components/admin/PendingShopsNotifier";
 import { cn } from "@/lib/cn";
 import { signOutAdmin } from "@/app/admin/actions";
 
@@ -23,16 +22,10 @@ const navItems = [
 export function AdminShell({
   adminName,
   adminPhone,
-  initialSinceIso,
-  pendingCount,
   children,
 }: {
   adminName: string;
   adminPhone: string;
-  /** Server's "now" at render — baseline cursor for the live notifier. */
-  initialSinceIso: string;
-  /** Shops awaiting moderation, for the "ร้านในระบบ" nav badge. */
-  pendingCount: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -95,19 +88,6 @@ export function AdminShell({
               >
                 <Icon name={item.icon} />
                 <span className="text-label-md">{item.label}</span>
-                {item.href === "/admin/shops" && pendingCount > 0 ? (
-                  <span
-                    aria-label={`${pendingCount} ร้านรออนุมัติ`}
-                    className={cn(
-                      "ml-auto min-w-[20px] h-5 px-1.5 rounded-full text-label-sm font-bold flex items-center justify-center",
-                      active
-                        ? "bg-on-primary/20 text-on-primary"
-                        : "bg-error text-on-error",
-                    )}
-                  >
-                    {pendingCount > 99 ? "99+" : pendingCount}
-                  </span>
-                ) : null}
               </Link>
             );
           })}
@@ -147,9 +127,6 @@ export function AdminShell({
           </h1>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
-            {/* Bell is the right-most item so its `right-0` dropdown anchors to
-                the viewport edge and stays on-screen on narrow widths. */}
-            <PendingShopsNotifier initialSinceIso={initialSinceIso} />
           </div>
         </header>
         <div className="flex-1">{children}</div>

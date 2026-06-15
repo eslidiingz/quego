@@ -2,6 +2,11 @@
 
 import { redirect } from "next/navigation";
 import { createShop } from "@/lib/services/shops";
+import {
+  isPhoneVerified,
+  clearPhoneVerified,
+} from "@/lib/auth/phone-verification-server";
+import { setShopLoginIntent } from "@/lib/auth/shop-session-server";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import {
   hasErrors,
@@ -68,6 +73,21 @@ export async function registerShop(
     };
   }
 
+  // OTP gate (the real trust boundary): the owner phone must have been proven
+  // via Firebase OTP in the current window. The client affordance is only UX —
+  // a direct POST that skips it is rejected here.
+  if (!(await isPhoneVerified(parsed.ownerPhone))) {
+    return {
+      ok: false,
+      message: "กรุณายืนยันเบอร์โทรด้วย OTP ก่อนสมัคร",
+      fieldErrors: {
+        ownerPhone: "กรุณายืนยันเบอร์โทรด้วย OTP ก่อนสมัคร",
+      },
+      values: parsed,
+      ts: Date.now(),
+    };
+  }
+
   const result = await createShop(parsed);
   if (!result.ok) {
     if (result.code === "category_not_found") {
@@ -94,5 +114,13 @@ export async function registerShop(
     return { ok: false, message: result.message, values: parsed, ts: Date.now() };
   }
 
-  redirect(`/shops/register/success?id=${result.id}`);
+  // Self-serve onboarding: the shop is created already-approved (no admin gate),
+  // so send the owner straight into PIN setup. Consume the one-time OTP proof,
+  // then drop a shop login-intent (the same cookie step-1 login sets) so
+  // /shop/login/pin shows the "set PIN" form for this shop and, on success,
+  // mints the session and lands them in /shop.
+  await clearPhoneVerified();
+  await setShopLoginIntent({ shopId: result.id, phone: parsed.ownerPhone });
+
+  redirect("/shop/login/pin");
 }

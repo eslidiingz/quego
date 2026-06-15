@@ -24,8 +24,6 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 /** Every auditable admin action, namespaced by entity. */
 export type AuditAction =
-  | "shop.approve"
-  | "shop.reject"
   | "shop.update"
   | "shop.impersonate"
   | "category.create"

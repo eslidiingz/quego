@@ -1,13 +1,16 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { LocationSearchPicker } from "@/components/ui/LocationSearchPicker";
 import { PhoneInput } from "@/components/ui/PhoneInput";
+import { Modal } from "@/components/ui/Modal";
+import { PhoneOtpStep } from "@/components/auth/PhoneOtpStep";
 import { Icon } from "@/components/ui/Icon";
+import { isValidThaiPhone } from "@/lib/validation/phone";
 import { registerShop, type RegisterShopState } from "./actions";
 import type { CategoryOption } from "@/lib/services/shops";
 
@@ -24,6 +27,18 @@ export function ShopRegistrationForm({
   const errors = state?.fieldErrors;
   const values = state?.values;
 
+  // OTP gate: the owner phone must be proven via Firebase OTP before the
+  // application can be submitted. `phoneVerified` is the UX mirror of the
+  // server cookie (the real trust gate lives in the action via isPhoneVerified).
+  const [ownerPhone, setOwnerPhone] = useState(values?.ownerPhone ?? "");
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [otpOpen, setOtpOpen] = useState(false);
+  // Client-side guard shown when the user tries to submit without verifying;
+  // takes precedence over the server-echoed ownerPhone error.
+  const [unverifiedError, setUnverifiedError] = useState<string | null>(null);
+
+  const canVerifyPhone = isValidThaiPhone(ownerPhone) && !phoneVerified;
+
   // On a failed submit, scroll the first invalid field into view and focus it.
   const formRef = useRef<HTMLFormElement>(null);
   useEffect(() => {
@@ -38,11 +53,30 @@ export function ShopRegistrationForm({
   }, [state]);
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-8" noValidate>
+    <form
+      ref={formRef}
+      action={formAction}
+      className="space-y-8"
+      noValidate
+      onSubmit={(e) => {
+        // Client-side guard only — the server still enforces via isPhoneVerified.
+        if (!phoneVerified) {
+          e.preventDefault();
+          setUnverifiedError(
+            "กรุณายืนยันเบอร์โทรด้วย OTP ก่อนสมัคร",
+          );
+          const field = formRef.current?.querySelector<HTMLElement>(
+            '[name="ownerPhone"]',
+          );
+          field?.scrollIntoView({ behavior: "smooth", block: "center" });
+          field?.focus({ preventScroll: true });
+        }
+      }}
+    >
       <Section
         icon="storefront"
         title="ข้อมูลร้าน"
-        description="จะแสดงให้ลูกค้าค้นหาเจอเมื่อร้านได้รับการอนุมัติ"
+        description="ข้อมูลนี้จะแสดงให้ลูกค้าค้นหาเจอ หลังคุณเพิ่มบริการของร้าน"
       >
         <Input
           name="name"
@@ -120,7 +154,7 @@ export function ShopRegistrationForm({
       <Section
         icon="badge"
         title="ผู้ติดต่อ"
-        description="สำหรับให้ทีมงานติดต่อกลับเรื่องการอนุมัติ และใช้สำหรับเข้าสู่ระบบในอนาคต"
+        description="เบอร์นี้ใช้สำหรับเข้าสู่ระบบของร้าน และให้เราติดต่อกลับเมื่อจำเป็น"
       >
         <Input
           name="ownerName"
@@ -133,18 +167,49 @@ export function ShopRegistrationForm({
           errorText={errors?.ownerName}
           disabled={pending}
         />
-        <PhoneInput
-          name="ownerPhone"
-          label="เบอร์โทรผู้ติดต่อ"
-          required
-          placeholder="0xxxxxxxxx"
-          iconLeft={<Icon name="phone" />}
-          autoComplete="tel"
-          helperText="เบอร์นี้ใช้สำหรับเข้าสู่ระบบร้าน"
-          defaultValue={values?.ownerPhone ?? ""}
-          errorText={errors?.ownerPhone}
-          disabled={pending}
-        />
+        <div className="flex flex-col gap-2">
+          <PhoneInput
+            name="ownerPhone"
+            label="เบอร์โทรผู้ติดต่อ"
+            required
+            placeholder="0xxxxxxxxx"
+            iconLeft={<Icon name="phone" />}
+            autoComplete="tel"
+            helperText="เบอร์นี้ใช้สำหรับเข้าสู่ระบบร้าน และต้องยืนยันด้วย OTP"
+            value={ownerPhone}
+            onChange={(next) => {
+              setOwnerPhone(next);
+              // Any edit to the number invalidates a prior verification, so the
+              // user must re-verify the new number before submitting.
+              setPhoneVerified(false);
+              setUnverifiedError(null);
+            }}
+            errorText={unverifiedError ?? errors?.ownerPhone}
+            disabled={pending}
+          />
+          {phoneVerified ? (
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-success-container/40 px-3 py-1.5 text-label-md text-success">
+              <Icon name="check_circle" />
+              ยืนยันเบอร์แล้ว
+            </span>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              rounded="full"
+              className="w-fit"
+              disabled={pending || !canVerifyPhone}
+              onClick={() => {
+                setUnverifiedError(null);
+                setOtpOpen(true);
+              }}
+              iconLeft={<Icon name="verified_user" />}
+            >
+              ยืนยันเบอร์
+            </Button>
+          )}
+        </div>
         <Input
           name="ownerEmail"
           label="อีเมล (ไม่บังคับ)"
@@ -177,13 +242,30 @@ export function ShopRegistrationForm({
             pending ? (
               <Icon name="progress_activity" className="animate-spin" />
             ) : (
-              <Icon name="send" />
+              <Icon name="storefront" />
             )
           }
         >
-          {pending ? "กำลังส่งใบสมัคร..." : "ส่งใบสมัครให้ทีมงานตรวจสอบ"}
+          {pending ? "กำลังสร้างร้าน..." : "สมัครและเริ่มใช้งานทันที"}
         </Button>
       </div>
+
+      <Modal
+        open={otpOpen}
+        onClose={() => setOtpOpen(false)}
+        title="ยืนยันเบอร์โทร"
+        size="sm"
+      >
+        <PhoneOtpStep
+          phone={ownerPhone}
+          description="ยืนยันว่าเบอร์นี้เป็นของคุณ"
+          onVerified={() => {
+            setPhoneVerified(true);
+            setUnverifiedError(null);
+            setOtpOpen(false);
+          }}
+        />
+      </Modal>
     </form>
   );
 }

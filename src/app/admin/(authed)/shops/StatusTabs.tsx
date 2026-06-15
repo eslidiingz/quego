@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
-import type { ShopCountsByStatus, ShopStatus } from "@/lib/services/shops";
 
-type TabKey = ShopStatus | "all";
+/**
+ * Tabs for the admin shops list. Registration is self-serve and there is no
+ * moderation, so the only meaningful split is "all shops" vs the live
+ * (`approved`) set — the latter is the default. Legacy `rejected` tombstones
+ * from the old moderation era only surface under "ทั้งหมด".
+ */
+type TabKey = "all" | "approved";
 
 const tabs: { key: TabKey; label: string }[] = [
+  { key: "approved", label: "เปิดให้บริการ" },
   { key: "all", label: "ทั้งหมด" },
-  { key: "pending", label: "รออนุมัติ" },
-  { key: "approved", label: "อนุมัติแล้ว" },
-  { key: "rejected", label: "ปฏิเสธ" },
-  { key: "suspended", label: "ระงับ" },
 ];
 
 /**
@@ -22,11 +24,8 @@ export function StatusTabs({
   counts,
 }: {
   active: TabKey;
-  counts: ShopCountsByStatus;
+  counts: { all: number; approved: number };
 }) {
-  const totalAll =
-    counts.pending + counts.approved + counts.rejected + counts.suspended;
-
   return (
     <nav
       className="flex gap-1 p-1 bg-surface-container-low rounded-full border border-outline-variant overflow-x-auto no-scrollbar"
@@ -34,7 +33,7 @@ export function StatusTabs({
     >
       {tabs.map((tab) => {
         const isActive = tab.key === active;
-        const count = tab.key === "all" ? totalAll : counts[tab.key];
+        const count = counts[tab.key];
         return (
           <Link
             key={tab.key}

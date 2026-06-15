@@ -18,8 +18,6 @@ import type { AuditAction, AuditEntityType } from "./audit-log";
  * the fallback below keeps an unknown/legacy code from rendering as blank.
  */
 const ACTION_LABELS: Record<AuditAction, string> = {
-  "shop.approve": "อนุมัติร้าน",
-  "shop.reject": "ปฏิเสธร้าน",
   "shop.update": "แก้ไขข้อมูลร้าน",
   "shop.impersonate": "เข้าสู่ระบบแทนร้าน",
   "category.create": "เพิ่มหมวดหมู่",

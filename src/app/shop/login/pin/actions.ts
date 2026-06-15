@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import {
-  findApprovedShopByPhone,
+  findShopByOwnerPhone,
   setShopPin,
   verifyShopPin,
 } from "@/lib/services/shops";
@@ -74,7 +74,7 @@ export async function setupShopPin(
   }
 
   // Re-fetch the shop to put the canonical name in the session.
-  const shop = await findApprovedShopByPhone(intent.phone);
+  const shop = await findShopByOwnerPhone(intent.phone);
   if (!shop) {
     return { ok: false, message: "บัญชีร้านถูกปิดใช้งานระหว่างที่ตั้ง PIN" };
   }
@@ -139,7 +139,7 @@ export async function verifyShopPinAction(
     };
   }
 
-  const shop = await findApprovedShopByPhone(intent.phone);
+  const shop = await findShopByOwnerPhone(intent.phone);
   if (!shop) {
     return { ok: false, message: "บัญชีร้านถูกปิดใช้งาน" };
   }

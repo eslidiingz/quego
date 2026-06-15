@@ -46,11 +46,9 @@ export default async function ShopSharePage() {
         eyebrow="โปรโมตร้าน"
         title="แชร์ร้าน"
         badge={
-          shop.status === "approved" ? (
-            <Chip variant="premium" size="sm">
-              เปิดให้บริการ
-            </Chip>
-          ) : null
+          <Chip variant="premium" size="sm">
+            เปิดให้บริการ
+          </Chip>
         }
         description="คัดลอกลิงก์หรือดาวน์โหลด QR เพื่อให้ลูกค้าจองคิว และนำไปติดในเมนู LINE ของร้าน"
       />
@@ -62,7 +60,6 @@ export default async function ShopSharePage() {
         walkInUrl={walkInUrl}
         walkInQrDataUrl={walkInQrDataUrl}
         shopName={shop.name}
-        isApproved={shop.status === "approved"}
       />
     </div>
   );

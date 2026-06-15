@@ -8,8 +8,6 @@ import {
 describe("thaiActionLabel", () => {
   it("maps every known action to a non-empty Thai label", () => {
     const known = [
-      "shop.approve",
-      "shop.reject",
       "shop.update",
       "shop.impersonate",
       "category.create",
@@ -28,8 +26,8 @@ describe("thaiActionLabel", () => {
   });
 
   it("returns distinct labels for distinct actions", () => {
-    expect(thaiActionLabel("shop.approve")).not.toBe(
-      thaiActionLabel("shop.reject"),
+    expect(thaiActionLabel("shop.update")).not.toBe(
+      thaiActionLabel("shop.impersonate"),
     );
     expect(thaiActionLabel("category.create")).not.toBe(
       thaiActionLabel("preset.create"),
@@ -37,7 +35,7 @@ describe("thaiActionLabel", () => {
   });
 
   it("maps specific actions to their expected Thai copy", () => {
-    expect(thaiActionLabel("shop.approve")).toBe("อนุมัติร้าน");
+    expect(thaiActionLabel("shop.update")).toBe("แก้ไขข้อมูลร้าน");
     expect(thaiActionLabel("preset.toggle_active")).toBe(
       "เปิด/ปิดบริการ preset",
     );

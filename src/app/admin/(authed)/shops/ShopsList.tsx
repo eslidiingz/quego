@@ -7,17 +7,16 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import type { CategoryOption, ShopListItem } from "@/lib/services/shops";
 import { ShopApplicationCard } from "./ShopCard";
-import { ApproveShopDialog } from "./ApproveShopDialog";
-import { RejectShopDialog } from "./RejectShopDialog";
 import { EditShopDialog } from "./EditShopDialog";
 import { startImpersonation } from "./actions";
 
 type ToastState = { kind: "success" | "error"; message: string } | null;
 
 /**
- * Owns the local state for the moderation page: toast feedback and which
- * row has a moderation dialog open. Card renders are stateless and delegate
- * via callbacks (DIP).
+ * Owns the local state for the admin shops page: toast feedback and which
+ * row has an edit / impersonate dialog open. Card renders are stateless and
+ * delegate via callbacks (DIP). There is no moderation — registration is
+ * self-serve — so the admin can only view, edit, or impersonate a shop.
  */
 export function ShopsList({
   rows,
@@ -26,8 +25,6 @@ export function ShopsList({
   rows: ShopListItem[];
   categories: CategoryOption[];
 }) {
-  const [rejectTarget, setRejectTarget] = useState<ShopListItem | null>(null);
-  const [approveTarget, setApproveTarget] = useState<ShopListItem | null>(null);
   const [editTarget, setEditTarget] = useState<ShopListItem | null>(null);
   const [impersonateTarget, setImpersonateTarget] =
     useState<ShopListItem | null>(null);
@@ -59,12 +56,7 @@ export function ShopsList({
     return <EmptyState />;
   }
 
-  const pendingId =
-    approveTarget?.id ??
-    rejectTarget?.id ??
-    editTarget?.id ??
-    impersonateTarget?.id ??
-    null;
+  const pendingId = editTarget?.id ?? impersonateTarget?.id ?? null;
 
   return (
     <div className="space-y-4">
@@ -81,33 +73,10 @@ export function ShopsList({
           key={shop.id}
           shop={shop}
           pending={pendingId === shop.id}
-          onApprove={(s) => setApproveTarget(s)}
-          onReject={(s) => setRejectTarget(s)}
           onEdit={(s) => setEditTarget(s)}
           onImpersonate={(s) => setImpersonateTarget(s)}
         />
       ))}
-
-      {approveTarget ? (
-        <ApproveShopDialog
-          open={approveTarget !== null}
-          onClose={() => setApproveTarget(null)}
-          shopId={approveTarget.id}
-          shopName={approveTarget.name}
-          reapproval={approveTarget.status !== "pending"}
-          onResult={(ok, msg) => showToast(ok ? "success" : "error", msg)}
-        />
-      ) : null}
-
-      {rejectTarget ? (
-        <RejectShopDialog
-          open={rejectTarget !== null}
-          onClose={() => setRejectTarget(null)}
-          shopId={rejectTarget.id}
-          shopName={rejectTarget.name}
-          onResult={(ok, msg) => showToast(ok ? "success" : "error", msg)}
-        />
-      ) : null}
 
       {editTarget ? (
         <EditShopDialog
@@ -179,9 +148,9 @@ function EmptyState() {
       <div className="w-16 h-16 mx-auto rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant mb-4">
         <Icon name="storefront" size={32} />
       </div>
-      <p className="text-body-md text-on-surface">ยังไม่มีร้านในสถานะนี้</p>
+      <p className="text-body-md text-on-surface">ยังไม่มีร้านในระบบ</p>
       <p className="text-label-md text-on-surface-variant mt-1">
-        ลองสลับแท็บอื่นเพื่อดูร้านในสถานะต่าง ๆ
+        ร้านจะปรากฏที่นี่เมื่อมีการสมัครเข้ามา
       </p>
     </div>
   );

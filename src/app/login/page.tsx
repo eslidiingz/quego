@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FlashToast } from "@/components/ui/FlashToast";
 import { AuthHeroShell } from "@/components/auth/AuthHeroShell";
 import { ShopLoginPhoneForm } from "@/app/shop/login/ShopLoginPhoneForm";
@@ -40,7 +41,18 @@ export default async function LoginPage({
         {active === "customer" ? (
           <CustomerLoginForm referralCode={ref} />
         ) : (
-          <ShopLoginPhoneForm />
+          <>
+            <ShopLoginPhoneForm />
+            <p className="mt-4 text-center text-body-sm text-on-surface-variant">
+              ยังไม่มีบัญชี?{" "}
+              <Link
+                href="/shops/register"
+                className="text-primary font-semibold underline-offset-2 hover:underline"
+              >
+                สมัครเป็นร้าน
+              </Link>
+            </p>
+          </>
         )}
       </AuthHeroShell>
     </>

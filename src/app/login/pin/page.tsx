@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AuthHeroShell } from "@/components/auth/AuthHeroShell";
 import { getCustomerLoginIntent } from "@/lib/auth/customer-session-server";
 import { findCustomerByPhone } from "@/lib/services/customers";
-import { SetupPinForm } from "./SetupPinForm";
+import { CustomerSetupGate } from "./CustomerSetupGate";
 import { VerifyPinForm } from "./VerifyPinForm";
 
 export const metadata = {
@@ -52,7 +52,11 @@ export default async function CustomerPinPage() {
         </>
       }
     >
-      {mode === "setup" ? <SetupPinForm /> : <VerifyPinForm />}
+      {mode === "setup" ? (
+        <CustomerSetupGate phone={intent.phone} />
+      ) : (
+        <VerifyPinForm />
+      )}
     </AuthHeroShell>
   );
 }

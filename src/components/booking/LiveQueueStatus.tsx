@@ -7,8 +7,8 @@ import { formatWaitLabel } from "@/lib/booking/queue-format";
 
 /**
  * Customer-facing live-queue cadence (~10s) — kept tighter than the staff
- * notifiers (ShopNotifier / PendingShopsNotifier, ~20s) so the queue
- * figures a waiting customer is watching feel responsive.
+ * notifier (ShopNotifier, ~20s) so the queue figures a waiting customer is
+ * watching feel responsive.
  */
 const POLL_INTERVAL_MS = 10_000;
 

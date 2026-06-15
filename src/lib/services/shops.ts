@@ -24,7 +24,17 @@ import {
 
 // ----- Types --------------------------------------------------------------
 
-export type ShopStatus = "pending" | "approved" | "rejected" | "suspended";
+/**
+ * Lifecycle state of a shop row. Registration is fully self-serve — `createShop`
+ * only ever writes `"approved"`, and there is no admin moderation, so the app
+ * never produces any other value going forward. The union is deliberately kept
+ * as the historical superset purely for DB-READ typing: the live database still
+ * holds legacy `"rejected"` rows from the old moderation era, and public/login
+ * queries keep an `.eq("status","approved")` guard so those legacy rows can
+ * never surface or log in. Narrowing this to `"approved"` alone would make those
+ * read-side guards (and the legacy rows they protect against) untypable.
+ */
+export type ShopStatus = "approved" | "rejected";
 
 export type CategoryOption = {
   id: string;
@@ -86,12 +96,6 @@ export type ShopListItem = {
    */
   reschedule_cancel_cutoff_hours?: number;
 };
-
-export type ShopCountsByStatus = Record<ShopStatus, number>;
-
-export type ModerationResult =
-  | { ok: true }
-  | { ok: false; code: "not_found" | "invalid_transition" | "unknown"; message: string };
 
 export type UpdateShopInput = CreateShopInput;
 
@@ -389,8 +393,9 @@ export async function listActiveCategories(): Promise<CategoryOption[]> {
 /**
  * Shop registration service.
  *
- * SRP: the only thing this function does is write a shop row in pending state
- * and surface domain errors as a typed result. It does not parse HTTP form
+ * SRP: the only thing this function does is write a shop row (live/approved on
+ * creation — registration is self-serve, no admin approval gate) and surface
+ * domain errors as a typed result. It does not parse HTTP form
  * data, set cookies, or redirect — those concerns belong in the server action.
  * DIP: callers depend on this interface, not on Supabase directly.
  */
@@ -419,13 +424,18 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
   // value, keeping the app check and the DB backstop in agreement.
   const ownerEmail = input.ownerEmail ? input.ownerEmail.toLowerCase() : undefined;
 
-  // Uniqueness guards among live (non-rejected) shops. owner_phone is the login
-  // key (findApprovedShopByPhone); contact_phone and owner_email must also be
-  // unique so a number/email can't be claimed by two shops. Each is checked
-  // within its OWN column only — a shop may legitimately reuse its owner_phone
-  // as its contact_phone, so we never cross-check columns. Rejected shops are
-  // excluded so a turned-down owner can re-apply. App-level guards; the partial
-  // unique indexes are the race backstop (23505 → mapped below).
+  // Uniqueness guards among live shops. owner_phone is the login key
+  // (findShopByOwnerPhone); contact_phone and owner_email must also be unique so
+  // a number/email can't be claimed by two shops. Each is checked within its OWN
+  // column only — a shop may legitimately reuse its owner_phone as its
+  // contact_phone, so we never cross-check columns.
+  //
+  // The `.neq("status","rejected")` below is now purely a LEGACY concern: the
+  // moderation era is gone and nothing creates `rejected` rows anymore, but the
+  // live DB still holds old `rejected` tombstones. Excluding them means an owner
+  // whose shop was rejected under the old flow isn't permanently locked out of
+  // self-serve registration. App-level guards; the partial unique indexes are
+  // the race backstop (23505 → mapped below).
   const dupChecks: ReadonlyArray<{
     column: "owner_phone" | "contact_phone" | "owner_email";
     value: string;
@@ -485,6 +495,9 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
   const { data, error } = await supabase
     .from("shops")
     .insert({
+      // Self-serve registration: a shop is live the moment it's created (no admin
+      // approval step). OTP-proven phone ownership is the gate, enforced upstream.
+      status: "approved",
       name: input.name,
       category_id: input.categoryId,
       description: input.description || null,
@@ -496,6 +509,11 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
       owner_name: input.ownerName,
       owner_phone: input.ownerPhone,
       owner_email: ownerEmail ?? null,
+      // Audit: the owner proved this phone via Firebase OTP at registration.
+      // The action gates on isPhoneVerified before reaching here, so by the time
+      // we insert, ownership has been established. Absolute UTC instant, matching
+      // the reviewed_at convention.
+      phone_verified_at: new Date().toISOString(),
     })
     .select("id")
     .single();
@@ -598,184 +616,14 @@ export async function listShops(filter?: {
   }));
 }
 
-// ----- Read: admin new-registration notifications -------------------------
-
-export type NewPendingShopAlert = {
-  id: string;
-  name: string;
-  ownerName: string;
-  /** จังหวัด, may be null for legacy rows. */
-  province: string | null;
-  createdAt: string; // UTC ISO
-};
-
-/**
- * List shops still awaiting moderation that were registered strictly after
- * `sinceIso`. Backs the admin's live "new registration" notifier, which polls
- * this on a short interval with a server-supplied cursor.
- *
- * SRP: a thin "what registered since T?" read — no UI shaping, no side effects.
- * `.gt` (strict) pairs with the caller advancing its cursor to the server's
- * current time each tick, so a row is never emitted twice on the boundary.
- * Only `pending` rows count — a shop approved/rejected in the same window is no
- * longer actionable and must not ping. Capped at 20 to bound a burst.
- */
-export async function listNewPendingShops(
-  sinceIso: string,
-): Promise<NewPendingShopAlert[]> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("shops")
-    .select("id, name, owner_name, province, created_at")
-    .eq("status", "pending")
-    .gt("created_at", sinceIso)
-    .order("created_at", { ascending: true })
-    .limit(20);
-
-  if (error || !data) return [];
-  return (
-    data as {
-      id: string;
-      name: string;
-      owner_name: string;
-      province: string | null;
-      created_at: string;
-    }[]
-  ).map((r) => ({
-    id: r.id,
-    name: r.name,
-    ownerName: r.owner_name,
-    province: r.province,
-    createdAt: r.created_at,
-  }));
-}
-
-/**
- * One round-trip count grouped by status, for tab badges on the moderation page.
- * Falls back to zeros on error so the UI still renders.
- */
-export async function countShopsByStatus(): Promise<ShopCountsByStatus> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("shops")
-    .select("status", { count: "exact" });
-
-  const zero: ShopCountsByStatus = {
-    pending: 0,
-    approved: 0,
-    rejected: 0,
-    suspended: 0,
-  };
-  if (error || !data) return zero;
-
-  for (const row of data) {
-    const status = (row as { status: ShopStatus }).status;
-    if (status in zero) zero[status] += 1;
-  }
-  return zero;
-}
-
-// ----- Admin write: moderation --------------------------------------------
-
-/**
- * Approve a pending shop. Idempotent only when the shop is in `pending`;
- * rejecting an already-approved shop returns an `invalid_transition`.
- */
-export async function approveShop(
-  id: string,
-  reviewerAdminId: string,
-): Promise<ModerationResult> {
-  return updateShopStatus({
-    id,
-    reviewerAdminId,
-    targetStatus: "approved",
-    allowedFrom: ["pending", "rejected", "suspended"],
-    rejectionReason: null,
-  });
-}
-
-/**
- * Reject a pending shop with a reason that becomes visible to the owner.
- */
-export async function rejectShop(
-  id: string,
-  reviewerAdminId: string,
-  reason: string,
-): Promise<ModerationResult> {
-  const trimmed = reason.trim();
-  if (!trimmed) {
-    return {
-      ok: false,
-      code: "invalid_transition",
-      message: "ต้องระบุเหตุผลเมื่อปฏิเสธ",
-    };
-  }
-  return updateShopStatus({
-    id,
-    reviewerAdminId,
-    targetStatus: "rejected",
-    allowedFrom: ["pending", "approved"],
-    rejectionReason: trimmed,
-  });
-}
-
-async function updateShopStatus(args: {
-  id: string;
-  reviewerAdminId: string;
-  targetStatus: ShopStatus;
-  allowedFrom: ShopStatus[];
-  rejectionReason: string | null;
-}): Promise<ModerationResult> {
-  const supabase = getSupabaseAdmin();
-
-  const { data: existing, error: readError } = await supabase
-    .from("shops")
-    .select("status")
-    .eq("id", args.id)
-    .maybeSingle();
-
-  if (readError) {
-    return { ok: false, code: "unknown", message: readError.message };
-  }
-  if (!existing) {
-    return { ok: false, code: "not_found", message: "ไม่พบร้านในระบบ" };
-  }
-
-  const currentStatus = (existing as { status: ShopStatus }).status;
-  if (!args.allowedFrom.includes(currentStatus)) {
-    return {
-      ok: false,
-      code: "invalid_transition",
-      message: `ร้านนี้อยู่ในสถานะ "${currentStatus}" ไม่สามารถเปลี่ยนเป็น "${args.targetStatus}" ได้`,
-    };
-  }
-
-  const { error: updateError } = await supabase
-    .from("shops")
-    .update({
-      status: args.targetStatus,
-      rejection_reason: args.rejectionReason,
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: args.reviewerAdminId,
-    })
-    .eq("id", args.id);
-
-  if (updateError) {
-    return { ok: false, code: "unknown", message: updateError.message };
-  }
-
-  return { ok: true };
-}
-
 // ----- Admin write: edit shop profile -------------------------------------
 
 /**
- * Admin-side update of shop fields. Does not touch `status` — that's owned
- * by the moderation flow (approveShop / rejectShop).
+ * Admin-side update of shop fields. Does not touch `status` — registration is
+ * self-serve and there is no moderation flow, so `status` is never edited.
  *
  * Stamps `reviewed_by` with the editing admin so we have an audit trail of
- * the most recent admin touch; `reviewed_at` is NOT updated because that
- * field tracks moderation decisions, not edits.
+ * the most recent admin touch.
  */
 export async function updateShop(
   id: string,
@@ -993,12 +841,13 @@ export async function updateOwnShopProfile(
 // ----- Shop owner authentication ------------------------------------------
 
 /**
- * Step 1 of shop login: look up an APPROVED shop by phone.
- * Returns a minimal login descriptor — never the PIN hash itself.
- * Returning `null` for both "shop doesn't exist" and "shop not approved"
- * keeps the login flow from leaking which case is which.
+ * Step 1 of shop login: look up a shop by its owner phone. Keeps an
+ * `.eq("status","approved")` guard so a legacy non-approved row (e.g. an old
+ * `rejected` tombstone) can never log in. Returns a minimal login descriptor —
+ * never the PIN hash itself. Returning `null` for both "no such shop" and "not
+ * approved" keeps the login flow from leaking which case is which.
  */
-export async function findApprovedShopByPhone(
+export async function findShopByOwnerPhone(
   phone: string,
 ): Promise<ShopLoginInfo | null> {
   const supabase = getSupabaseAdmin();
