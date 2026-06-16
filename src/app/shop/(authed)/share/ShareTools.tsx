@@ -95,7 +95,7 @@ export function ShareTools({
           <Button
             type="button"
             onClick={() =>
-              downloadQr(qrDataUrl, `queva-qr-${slugify(shopName)}.png`)
+              downloadQr(qrDataUrl, `quego-qr-${slugify(shopName)}.png`)
             }
             iconLeft={<Icon name="download" size={18} />}
             className="w-full sm:w-auto"
@@ -134,7 +134,7 @@ export function ShareTools({
             onClick={() =>
               downloadQr(
                 walkInQrDataUrl,
-                `queva-walkin-${slugify(shopName)}.png`,
+                `quego-walkin-${slugify(shopName)}.png`,
               )
             }
             iconLeft={<Icon name="download" size={18} />}

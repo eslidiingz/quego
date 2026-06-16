@@ -7,7 +7,7 @@ import { ServiceManager } from "./ServiceManager";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "บริการ · queva",
+  title: "บริการ · quego",
 };
 
 export default async function ShopServicesPage() {

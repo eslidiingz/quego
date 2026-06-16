@@ -9,7 +9,7 @@ import { CancelWaitlistButton } from "./CancelWaitlistButton";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "รายการรอคิว · queva",
+  title: "รายการรอคิว · quego",
 };
 
 export default async function MyWaitlistPage() {

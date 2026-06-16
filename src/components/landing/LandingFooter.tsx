@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
+import { QuegoWordmark } from "@/components/ui/QuegoWordmark";
 
 type FootCol = { title: string; links: { label: string; href: string }[] };
 
@@ -31,7 +31,7 @@ const COLS: FootCol[] = [
 ];
 
 /**
- * queva footer on the Ink surface. SRP: site-wide navigation chrome only.
+ * quego footer on the Ink surface. SRP: site-wide navigation chrome only.
  */
 export function LandingFooter() {
   const year = new Date().getFullYear();
@@ -40,7 +40,7 @@ export function LandingFooter() {
       <div className="max-w-[1180px] mx-auto">
         <div className="flex flex-wrap justify-between gap-8 pb-7 border-b border-inverse-on-surface/10 dark:border-outline-variant">
           <div className="max-w-[280px]">
-            <QuevaWordmark className="!text-inverse-on-surface dark:!text-on-surface" />
+            <QuegoWordmark className="!text-inverse-on-surface dark:!text-on-surface" />
             <p className="text-body-sm text-inverse-on-surface/60 dark:text-on-surface-variant mt-2.5">
               ระบบจองคิวสำหรับร้านบริการความงามและสุขภาพทั่วประเทศไทย
             </p>
@@ -68,7 +68,7 @@ export function LandingFooter() {
           </nav>
         </div>
         <p className="text-label-md text-inverse-on-surface/45 dark:text-on-surface-variant mt-5">
-          © {year} queva · ไม่ต้องรอเก้อ แค่กดจอง
+          © {year} quego · ไม่ต้องรอเก้อ แค่กดจอง
         </p>
       </div>
     </footer>

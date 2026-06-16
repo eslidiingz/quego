@@ -7,7 +7,7 @@ import { CustomerSetupGate } from "./CustomerSetupGate";
 import { VerifyPinForm } from "./VerifyPinForm";
 
 export const metadata = {
-  title: "รหัส PIN · queva",
+  title: "รหัส PIN · quego",
 };
 
 export const dynamic = "force-dynamic";

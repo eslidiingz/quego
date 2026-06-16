@@ -11,9 +11,9 @@ import {
 import { ComponentGallery } from "./_components/ComponentGallery";
 
 export const metadata: Metadata = {
-  title: "queva · Design System",
+  title: "quego · Design System",
   description:
-    "Living design system ของ queva — tokens, typography และ component จริงทั้งหมด ออกแบบแบบ mobile-first",
+    "Living design system ของ quego — tokens, typography และ component จริงทั้งหมด ออกแบบแบบ mobile-first",
   // Internal reference surface — keep it out of search indexes.
   robots: { index: false, follow: false },
 };
@@ -88,8 +88,8 @@ const SHADOWS: { token: string; cls: string }[] = [
 ];
 
 const GRADIENTS: { token: string; cls: string }[] = [
-  { token: "bg-queva-hero", cls: "bg-queva-hero" },
-  { token: "bg-queva-panel", cls: "bg-queva-panel" },
+  { token: "bg-quego-hero", cls: "bg-quego-hero" },
+  { token: "bg-quego-panel", cls: "bg-quego-panel" },
   { token: "bg-luxury-gradient", cls: "bg-luxury-gradient" },
   { token: "bg-teal-purple-gradient", cls: "bg-teal-purple-gradient" },
   { token: "bg-progress-gradient", cls: "bg-progress-gradient" },
@@ -143,12 +143,12 @@ export default function DesignSystemPage() {
   return (
     <main className="min-h-screen bg-background pb-24">
       {/* ---------- Hero ---------- */}
-      <header className="bg-queva-hero px-4 pb-10 pt-12 text-white sm:px-6 sm:pt-16">
+      <header className="bg-quego-hero px-4 pb-10 pt-12 text-white sm:px-6 sm:pt-16">
         <div className="mx-auto max-w-5xl">
           <p className="text-label-sm uppercase tracking-[0.3em] text-white/70">
             Living design system
           </p>
-          <h1 className="mt-2 font-display text-display-lg">queva</h1>
+          <h1 className="mt-2 font-display text-display-lg">quego</h1>
           <p className="mt-3 max-w-prose text-body-md text-white/80">
             แหล่งอ้างอิงเดียวของทีม — token, typography และ component
             ทุกตัว render จากโค้ดจริงใน <code className="text-white">globals.css</code> และ{" "}
@@ -179,7 +179,7 @@ export default function DesignSystemPage() {
           id="principles"
           eyebrow="Foundations"
           title="หลักการ"
-          description="กติกาที่ทุก surface ของ queva ยึดร่วมกัน — สรุปจาก convention จริงของโปรเจกต์"
+          description="กติกาที่ทุก surface ของ quego ยึดร่วมกัน — สรุปจาก convention จริงของโปรเจกต์"
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PRINCIPLES.map((p) => (

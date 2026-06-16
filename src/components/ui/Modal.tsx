@@ -62,7 +62,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="queva-overlay-in fixed inset-0 z-50 flex items-center justify-center p-4 bg-on-surface/40 backdrop-blur-sm"
+      className="quego-overlay-in fixed inset-0 z-50 flex items-center justify-center p-4 bg-on-surface/40 backdrop-blur-sm"
       onClick={onClose}
       role="presentation"
     >
@@ -71,7 +71,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby="modal-title"
         className={cn(
-          "queva-pop-in w-full bg-surface-container-lowest rounded-2xl shadow-luxury border border-outline-variant flex flex-col max-h-[90vh]",
+          "quego-pop-in w-full bg-surface-container-lowest rounded-2xl shadow-luxury border border-outline-variant flex flex-col max-h-[90vh]",
           sizes[size],
           className,
         )}

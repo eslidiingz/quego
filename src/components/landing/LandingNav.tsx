@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SiteAuthLink } from "@/components/layout/SiteAuthLink";
-import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
+import { QuegoWordmark } from "@/components/ui/QuegoWordmark";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const NAV_LINKS: { label: string; href: string }[] = [
@@ -10,7 +10,7 @@ const NAV_LINKS: { label: string; href: string }[] = [
 ];
 
 /**
- * queva top navigation — sticky, frosted, brand wordmark + section links and
+ * quego top navigation — sticky, frosted, brand wordmark + section links and
  * the shared auth entry point.
  *
  * SRP: chrome + navigation only. Auth state lives entirely in SiteAuthLink
@@ -19,8 +19,8 @@ const NAV_LINKS: { label: string; href: string }[] = [
 export function LandingNav() {
   return (
     <nav className="sticky top-0 z-50 flex items-center justify-between gap-4 px-4 md:px-12 py-3.5 bg-surface/85 backdrop-blur-md border-b border-outline-variant">
-      <Link href="/" aria-label="queva หน้าแรก">
-        <QuevaWordmark />
+      <Link href="/" aria-label="quego หน้าแรก">
+        <QuegoWordmark />
       </Link>
 
       <div className="hidden md:flex items-center gap-7 text-body-sm text-on-surface-variant">

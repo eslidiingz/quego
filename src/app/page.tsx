@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "queva — ไม่ต้องรอเก้อ แค่กดจอง",
+  title: "quego — ไม่ต้องรอเก้อ แค่กดจอง",
   description:
     "จองคิวร้านบริการความงามและสุขภาพทั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า ไม่ต้องไปนั่งรอ",
 };
@@ -119,7 +119,7 @@ function EmptyState() {
       </div>
       <p className="text-body-md text-on-surface">ยังไม่มีร้านในระบบ</p>
       <p className="text-label-md text-on-surface-variant mt-1">
-        เป็นคนแรกที่สมัครและเปิดร้านบน queva
+        เป็นคนแรกที่สมัครและเปิดร้านบน quego
       </p>
       <Link
         href="/shops/register"

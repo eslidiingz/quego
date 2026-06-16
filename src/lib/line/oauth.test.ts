@@ -5,7 +5,7 @@ describe("buildLineAuthorizeUrl", () => {
   const url = buildLineAuthorizeUrl({
     clientId: "1234567890",
     state: "STATE.TOKEN.VALUE",
-    redirectUri: "https://queva.app/api/shop/line/callback",
+    redirectUri: "https://quego.app/api/shop/line/callback",
   });
   const params = new URL(url).searchParams;
 
@@ -20,7 +20,7 @@ describe("buildLineAuthorizeUrl", () => {
     expect(params.get("client_id")).toBe("1234567890");
     expect(params.get("state")).toBe("STATE.TOKEN.VALUE");
     expect(params.get("redirect_uri")).toBe(
-      "https://queva.app/api/shop/line/callback",
+      "https://quego.app/api/shop/line/callback",
     );
   });
 
@@ -31,7 +31,7 @@ describe("buildLineAuthorizeUrl", () => {
 
   it("url-encodes the redirect uri in the raw query string", () => {
     expect(url).toContain(
-      "redirect_uri=https%3A%2F%2Fqueva.app%2Fapi%2Fshop%2Fline%2Fcallback",
+      "redirect_uri=https%3A%2F%2Fquego.app%2Fapi%2Fshop%2Fline%2Fcallback",
     );
   });
 });

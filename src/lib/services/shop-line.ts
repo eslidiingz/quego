@@ -134,7 +134,7 @@ export async function bindShopLineGroupBySender(
       ok: false,
       code: "not_linked",
       message:
-        "บัญชี LINE ของคุณยังไม่ได้เชื่อมกับร้านใน queva — เปิดแอป queva ไปที่ " +
+        "บัญชี LINE ของคุณยังไม่ได้เชื่อมกับร้านใน quego — เปิดแอป quego ไปที่ " +
         "โปรไฟล์ › การแจ้งเตือน แล้วกด “เชื่อมต่อ LINE” ก่อน แล้วลองใหม่",
     };
   }

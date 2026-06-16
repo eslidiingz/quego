@@ -29,11 +29,11 @@ import { bindShopLineGroupBySender } from "@/lib/services/shop-line";
  */
 
 const WELCOME_TEXT =
-  "ยินดีต้อนรับสู่ queva 🙏 หากต้องการรับแจ้งเตือนผ่าน LINE " +
-  "เปิดแอป queva ไปที่ โปรไฟล์ › การแจ้งเตือน แล้วกด “เชื่อมต่อ LINE”";
+  "ยินดีต้อนรับสู่ quego 🙏 หากต้องการรับแจ้งเตือนผ่าน LINE " +
+  "เปิดแอป quego ไปที่ โปรไฟล์ › การแจ้งเตือน แล้วกด “เชื่อมต่อ LINE”";
 
 const LINK_HINT_TEXT =
-  "การเชื่อมบัญชีทำได้จากในแอป queva ที่หน้า โปรไฟล์ › การแจ้งเตือน " +
+  "การเชื่อมบัญชีทำได้จากในแอป quego ที่หน้า โปรไฟล์ › การแจ้งเตือน " +
   "แล้วกด “เชื่อมต่อ LINE”";
 
 export async function dispatchLineEvents(
@@ -95,9 +95,9 @@ async function handleJoin(event: LineJoinEvent): Promise<void> {
       {
         type: "text",
         text:
-          "สวัสดีค่ะ 🙏 queva พร้อมส่งแจ้งเตือนการจองเข้ากลุ่มนี้\n\n" +
+          "สวัสดีค่ะ 🙏 quego พร้อมส่งแจ้งเตือนการจองเข้ากลุ่มนี้\n\n" +
           "เจ้าของร้านพิมพ์ “เชื่อมร้าน” ในกลุ่มนี้เพื่อผูกกับร้านของคุณ " +
-          "(ต้องเชื่อมต่อ LINE ส่วนตัวกับร้านในแอป queva ก่อน)",
+          "(ต้องเชื่อมต่อ LINE ส่วนตัวกับร้านในแอป quego ก่อน)",
       },
     ],
     { kind: "group_join", recipient: groupId },
@@ -176,7 +176,7 @@ async function handleMessage(event: LineMessageEvent): Promise<void> {
           [
             {
               type: "text",
-              text: "ไม่พบบัญชีผู้ส่ง — โปรดเพิ่ม queva เป็นเพื่อนใน LINE ก่อน แล้วลองพิมพ์ “เชื่อมร้าน” อีกครั้ง",
+              text: "ไม่พบบัญชีผู้ส่ง — โปรดเพิ่ม quego เป็นเพื่อนใน LINE ก่อน แล้วลองพิมพ์ “เชื่อมร้าน” อีกครั้ง",
             },
           ],
           { kind: "group_bind", recipient: groupId },

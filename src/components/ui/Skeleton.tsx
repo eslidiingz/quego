@@ -1,4 +1,4 @@
-import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
+import { QuegoWordmark } from "@/components/ui/QuegoWordmark";
 import { cn } from "@/lib/cn";
 
 /**
@@ -62,7 +62,7 @@ export function FullPageSpinner() {
       aria-label="กำลังโหลด"
       className="flex min-h-[70vh] flex-col items-center justify-center gap-6"
     >
-      <QuevaWordmark className="text-[28px] opacity-90" />
+      <QuegoWordmark className="text-[28px] opacity-90" />
       <span
         aria-hidden="true"
         className="size-8 animate-spin motion-reduce:animate-none rounded-full border-[3px] border-outline-variant border-t-primary"

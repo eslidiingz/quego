@@ -13,7 +13,7 @@ import { ReferralCard } from "./ReferralCard";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "แต้มสะสมของฉัน · queva",
+  title: "แต้มสะสมของฉัน · quego",
 };
 
 export default async function MyCreditPage() {
@@ -34,7 +34,7 @@ export default async function MyCreditPage() {
       <PageHeader
         eyebrow="แต้มสะสม"
         title="แต้มสะสมของฉัน"
-        description="สะสมแต้มทุกครั้งที่ใช้บริการ และรับแต้มเพิ่มเมื่อชวนเพื่อนมาใช้ queva"
+        description="สะสมแต้มทุกครั้งที่ใช้บริการ และรับแต้มเพิ่มเมื่อชวนเพื่อนมาใช้ quego"
       />
 
       {/* Balance summary */}

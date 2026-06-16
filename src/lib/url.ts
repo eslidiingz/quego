@@ -17,7 +17,7 @@ function stripTrailingSlash(value: string): string {
 }
 
 /**
- * Ensure an origin has an explicit scheme. A value like `queva.app` (a common
+ * Ensure an origin has an explicit scheme. A value like `quego.app` (a common
  * misconfiguration of NEXT_PUBLIC_SITE_URL) would otherwise produce a broken
  * relative-looking URL — and a wrong QR code — with no error. Default to https.
  */

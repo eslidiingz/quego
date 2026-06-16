@@ -187,7 +187,7 @@ export function LocationFieldCombobox({
           <ul
             id={listId}
             role="listbox"
-            className="queva-pop-in absolute z-50 mt-2 w-full max-h-72 overflow-auto rounded-xl border border-outline-variant bg-surface-container-lowest shadow-lg py-1"
+            className="quego-pop-in absolute z-50 mt-2 w-full max-h-72 overflow-auto rounded-xl border border-outline-variant bg-surface-container-lowest shadow-lg py-1"
           >
             {results.map((opt, i) => {
               const active = i === activeIndex;

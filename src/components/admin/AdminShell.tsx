@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/Icon";
-import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
+import { QuegoWordmark } from "@/components/ui/QuegoWordmark";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { cn } from "@/lib/cn";
@@ -56,7 +56,7 @@ export function AdminShell({
         )}
       >
         <div className="px-6 py-8 flex items-center">
-          <QuevaWordmark />
+          <QuegoWordmark />
         </div>
         <div className="px-4 mx-2 mb-6 py-3 bg-surface-container-high rounded-xl flex items-center gap-3">
           <Avatar initials={initials(adminName)} ring="primary" size="lg" />
@@ -123,7 +123,7 @@ export function AdminShell({
             <Icon name={menuOpen ? "close" : "menu"} />
           </button>
           <h1 className="font-display text-headline-md text-on-surface lg:hidden">
-            queva Admin
+            quego Admin
           </h1>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />

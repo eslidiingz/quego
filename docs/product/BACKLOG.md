@@ -1,4 +1,4 @@
-# queva — Product Backlog
+# quego — Product Backlog
 
 > Living, prioritized backlog maintained by the **`product-owner`** agent.
 > First pass: 2026-06-06, from a codebase audit (5 persona areas) + web
@@ -12,7 +12,7 @@
 
 ## Product in one paragraph
 
-queva is a Thai booking + **virtual-queue concierge** for beauty/wellness ร้าน
+quego is a Thai booking + **virtual-queue concierge** for beauty/wellness ร้าน
 (barber/salon/nail/spa), 3 personas. The **booking engine is the crown jewel**
 (per-service durations, parallel staff capacity, GiST overlap, staff↔service,
 shared slot-math). The **gap** is the entire customer-facing realtime + LINE
@@ -272,7 +272,7 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
 
 ### [OPP-10] Rich-menu "จองคิว" deep link ต่อร้าน ⭐ quick win
 - **Persona:** shop · **Impact/Effort:** med · S · **หมวด:** discovery
-- **ปัญหา:** Discovery lives only on queva's home page; shops can't plug queva
+- **ปัญหา:** Discovery lives only on quego's home page; shops can't plug quego
   into their own LINE OA where their audience already is.
 - **ข้อเสนอ:** First-class copy-pasteable rich-menu deep link (+ clean shareable
   booking URL + QR) into each shop's booking flow, so a "จองคิว" button in the
@@ -311,13 +311,13 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
 - **ข้อเสนอ:** Real per-customer VIP flag (phone-keyed) the shop sets, surfaced in
   queue/booking views, used for (a) waitlist first-refusal (OPP-05) and (b)
   controlled re-order/bump within today's queue. Small state addition.
-- **คู่แข่งอ้างอิง:** OpenTable fills freed slots to VIPs first; queva's marketing
+- **คู่แข่งอ้างอิง:** OpenTable fills freed slots to VIPs first; quego's marketing
   already promises VIP — make it real.
 
 ### [OPP-14] ลูกค้าสัมพันธ์เบา ๆ: ประวัติการมา + โน้ตลูกค้า (CRM-lite)
 - **Persona:** shop · **Impact/Effort:** med · M · **หมวด:** retention
 - **ปัญหา:** No booking/customer notes (allergy, "regular, prefers fade") and no
-  per-customer visit history; queva reads as "just a calendar".
+  per-customer visit history; quego reads as "just a calendar".
 - **ข้อเสนอ:** Exploit phone-as-identity to show visit history (across anonymous/
   shop-made/authenticated bookings) + an editable internal notes field on the
   booking/customer record, visible in the queue view. No new identity model.
@@ -326,7 +326,7 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
 
 ### [OPP-15] เครดิตสะสม + ชวนเพื่อน (ผูกกับเบอร์โทร, ไม่ต้องมีระบบจ่ายเงิน)
 - **Persona:** platform · **Impact/Effort:** med · M · **หมวด:** monetization
-- **ปัญหา:** No retention loop; GoWabi locks spend with cashback/referral, queva
+- **ปัญหา:** No retention loop; GoWabi locks spend with cashback/referral, quego
   has nothing sticky, and we have no payment processor for a wallet.
 - **ข้อเสนอ:** Closed-loop loyalty-credit **ledger** keyed to `customer_phone`
   ("จองอีกได้เครดิต") + a referral reward with a 3-day anti-abuse hold — pure

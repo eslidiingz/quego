@@ -19,9 +19,9 @@ type RouteParams = Promise<{ id: string }>;
 export async function generateMetadata({ params }: { params: RouteParams }) {
   const { id } = await params;
   const ctx = await getBookingContext(id);
-  if (!ctx) return { title: "จองคิว · queva" };
+  if (!ctx) return { title: "จองคิว · quego" };
   return {
-    title: `จองคิวร้าน ${ctx.shop.name} · queva`,
+    title: `จองคิวร้าน ${ctx.shop.name} · quego`,
   };
 }
 

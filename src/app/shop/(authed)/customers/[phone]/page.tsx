@@ -18,7 +18,7 @@ import { CustomerNoteForm } from "./CustomerNoteForm";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "ลูกค้า · queva",
+  title: "ลูกค้า · quego",
 };
 
 type Params = Promise<{ phone: string }>;

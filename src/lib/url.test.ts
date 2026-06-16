@@ -15,18 +15,18 @@ describe("getSiteUrl", () => {
   });
 
   it("uses NEXT_PUBLIC_SITE_URL verbatim when it already has a scheme", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://queva.app");
-    expect(getSiteUrl()).toBe("https://queva.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://quego.app");
+    expect(getSiteUrl()).toBe("https://quego.app");
   });
 
   it("strips a trailing slash from NEXT_PUBLIC_SITE_URL", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://queva.app/");
-    expect(getSiteUrl()).toBe("https://queva.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://quego.app/");
+    expect(getSiteUrl()).toBe("https://quego.app");
   });
 
   it("defaults a bare host without scheme to https", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "queva.app");
-    expect(getSiteUrl()).toBe("https://queva.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "quego.app");
+    expect(getSiteUrl()).toBe("https://quego.app");
   });
 
   it("preserves an explicit http scheme", () => {
@@ -67,17 +67,17 @@ describe("absoluteUrl", () => {
   });
 
   it("keeps exactly one leading slash when the path already has one", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://queva.app");
-    expect(absoluteUrl("/bookings/1")).toBe("https://queva.app/bookings/1");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://quego.app");
+    expect(absoluteUrl("/bookings/1")).toBe("https://quego.app/bookings/1");
   });
 
   it("adds a leading slash when the path has none", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://queva.app");
-    expect(absoluteUrl("x")).toBe("https://queva.app/x");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://quego.app");
+    expect(absoluteUrl("x")).toBe("https://quego.app/x");
   });
 
   it("treats '/x' and 'x' as the same single-slash join", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://queva.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://quego.app");
     expect(absoluteUrl("/x")).toBe(absoluteUrl("x"));
     expect(absoluteUrl("/x").endsWith("/x")).toBe(true);
     expect(absoluteUrl("x").endsWith("/x")).toBe(true);

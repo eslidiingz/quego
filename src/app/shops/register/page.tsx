@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
-import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
+import { QuegoWordmark } from "@/components/ui/QuegoWordmark";
 import { listActiveCategories } from "@/lib/services/shops";
 import { ShopRegistrationForm } from "./ShopRegistrationForm";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "สมัครเป็นร้าน · queva",
+  title: "สมัครเป็นร้าน · quego",
   description:
-    "เพิ่มร้านของคุณเข้าสู่ระบบ queva เพื่อให้ลูกค้าจองคิวได้สะดวกขึ้น",
+    "เพิ่มร้านของคุณเข้าสู่ระบบ quego เพื่อให้ลูกค้าจองคิวได้สะดวกขึ้น",
 };
 
 export default async function ShopRegisterPage() {
@@ -21,7 +21,7 @@ export default async function ShopRegisterPage() {
       <header className="w-full sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-outline-variant">
         <div className="max-w-[1280px] mx-auto px-4 md:px-12 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <QuevaWordmark />
+            <QuegoWordmark />
           </Link>
           <Link
             href="/"
@@ -39,7 +39,7 @@ export default async function ShopRegisterPage() {
             สำหรับร้าน
           </span>
           <h1 className="font-display text-headline-lg text-on-background mb-2">
-            สมัครเป็นร้านใน queva
+            สมัครเป็นร้านใน quego
           </h1>
           <p className="text-body-md text-on-surface-variant max-w-xl mx-auto">
             กรอกข้อมูลด้านล่าง ยืนยันเบอร์โทร แล้วตั้งรหัส PIN

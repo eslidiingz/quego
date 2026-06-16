@@ -31,7 +31,7 @@ const base: WaitlistSlotOpenFlexInput = {
 describe("buildWaitlistBookUrl", () => {
   // Pin a known origin so URL assertions are stable; the shell env can't leak in.
   beforeEach(() => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://queva.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://quego.app");
     vi.stubEnv("NEXT_PUBLIC_VERCEL_URL", "");
     vi.stubEnv("VERCEL_URL", "");
   });
@@ -63,7 +63,7 @@ describe("buildWaitlistBookUrl", () => {
 
 describe("buildWaitlistSlotOpenFlex", () => {
   beforeEach(() => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://queva.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://quego.app");
     vi.stubEnv("NEXT_PUBLIC_VERCEL_URL", "");
     vi.stubEnv("VERCEL_URL", "");
   });
