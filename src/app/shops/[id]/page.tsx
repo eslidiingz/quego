@@ -63,12 +63,12 @@ export async function generateMetadata({ params }: { params: RouteParams }) {
   const { id } = await params;
   const shop = await getPublicShopById(id);
   if (!shop) {
-    return { title: "ไม่พบร้านที่ต้องการ · queva" };
+    return { title: "ไม่พบร้านที่ต้องการ · quego" };
   }
   return {
-    title: `${shop.name} · queva`,
+    title: `${shop.name} · quego`,
     description:
-      shop.description ?? `จองคิวร้าน ${shop.name} ผ่าน queva ได้ทันที`,
+      shop.description ?? `จองคิวร้าน ${shop.name} ผ่าน quego ได้ทันที`,
   };
 }
 

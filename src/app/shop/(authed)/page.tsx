@@ -18,7 +18,7 @@ import { NewBookingDialog } from "./bookings/NewBookingDialog";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "ภาพรวมร้าน · queva",
+  title: "ภาพรวมร้าน · quego",
 };
 
 const PREVIEW_LIMIT = 5;

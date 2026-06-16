@@ -6,7 +6,7 @@ import { LoginTabs, type LoginTabKey } from "./LoginTabs";
 import { CustomerLoginForm } from "./CustomerLoginForm";
 
 export const metadata = {
-  title: "เข้าสู่ระบบ · queva",
+  title: "เข้าสู่ระบบ · quego",
 };
 
 export const dynamic = "force-dynamic";
@@ -31,11 +31,11 @@ export default async function LoginPage({
       <AuthHeroShell
         title={
           <h1 className="font-display font-semibold text-[34px] leading-none tracking-tight text-on-primary">
-            queva<span className="text-secondary">.</span>
+            quego<span className="text-secondary">.</span>
           </h1>
         }
         subtitle="เข้าสู่ระบบเพื่อจัดการคิวของคุณ"
-        footer={`© ${new Date().getFullYear()} queva · Premium Queue Concierge`}
+        footer={`© ${new Date().getFullYear()} quego · Premium Queue Concierge`}
       >
         <LoginTabs active={active} />
         {active === "customer" ? (

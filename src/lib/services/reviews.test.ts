@@ -68,15 +68,15 @@ describe("validateReviewInput", () => {
 
 describe("maskReviewerName", () => {
   it("falls back to generic label for null", () => {
-    expect(maskReviewerName(null)).toBe("สมาชิก Queva");
+    expect(maskReviewerName(null)).toBe("สมาชิก Quego");
   });
 
   it("falls back to generic label for empty string", () => {
-    expect(maskReviewerName("")).toBe("สมาชิก Queva");
+    expect(maskReviewerName("")).toBe("สมาชิก Quego");
   });
 
   it("falls back to generic label for whitespace-only", () => {
-    expect(maskReviewerName("   ")).toBe("สมาชิก Queva");
+    expect(maskReviewerName("   ")).toBe("สมาชิก Quego");
   });
 
   it("returns a single-token name unchanged", () => {

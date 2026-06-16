@@ -5,7 +5,7 @@ import { ShopQueueDisplay } from "./ShopQueueDisplay";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "หน้าจอแสดงคิว · queva",
+  title: "หน้าจอแสดงคิว · quego",
 };
 
 /**

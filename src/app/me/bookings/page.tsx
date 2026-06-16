@@ -17,7 +17,7 @@ import { BookingPeriodFilter } from "./BookingPeriodFilter";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "คิวของฉัน · queva",
+  title: "คิวของฉัน · quego",
 };
 
 type SearchParams = Promise<{ period?: string }>;

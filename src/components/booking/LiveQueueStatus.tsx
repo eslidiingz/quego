@@ -35,7 +35,7 @@ export function LiveQueueStatus({
 }) {
   const [status, setStatus] = useState<ShopQueueStatus>(initial);
   // Bumped only when a displayed value actually changes, to replay the subtle
-  // fade/rise (`.queva-fade-in`, reduced-motion-gated) via a changing key.
+  // fade/rise (`.quego-fade-in`, reduced-motion-gated) via a changing key.
   const [rev, setRev] = useState(0);
   // Latest value, compared outside the setState updater so the updater stays
   // pure (no side effects under React 19 double-invoke).
@@ -84,7 +84,7 @@ export function LiveQueueStatus({
         <p className="text-label-md text-on-surface-variant">คิวที่รออยู่</p>
         <p
           key={`count-${rev}`}
-          className="queva-fade-in font-display font-semibold text-display-sm text-secondary mt-0.5 tabular-nums"
+          className="quego-fade-in font-display font-semibold text-display-sm text-secondary mt-0.5 tabular-nums"
         >
           {status.waitingCount} คิว
         </p>
@@ -93,7 +93,7 @@ export function LiveQueueStatus({
         <p className="text-label-md text-on-surface-variant">เวลารอโดยประมาณ</p>
         <p
           key={`wait-${rev}`}
-          className="queva-fade-in font-display font-semibold text-display-sm text-tertiary mt-0.5 tabular-nums"
+          className="quego-fade-in font-display font-semibold text-display-sm text-tertiary mt-0.5 tabular-nums"
         >
           {waitLabel}
         </p>

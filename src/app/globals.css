@@ -6,7 +6,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* =========================================================================
-   queva — Design Tokens
+   quego — Design Tokens
    Brand CI: Deep Teal (primary) + Warm Coral (accent/CTA) + Soft Gold (premium).
    Surfaces on Cloud, text in Ink. Roles are Material-3 style so a single
    swap here re-skins the whole app.
@@ -83,7 +83,7 @@
   --color-on-info-container: #00316e;
 
   /* ---------- Typography ---------- */
-  /* queva: Sora leads display (Latin/numerals) with Anuphan as the Thai
+  /* quego: Sora leads display (Latin/numerals) with Anuphan as the Thai
      fallback; Anuphan carries all prose + Thai headings. */
   --font-display: var(--font-sora), var(--font-anuphan), "Anuphan", system-ui, sans-serif;
   --font-headline: var(--font-anuphan), "Anuphan", system-ui, sans-serif;
@@ -184,7 +184,7 @@
 /* ---------- Dark mode token overrides (see design/aura_queue/DARK_MODE.md) ----------
    Redefining the semantic tokens here re-skins the whole app: every gradient /
    shadow utility resolves --color-* at use-time via color-mix. The handful of
-   utilities that hardcode a literal (bg-queva-hero/panel, bg-gold-shimmer,
+   utilities that hardcode a literal (bg-quego-hero/panel, bg-gold-shimmer,
    glass-card) are hand-patched in @layer utilities below. */
 .dark {
   --color-background: #0b1513;
@@ -260,13 +260,13 @@
   .bg-luxury-gradient {
     background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-container) 100%);
   }
-  /* queva hero: teal gradient with a warm gold glow bleeding from top-right */
-  .bg-queva-hero {
+  /* quego hero: teal gradient with a warm gold glow bleeding from top-right */
+  .bg-quego-hero {
     background:
       radial-gradient(120% 120% at 85% -10%, color-mix(in oklab, var(--color-tertiary-fixed-dim) 18%, transparent), transparent 50%),
       linear-gradient(165deg, var(--color-primary) 0%, var(--color-primary-container) 100%);
   }
-  .bg-queva-panel {
+  .bg-quego-panel {
     background:
       radial-gradient(100% 100% at 0% 0%, color-mix(in oklab, var(--color-tertiary-fixed-dim) 22%, transparent), transparent 55%),
       linear-gradient(150deg, #15706a, var(--color-primary-container));
@@ -295,19 +295,19 @@
   /* Dark hand-patches — these utilities embed a literal color that does NOT
      track the --color-* tokens, so they must be re-stated for .dark.
 
-     queva-hero / queva-panel / luxury-gradient are queva's "constant dark teal"
+     quego-hero / quego-panel / luxury-gradient are quego's "constant dark teal"
      branded surfaces: they stay deep teal in BOTH themes. In dark mode `primary`
      now reads as a light mint (for buttons), so we both deepen the gradient AND
      re-pin --color-on-primary to a light value *locally* — that keeps every
      `text-on-primary` / on-primary icon on these surfaces legible without
      editing a single component. */
-  .dark .bg-queva-hero {
+  .dark .bg-quego-hero {
     --color-on-primary: #eafff8;
     background:
       radial-gradient(120% 120% at 85% -10%, color-mix(in oklab, var(--color-tertiary-fixed-dim) 16%, transparent), transparent 50%),
       linear-gradient(165deg, var(--color-primary-container) 0%, #06231f 100%);
   }
-  .dark .bg-queva-panel {
+  .dark .bg-quego-panel {
     --color-on-primary: #eafff8;
     background:
       radial-gradient(100% 100% at 0% 0%, color-mix(in oklab, var(--color-tertiary-fixed-dim) 22%, transparent), transparent 55%),
@@ -340,7 +340,7 @@
   animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Live queue dot — coral ring pulse (queva featured card) */
+/* Live queue dot — coral ring pulse (quego featured card) */
 @keyframes queue-pulse {
   0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-secondary) 60%, transparent); }
   70% { box-shadow: 0 0 0 9px color-mix(in oklab, var(--color-secondary) 0%, transparent); }
@@ -351,16 +351,16 @@
 }
 
 /* Section entrance — subtle rise-in */
-@keyframes queva-rise {
+@keyframes quego-rise {
   to { opacity: 1; transform: none; }
 }
-.queva-reveal {
+.quego-reveal {
   opacity: 0;
   transform: translateY(18px);
-  animation: queva-rise 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  animation: quego-rise 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
 }
 @media (prefers-reduced-motion: reduce) {
-  .queva-reveal { opacity: 1; transform: none; animation: none; }
+  .quego-reveal { opacity: 1; transform: none; animation: none; }
   .animate-queue-pulse { animation: none; }
 }
 
@@ -372,38 +372,38 @@
 /* Results / filter / list changes — a gentle fade+rise so a re-rendered grid
    eases in rather than hard-swapping. Pair with a changing React `key` to
    replay it; per-item `animation-delay` (capped) gives a subtle stagger. */
-@keyframes queva-fade-in {
+@keyframes quego-fade-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }
 }
-.queva-fade-in {
-  animation: queva-fade-in 0.4s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+.quego-fade-in {
+  animation: quego-fade-in 0.4s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 
 /* Pop — floating layers (modal, dropdown, toast, popover) enter from slightly
    down + scaled instead of appearing instantly. */
-@keyframes queva-pop-in {
+@keyframes quego-pop-in {
   from { opacity: 0; transform: scale(0.97) translateY(8px); }
   to { opacity: 1; transform: none; }
 }
-.queva-pop-in {
-  animation: queva-pop-in 0.2s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+.quego-pop-in {
+  animation: quego-pop-in 0.2s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 
 /* Overlay — modal/scrim backdrops fade in (opacity only; no transform so a
    full-bleed inset-0 layer never reveals an edge gap). */
-@keyframes queva-overlay-in {
+@keyframes quego-overlay-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-.queva-overlay-in {
-  animation: queva-overlay-in 0.2s ease-out both;
+.quego-overlay-in {
+  animation: quego-overlay-in 0.2s ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .queva-fade-in,
-  .queva-pop-in,
-  .queva-overlay-in {
+  .quego-fade-in,
+  .quego-pop-in,
+  .quego-overlay-in {
     animation: none;
     opacity: 1;
     transform: none;

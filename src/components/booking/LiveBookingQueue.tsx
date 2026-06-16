@@ -47,7 +47,7 @@ export function LiveBookingQueue({
   const router = useRouter();
   const [status, setStatus] = useState<BookingQueueStatus>(initial);
   // Bumped only when a displayed value actually changes, to replay the subtle
-  // fade/rise (`.queva-fade-in`, reduced-motion-gated) via a changing key.
+  // fade/rise (`.quego-fade-in`, reduced-motion-gated) via a changing key.
   const [rev, setRev] = useState(0);
   // Latest value, compared outside the setState updater so the updater stays
   // pure (no side effects under React 19 double-invoke).
@@ -134,7 +134,7 @@ export function LiveBookingQueue({
 
       <p
         key={`ahead-${rev}`}
-        className="queva-fade-in mt-3 font-display text-display-sm font-semibold leading-tight text-primary tabular-nums"
+        className="quego-fade-in mt-3 font-display text-display-sm font-semibold leading-tight text-primary tabular-nums"
       >
         {aheadLabel}
       </p>
@@ -146,7 +146,7 @@ export function LiveBookingQueue({
             เวลารอโดยประมาณ{" "}
             <span
               key={`wait-${rev}`}
-              className="queva-fade-in font-semibold text-on-surface tabular-nums"
+              className="quego-fade-in font-semibold text-on-surface tabular-nums"
             >
               {waitLabel}
             </span>

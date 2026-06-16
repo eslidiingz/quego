@@ -5,14 +5,14 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 type AuthHeroShellProps = {
   /** Material symbol rendered inside the gradient logo tile. When omitted, the
-   *  tile is not rendered and the title (the queva wordmark) stands alone. */
+   *  tile is not rendered and the title (the quego wordmark) stands alone. */
   icon?: string;
-  /** Accessible label for the logo tile link (defaults to "queva หน้าแรก"
+  /** Accessible label for the logo tile link (defaults to "quego หน้าแรก"
    *  so it reads distinctly from the textual back link). */
   iconLabel?: string;
   /** Optional uppercase pill above the title — persona / context cue. */
   eyebrow?: ReactNode;
-  /** Main heading slot — the queva wordmark or a step title. */
+  /** Main heading slot — the quego wordmark or a step title. */
   title: ReactNode;
   /** Supporting line under the title. */
   subtitle: ReactNode;
@@ -23,7 +23,7 @@ type AuthHeroShellProps = {
 };
 
 /**
- * The shared "luxury" auth screen chrome: the queva teal-and-gold hero
+ * The shared "luxury" auth screen chrome: the quego teal-and-gold hero
  * background, decorative concentric rings, a gradient logo tile, the
  * centered title block, and the white card that holds the form.
  *
@@ -33,7 +33,7 @@ type AuthHeroShellProps = {
  */
 export function AuthHeroShell({
   icon,
-  iconLabel = "queva หน้าแรก",
+  iconLabel = "quego หน้าแรก",
   eyebrow,
   title,
   subtitle,
@@ -41,8 +41,8 @@ export function AuthHeroShell({
   footer,
 }: AuthHeroShellProps) {
   return (
-    <main className="relative min-h-screen w-full overflow-hidden bg-queva-hero text-on-primary flex flex-col px-4 py-6 md:py-10">
-      {/* Decorative concentric rings + soft glow — the queva hero signature */}
+    <main className="relative min-h-screen w-full overflow-hidden bg-quego-hero text-on-primary flex flex-col px-4 py-6 md:py-10">
+      {/* Decorative concentric rings + soft glow — the quego hero signature */}
       <div
         aria-hidden
         className="pointer-events-none absolute -right-40 -top-32 size-[520px] rounded-full border border-on-primary/10"
@@ -77,7 +77,7 @@ export function AuthHeroShell({
       </div>
 
       <div className="relative z-10 w-full max-w-md mx-auto flex-1 flex flex-col justify-center pb-8">
-        <div className="queva-reveal flex flex-col items-center text-center mb-8">
+        <div className="quego-reveal flex flex-col items-center text-center mb-8">
           {icon ? (
             <Link
               href="/"
@@ -98,12 +98,12 @@ export function AuthHeroShell({
           <p className="text-body-md text-on-primary/90 mt-3 break-words">{subtitle}</p>
         </div>
 
-        <div className="queva-reveal bg-surface text-on-surface rounded-3xl shadow-luxury ring-1 ring-outline-variant/70 p-6 md:p-8">
+        <div className="quego-reveal bg-surface text-on-surface rounded-3xl shadow-luxury ring-1 ring-outline-variant/70 p-6 md:p-8">
           {children}
         </div>
 
         {footer ? (
-          <p className="queva-reveal text-label-sm text-on-primary/90 text-center mt-6">
+          <p className="quego-reveal text-label-sm text-on-primary/90 text-center mt-6">
             {footer}
           </p>
         ) : null}

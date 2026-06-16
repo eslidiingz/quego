@@ -13,7 +13,7 @@ type HeroStat = { num: string; label: string };
 export type HeroCategory = { id: string; name: string; icon: string | null };
 
 /**
- * queva landing hero — teal gradient, headline, and a search affordance that
+ * quego landing hero — teal gradient, headline, and a search affordance that
  * seeds the real shop-discovery filter below (via `?q=` + `#shops` anchor) so
  * the box is never a dead end. Category pills are marketing chips that jump to
  * the same discovery section.
@@ -98,7 +98,7 @@ export function LandingHero({
   }
 
   return (
-    <header className="relative overflow-hidden bg-queva-hero text-on-primary px-4 md:px-12 pt-12 md:pt-20 pb-16 md:pb-20">
+    <header className="relative overflow-hidden bg-quego-hero text-on-primary px-4 md:px-12 pt-12 md:pt-20 pb-16 md:pb-20">
       {/* Decorative concentric rings, bottom-right */}
       <div
         aria-hidden
@@ -110,17 +110,17 @@ export function LandingHero({
       />
 
       <div className="relative z-10 max-w-[760px] mx-auto md:mx-0 md:ml-[max(0px,calc((100%-1180px)/2))]">
-        <span className="queva-reveal inline-flex items-center gap-2 font-display text-label-sm font-medium uppercase tracking-wide text-primary-fixed-dim border border-primary-fixed-dim/40 px-3.5 py-1.5 rounded-full mb-6">
+        <span className="quego-reveal inline-flex items-center gap-2 font-display text-label-sm font-medium uppercase tracking-wide text-primary-fixed-dim border border-primary-fixed-dim/40 px-3.5 py-1.5 rounded-full mb-6">
           จองคิวร้านบริการ ทั่วไทย
         </span>
 
-        <h1 className="queva-reveal font-headline font-bold leading-[1.18] tracking-tight text-[34px] sm:text-[44px] lg:text-[56px] mb-4">
+        <h1 className="quego-reveal font-headline font-bold leading-[1.18] tracking-tight text-[34px] sm:text-[44px] lg:text-[56px] mb-4">
           ตัดผม ทำเล็บ นวด สปา
           <br />
           จองคิวไว้ <em className="not-italic text-tertiary-fixed-dim">ไม่ต้องไปนั่งรอ</em>
         </h1>
 
-        <p className="queva-reveal text-body-lg text-on-primary/85 max-w-[560px] mb-8">
+        <p className="quego-reveal text-body-lg text-on-primary/85 max-w-[560px] mb-8">
           ดูคิวของร้านแบบเรียลไทม์ กดจองล่วงหน้า แล้วรอรับแจ้งเตือนผ่าน LINE
           ตอนใกล้ถึงคิวของคุณ
         </p>
@@ -129,7 +129,7 @@ export function LandingHero({
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="queva-reveal flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 bg-surface rounded-2xl sm:rounded-full p-2 sm:pl-5 max-w-[680px] shadow-luxury"
+          className="quego-reveal flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 bg-surface rounded-2xl sm:rounded-full p-2 sm:pl-5 max-w-[680px] shadow-luxury"
         >
           {/* Location (จังหวัด / เขต-อำเภอ) */}
           <div className="flex-1 sm:basis-[42%] sm:min-w-0 px-1">
@@ -170,7 +170,7 @@ export function LandingHero({
 
         {/* Category quick-jumps — real bookable categories that filter below */}
         {categories.length > 0 ? (
-          <div className="queva-reveal flex flex-wrap gap-2.5 mt-6">
+          <div className="quego-reveal flex flex-wrap gap-2.5 mt-6">
             {categories.slice(0, 6).map((c) => (
               <button
                 key={c.id}
@@ -186,7 +186,7 @@ export function LandingHero({
         ) : null}
 
         {/* Stats */}
-        <dl className="queva-reveal flex flex-wrap gap-x-9 gap-y-4 mt-10">
+        <dl className="quego-reveal flex flex-wrap gap-x-9 gap-y-4 mt-10">
           {stats.map((s) => (
             <div key={s.label}>
               <dt className="sr-only">{s.label}</dt>

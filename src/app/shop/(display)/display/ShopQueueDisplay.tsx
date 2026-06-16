@@ -25,7 +25,7 @@ const POLL_INTERVAL_MS = 10_000;
  * `cancelled` guard, and a try/catch that KEEPS the last good value on any
  * network/server/rate-limit hiccup (never flashes an empty queue). A `rev`
  * counter bumps only when a displayed value changes, replaying the subtle
- * `.queva-fade-in`.
+ * `.quego-fade-in`.
  *
  * "เรียกคิวถัดไป" completes the earliest-remaining booking via
  * `callNextQueueAction` (wrapped in `ConfirmDialog` — no native confirm). On
@@ -125,13 +125,13 @@ export function ShopQueueDisplay({
             />
             <p
               key={`serving-time-${rev}`}
-              className="queva-fade-in mt-4 font-display text-[64px] font-bold leading-none text-primary tabular-nums md:text-[120px]"
+              className="quego-fade-in mt-4 font-display text-[64px] font-bold leading-none text-primary tabular-nums md:text-[120px]"
             >
               {nowServing.slotTime}
             </p>
             <p
               key={`serving-name-${rev}`}
-              className="queva-fade-in mt-5 font-display text-headline-md font-semibold text-on-surface md:text-display-sm"
+              className="quego-fade-in mt-5 font-display text-headline-md font-semibold text-on-surface md:text-display-sm"
             >
               {nowServing.customerName}
             </p>

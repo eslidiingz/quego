@@ -36,7 +36,7 @@ export type ShopReviewItem = {
   id: string;
   rating: number; // 1-5 integer
   comment: string | null;
-  reviewerName: string; // ALREADY masked, e.g. "สมชาย ก." or "สมาชิก Queva"
+  reviewerName: string; // ALREADY masked, e.g. "สมชาย ก." or "สมาชิก Quego"
   createdAt: string; // ISO timestamp (created_at)
 };
 
@@ -110,7 +110,7 @@ export function validateReviewInput(
  */
 export function maskReviewerName(name: string | null): string {
   const trimmed = (name ?? "").trim();
-  if (trimmed.length === 0) return "สมาชิก Queva";
+  if (trimmed.length === 0) return "สมาชิก Quego";
   const parts = trimmed.split(/\s+/);
   if (parts.length === 1) return parts[0];
   return `${parts[0]} ${parts[1].charAt(0)}.`;

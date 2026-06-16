@@ -92,7 +92,7 @@ export function FilterSheet({
 
   return createPortal(
     <div
-      className="queva-overlay-in fixed inset-0 z-50 flex items-end justify-center bg-on-surface/40 backdrop-blur-sm"
+      className="quego-overlay-in fixed inset-0 z-50 flex items-end justify-center bg-on-surface/40 backdrop-blur-sm"
       onClick={onClose}
       role="presentation"
     >

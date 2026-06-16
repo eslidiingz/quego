@@ -3,7 +3,7 @@ import { Sora, Anuphan } from "next/font/google";
 import "./globals.css";
 
 /**
- * queva brand typography:
+ * quego brand typography:
  * - Sora — Latin display / numerals (logo, stat numbers, queue tickets, micro-labels).
  * - Anuphan — Thai-designed family for all prose and Thai headings.
  *
@@ -27,7 +27,7 @@ const anuphan = Anuphan({
 });
 
 export const metadata: Metadata = {
-  title: "queva — ไม่ต้องรอเก้อ แค่กดจอง",
+  title: "quego — ไม่ต้องรอเก้อ แค่กดจอง",
   description:
     "จองคิวร้านบริการความงามและสุขภาพทั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า ไม่ต้องไปนั่งรอ",
 };
@@ -52,7 +52,7 @@ export default function RootLayout({
           // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var t=localStorage.getItem('queva-theme');var d=t?t==='dark':matchMedia('(prefers-color-scheme:dark)').matches;var e=document.documentElement;if(d)e.classList.add('dark');e.style.colorScheme=d?'dark':'light';}catch(e){}})();",
+              "(function(){try{var t=localStorage.getItem('quego-theme');var d=t?t==='dark':matchMedia('(prefers-color-scheme:dark)').matches;var e=document.documentElement;if(d)e.classList.add('dark');e.style.colorScheme=d?'dark':'light';}catch(e){}})();",
           }}
         />
         {/* Material Symbols is an icon font; next/font subsetting would strip glyphs.

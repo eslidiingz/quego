@@ -1,7 +1,7 @@
 import { cn } from "@/lib/cn";
 
 /**
- * Brand wordmark: "queva" in teal with a coral full-stop.
+ * Brand wordmark: "quego" in teal with a coral full-stop.
  *
  * Standalone primitive with no app/session dependencies, so it can be rendered
  * from both server components (landing nav/footer) and client components (the
@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
  * `className` is merged last via `cn()`, so callers can override the default
  * size/color (e.g. `text-[34px] text-on-primary` on the dark login hero).
  */
-export function QuevaWordmark({ className }: { className?: string }) {
+export function QuegoWordmark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
@@ -18,7 +18,7 @@ export function QuevaWordmark({ className }: { className?: string }) {
         className,
       )}
     >
-      queva<span className="text-secondary">.</span>
+      quego<span className="text-secondary">.</span>
     </span>
   );
 }

@@ -41,8 +41,8 @@ describe("getLineChannelAccessToken", () => {
 
 describe("getLineOaBasicId", () => {
   it("returns the NEXT_PUBLIC_LINE_OA_BASIC_ID value when set", () => {
-    vi.stubEnv("NEXT_PUBLIC_LINE_OA_BASIC_ID", "@queva");
-    expect(getLineOaBasicId()).toBe("@queva");
+    vi.stubEnv("NEXT_PUBLIC_LINE_OA_BASIC_ID", "@quego");
+    expect(getLineOaBasicId()).toBe("@quego");
   });
 
   it("throws naming NEXT_PUBLIC_LINE_OA_BASIC_ID when unset", () => {

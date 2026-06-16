@@ -90,7 +90,7 @@ export function ShopLineCard({ linked }: { linked: boolean }) {
 
       <ol className="list-decimal space-y-2 pl-5 text-label-md text-on-surface-variant">
         <li>กดปุ่ม “เชื่อมต่อ LINE” ด้านล่าง</li>
-        <li>อนุญาตการเข้าถึง และเพิ่มบัญชีทางการของ queva เป็นเพื่อนใน LINE</li>
+        <li>อนุญาตการเข้าถึง และเพิ่มบัญชีทางการของ quego เป็นเพื่อนใน LINE</li>
         <li>ระบบจะพากลับมาที่หน้านี้พร้อมสถานะ “เชื่อมต่อ LINE แล้ว”</li>
       </ol>
 

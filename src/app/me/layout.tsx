@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
-import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
+import { QuegoWordmark } from "@/components/ui/QuegoWordmark";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { requireCustomerSession } from "@/lib/auth/customer-session-server";
 import { signOutCustomer } from "@/app/me/actions";
@@ -25,10 +25,10 @@ export default async function MeLayout({
         <div className="max-w-5xl mx-auto w-full px-4 md:px-6 h-16 flex items-center justify-between gap-4">
           <Link
             href="/"
-            aria-label="queva หน้าแรก"
+            aria-label="quego หน้าแรก"
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
-            <QuevaWordmark />
+            <QuegoWordmark />
           </Link>
 
           <div className="flex items-center gap-1 sm:gap-2">

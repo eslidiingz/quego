@@ -18,7 +18,7 @@ import { BusyByHourChart } from "@/components/shop/insights/BusyByHourChart";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "รายงานร้าน · queva",
+  title: "รายงานร้าน · quego",
 };
 
 type SearchParams = Promise<{ range?: string; staff?: string; service?: string }>;

@@ -26,7 +26,7 @@ export function getLineChannelAccessToken(): string {
 }
 
 /**
- * OA basic id (e.g. "@queva"), used to build the "เชื่อม LINE" deep link. This
+ * OA basic id (e.g. "@quego"), used to build the "เชื่อม LINE" deep link. This
  * value IS public — it appears in a user-facing link — hence the NEXT_PUBLIC_
  * name. Resolved server-side and passed to the client as a finished URL.
  */

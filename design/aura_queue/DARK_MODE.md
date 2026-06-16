@@ -1,4 +1,4 @@
-# Design: queva Dark Mode — โหมดมืด (สำหรับทุก persona)
+# Design: quego Dark Mode — โหมดมืด (สำหรับทุก persona)
 
 อ้างอิง: brand spec `design/aura_queue/DESIGN.md` · tokens `src/app/globals.css` · ระบบ `/design-system`
 
@@ -11,11 +11,11 @@
 
 ## 1. เป้าหมายและปรัชญา
 
-PO สั่งว่า "สวยงามและใช้ง่าย" โหมดมืดของ queva ไม่ใช่การกลับสีแบบ mechanical แต่คือ
+PO สั่งว่า "สวยงามและใช้ง่าย" โหมดมืดของ quego ไม่ใช่การกลับสีแบบ mechanical แต่คือ
 **การย้ายประสบการณ์ Modern-Luxury ทั้งหมดไปอยู่บนพื้นหมึกลึก (deep ink)** — เหมือนเดินจาก
 ล็อบบีสว่างเข้าสู่เลาจน์ส่วนตัวยามค่ำ ยังหรู ยังสงบ ยังอุ่น
 
-หลักการ (Material-3 dark + queva brand):
+หลักการ (Material-3 dark + quego brand):
 
 1. **พื้นมืดไม่ใช่ดำสนิท** — ใช้ "หมึกเขียวเข้ม" (deep teal-tinted ink ตระกูล `#0b1513`)
    ให้แบรนด์เขียวซึมผ่านพื้น ไม่เป็นสีเทากลาง/ดำตาย
@@ -221,9 +221,9 @@ PO สั่งว่า "สวยงามและใช้ง่าย" โ�
 | utility | dark treatment |
 |---|---|
 | `.glass-card` | `white 80%` → `.dark .glass-card { background: color-mix(in oklab, #0e1a17 72%, transparent); }` คง `blur(12px)` + เพิ่ม hairline ring `outline-variant 60%` |
-| `.bg-queva-panel` | literal `#15706a` ไม่ track token → `.dark` override สองสตอป `#0e3b37 → #06302c` + gold radial เดิม |
+| `.bg-quego-panel` | literal `#15706a` ไม่ track token → `.dark` override สองสตอป `#0e3b37 → #06302c` + gold radial เดิม |
 | `.bg-gold-shimmer` | literal `#fed488` mid-stop → `.dark` ใช้ `#f0c97a` (ทองอุ่นนุ่ม ไม่แสบตา) |
-| `.bg-queva-hero` | token-driven; ลึกเองเพราะ `primary-container` คุมปลาย gradient — คง gold bleed มุมขวาบน (อาจเพิ่ม stop เข้มที่ปลายถ้า teal สว่างเกิน) |
+| `.bg-quego-hero` | token-driven; ลึกเองเพราะ `primary-container` คุมปลาย gradient — คง gold bleed มุมขวาบน (อาจเพิ่ม stop เข้มที่ปลายถ้า teal สว่างเกิน) |
 | `.bg-luxury-gradient` / `.bg-progress-gradient` / `.bg-teal-purple-gradient` | token-driven, re-tint อัตโนมัติ ไม่ต้อง patch |
 | shadows | `.dark`: tinted 18%→40%, luxury 22%→48%, coral-glow 38%→44%; ใช้ ring + tonal layering เป็น cue หลัก |
 
@@ -238,7 +238,7 @@ PO สั่งว่า "สวยงามและใช้ง่าย" โ�
 - **States:** rest (icon `on-surface-variant`, พื้นโปร่ง) · hover/focus (พื้น
   `surface-container-high` + ขอบ 2px primary) · active (scale .96). icon state seed จาก DOM
   class ตอน mount (กัน hydration mismatch)
-- **Default:** ตาม OS เมื่อยังไม่เลือก; เลือกแล้วจำใน `localStorage('queva-theme')` ชนะ OS ครั้งถัดไป
+- **Default:** ตาม OS เมื่อยังไม่เลือก; เลือกแล้วจำใน `localStorage('quego-theme')` ชนะ OS ครั้งถัดไป
 - **ตำแหน่ง:** มุมขวาของ sticky header แต่ละ persona — public `LandingNav` (z-50), `/me` (z-30),
   shop (z-30), admin (z-30); และมุมขวาบน `AuthHeroShell` (absolute z-10+). หน้า discovery
   ที่ไม่มี header ของตัวเองใช้ปุ่มใน `LandingNav` ที่ sticky ครอบทั้งหน้า
@@ -253,7 +253,7 @@ PO สั่งว่า "สวยงามและใช้ง่าย" โ�
 1. เพิ่ม `@custom-variant dark (&:where(.dark, .dark *));` ใน globals.css (หลัง `@import`)
    — Tailwind v4 default `dark:` ผูกกับ media query; ต้องบรรทัดนี้เพื่อให้ class-based ทำงาน
 2. นิยาม `.dark { …override --color-* ทั้งหมด… }` (พื้น CSS ปกติ)
-3. hand-patch 3 literal (`.dark .bg-queva-panel`, `.dark .bg-gold-shimmer`, `.dark .glass-card`)
+3. hand-patch 3 literal (`.dark .bg-quego-panel`, `.dark .bg-gold-shimmer`, `.dark .glass-card`)
    + เพิ่ม % เงาใน `.dark`
 4. inline `<script>` no-FOUC ใน `<head>` (`src/app/layout.tsx`) อ่าน localStorage/`matchMedia`
    → toggle `.dark` + `documentElement.style.colorScheme` ก่อน paint + `suppressHydrationWarning`
@@ -266,7 +266,7 @@ PO สั่งว่า "สวยงามและใช้ง่าย" โ�
 ## 8. Audit — hardcoded color ที่ต้องแก้ (27 จุด / 8 ไฟล์)
 
 **ต้องแก้ (breaks-in-dark):**
-- `globals.css` — `.bg-queva-panel #15706a`, `.bg-gold-shimmer #fed488`, `.glass-card white 80%`
+- `globals.css` — `.bg-quego-panel #15706a`, `.bg-gold-shimmer #fed488`, `.glass-card white 80%`
 - `components/landing/LandingFooter.tsx` — 6 จุด (`text-white*`, `border-white/10`, `!text-white`)
   → footer คือ blocker ใหญ่สุด
 - `components/ui/Switch.tsx:30` — `after:bg-white` → `after:bg-surface`

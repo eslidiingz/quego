@@ -3,7 +3,7 @@
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 
-const STORAGE_KEY = "queva-theme";
+const STORAGE_KEY = "quego-theme";
 
 /**
  * Single-tap light/dark switch. The displayed icon is driven purely by the

@@ -126,7 +126,7 @@ export function EditProfileForm({
         <Section
           icon="badge"
           title="ผู้ติดต่อ"
-          description="ข้อมูลที่ทีมงาน queva ใช้ติดต่อกลับ"
+          description="ข้อมูลที่ทีมงาน quego ใช้ติดต่อกลับ"
         >
           <Input
             name="ownerName"
@@ -143,7 +143,7 @@ export function EditProfileForm({
             value={shop.owner_phone}
             readOnly
             disabled
-            helperText="หากต้องการเปลี่ยนเบอร์โทรนี้ ติดต่อทีมงาน queva"
+            helperText="หากต้องการเปลี่ยนเบอร์โทรนี้ ติดต่อทีมงาน quego"
           />
           <Input
             name="ownerEmail"

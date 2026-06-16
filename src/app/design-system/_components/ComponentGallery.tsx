@@ -17,7 +17,7 @@ import { PhoneInput } from "@/components/ui/PhoneInput";
 import { PinInput } from "@/components/ui/PinInput";
 import { LocationSearchPicker } from "@/components/ui/LocationSearchPicker";
 import { LocationCombobox, type LocationValue } from "@/components/ui/LocationCombobox";
-import { QuevaWordmark } from "@/components/ui/QuevaWordmark";
+import { QuegoWordmark } from "@/components/ui/QuegoWordmark";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Subsection, DemoCard, DemoLabel } from "./kit";
@@ -286,10 +286,10 @@ export function ComponentGallery() {
       <Subsection title="Brand & chrome" className="space-y-5">
         <DemoCard className="flex flex-wrap items-center gap-6">
           <div>
-            <DemoLabel>QuevaWordmark — โลโก้ตัวอักษร (จุดท้ายสีคอรัล)</DemoLabel>
+            <DemoLabel>QuegoWordmark — โลโก้ตัวอักษร (จุดท้ายสีคอรัล)</DemoLabel>
             <div className="flex flex-wrap items-center gap-5">
-              <QuevaWordmark />
-              <QuevaWordmark className="text-[34px]" />
+              <QuegoWordmark />
+              <QuegoWordmark className="text-[34px]" />
             </div>
           </div>
         </DemoCard>

@@ -12,7 +12,7 @@ import { PresetsManager } from "./PresetsManager";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "บริการ preset · queva Admin",
+  title: "บริการ preset · quego Admin",
 };
 
 type SearchParams = Promise<{ category?: string }>;

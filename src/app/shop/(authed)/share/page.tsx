@@ -10,7 +10,7 @@ import { ShareTools } from "./ShareTools";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "แชร์ร้าน · queva",
+  title: "แชร์ร้าน · quego",
 };
 
 export default async function ShopSharePage() {
