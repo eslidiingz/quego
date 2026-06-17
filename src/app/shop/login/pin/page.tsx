@@ -7,7 +7,7 @@ import { SetupPinForm } from "./SetupPinForm";
 import { VerifyPinForm } from "./VerifyPinForm";
 
 export const metadata = {
-  title: "รหัส PIN · quego",
+  title: "รหัส PIN · Quego",
 };
 
 export const dynamic = "force-dynamic";

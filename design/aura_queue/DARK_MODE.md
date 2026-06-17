@@ -1,4 +1,4 @@
-# Design: quego Dark Mode — โหมดมืด (สำหรับทุก persona)
+# Design: Quego Dark Mode — โหมดมืด (สำหรับทุก persona)
 
 อ้างอิง: brand spec `design/aura_queue/DESIGN.md` · tokens `src/app/globals.css` · ระบบ `/design-system`
 
@@ -11,11 +11,11 @@
 
 ## 1. เป้าหมายและปรัชญา
 
-PO สั่งว่า "สวยงามและใช้ง่าย" โหมดมืดของ quego ไม่ใช่การกลับสีแบบ mechanical แต่คือ
+PO สั่งว่า "สวยงามและใช้ง่าย" โหมดมืดของ Quego ไม่ใช่การกลับสีแบบ mechanical แต่คือ
 **การย้ายประสบการณ์ Modern-Luxury ทั้งหมดไปอยู่บนพื้นหมึกลึก (deep ink)** — เหมือนเดินจาก
 ล็อบบีสว่างเข้าสู่เลาจน์ส่วนตัวยามค่ำ ยังหรู ยังสงบ ยังอุ่น
 
-หลักการ (Material-3 dark + quego brand):
+หลักการ (Material-3 dark + Quego brand):
 
 1. **พื้นมืดไม่ใช่ดำสนิท** — ใช้ "หมึกเขียวเข้ม" (deep teal-tinted ink ตระกูล `#0b1513`)
    ให้แบรนด์เขียวซึมผ่านพื้น ไม่เป็นสีเทากลาง/ดำตาย

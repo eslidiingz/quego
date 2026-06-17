@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { CustomerBottomNav } from "@/components/layout/CustomerBottomNav";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { getBookingContext } from "@/lib/services/bookings";
+import { resolveApprovedShopId } from "@/lib/services/shops";
 import { getCustomerSession } from "@/lib/auth/customer-session-server";
 import { shouldShowCustomerBottomNav } from "@/lib/auth/customer-bottom-nav";
 import { getCustomerProfile } from "@/lib/services/customers";
@@ -17,11 +18,12 @@ export const dynamic = "force-dynamic";
 type RouteParams = Promise<{ id: string }>;
 
 export async function generateMetadata({ params }: { params: RouteParams }) {
-  const { id } = await params;
-  const ctx = await getBookingContext(id);
-  if (!ctx) return { title: "จองคิว · quego" };
+  const { id: param } = await params;
+  const shopId = await resolveApprovedShopId(param);
+  const ctx = shopId ? await getBookingContext(shopId) : null;
+  if (!ctx) return { title: "จองคิว · Quego" };
   return {
-    title: `จองคิวร้าน ${ctx.shop.name} · quego`,
+    title: `จองคิวร้าน ${ctx.shop.name} · Quego`,
   };
 }
 
@@ -34,9 +36,10 @@ export default async function BookShopPage({
   // booking form lands prefilled, ready to pick a freshly-freed time.
   searchParams: Promise<{ serviceId?: string; staffId?: string; date?: string }>;
 }) {
-  const { id } = await params;
+  const { id: param } = await params;
   const sp = await searchParams;
-  const context = await getBookingContext(id);
+  const shopId = await resolveApprovedShopId(param);
+  const context = shopId ? await getBookingContext(shopId) : null;
   if (!context) notFound();
 
   // Pre-fill the booker fields when a customer is signed in. Public page, so
@@ -74,7 +77,7 @@ export default async function BookShopPage({
 
       <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
         <Link
-          href={`/shops/${id}`}
+          href={`/shops/${param}`}
           className="inline-flex items-center gap-1 text-label-md text-on-surface-variant hover:text-primary transition-colors"
         >
           <Icon name="arrow_back" size={18} />

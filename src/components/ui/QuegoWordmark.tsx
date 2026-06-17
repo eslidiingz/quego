@@ -1,7 +1,7 @@
 import { cn } from "@/lib/cn";
 
 /**
- * Brand wordmark: "quego" in teal with a coral full-stop.
+ * Brand wordmark: "Quego" in teal with a coral full-stop.
  *
  * Standalone primitive with no app/session dependencies, so it can be rendered
  * from both server components (landing nav/footer) and client components (the
@@ -18,7 +18,7 @@ export function QuegoWordmark({ className }: { className?: string }) {
         className,
       )}
     >
-      quego<span className="text-secondary">.</span>
+      Quego<span className="text-secondary">.</span>
     </span>
   );
 }

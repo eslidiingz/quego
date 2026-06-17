@@ -16,7 +16,7 @@ import { changeShopPinAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "ข้อมูลร้าน · quego",
+  title: "ข้อมูลร้าน · Quego",
 };
 
 function parseTab(raw: string | undefined): ProfileTab {

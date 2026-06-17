@@ -6,7 +6,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* =========================================================================
-   quego — Design Tokens
+   Quego — Design Tokens
    Brand CI: Deep Teal (primary) + Warm Coral (accent/CTA) + Soft Gold (premium).
    Surfaces on Cloud, text in Ink. Roles are Material-3 style so a single
    swap here re-skins the whole app.
@@ -83,12 +83,23 @@
   --color-on-info-container: #00316e;
 
   /* ---------- Typography ---------- */
-  /* quego: Sora leads display (Latin/numerals) with Anuphan as the Thai
+  /* Quego: Sora leads display (Latin/numerals) with Anuphan as the Thai
      fallback; Anuphan carries all prose + Thai headings. */
   --font-display: var(--font-sora), var(--font-anuphan), "Anuphan", system-ui, sans-serif;
   --font-headline: var(--font-anuphan), "Anuphan", system-ui, sans-serif;
   --font-body: var(--font-anuphan), "Anuphan", system-ui, sans-serif;
   --font-sans: var(--font-anuphan), "Anuphan", system-ui, sans-serif;
+
+  /* Display XL — หัวข้อ marketing hero (ใหญ่สุด, Sora นำ) */
+  --text-display-xl: 56px;
+  --text-display-xl--line-height: 60px;
+  --text-display-xl--letter-spacing: -0.02em;
+  --text-display-xl--font-weight: 700;
+
+  --text-display-xl-mobile: 36px;
+  --text-display-xl-mobile--line-height: 42px;
+  --text-display-xl-mobile--letter-spacing: -0.02em;
+  --text-display-xl-mobile--font-weight: 700;
 
   /* Display — ตัวเลขเด่น/หัวข้อใหญ่ */
   --text-display-lg: 30px;
@@ -260,7 +271,7 @@
   .bg-luxury-gradient {
     background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-container) 100%);
   }
-  /* quego hero: teal gradient with a warm gold glow bleeding from top-right */
+  /* Quego hero: teal gradient with a warm gold glow bleeding from top-right */
   .bg-quego-hero {
     background:
       radial-gradient(120% 120% at 85% -10%, color-mix(in oklab, var(--color-tertiary-fixed-dim) 18%, transparent), transparent 50%),
@@ -295,7 +306,7 @@
   /* Dark hand-patches — these utilities embed a literal color that does NOT
      track the --color-* tokens, so they must be re-stated for .dark.
 
-     quego-hero / quego-panel / luxury-gradient are quego's "constant dark teal"
+     quego-hero / quego-panel / luxury-gradient are Quego's "constant dark teal"
      branded surfaces: they stay deep teal in BOTH themes. In dark mode `primary`
      now reads as a light mint (for buttons), so we both deepen the gradient AND
      re-pin --color-on-primary to a light value *locally* — that keeps every
@@ -340,7 +351,7 @@
   animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Live queue dot — coral ring pulse (quego featured card) */
+/* Live queue dot — coral ring pulse (Quego featured card) */
 @keyframes queue-pulse {
   0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-secondary) 60%, transparent); }
   70% { box-shadow: 0 0 0 9px color-mix(in oklab, var(--color-secondary) 0%, transparent); }

@@ -18,7 +18,7 @@ import { formatThaiDateFull } from "./bookingPresentation";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "รายการจอง · quego",
+  title: "รายการจอง · Quego",
 };
 
 /** Shop's booking context (services/staff/hours) or null when not bookable. */

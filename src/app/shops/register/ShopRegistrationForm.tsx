@@ -27,6 +27,10 @@ export function ShopRegistrationForm({
   const errors = state?.fieldErrors;
   const values = state?.values;
 
+  // Controlled so we can constrain input to handle-safe chars as the owner types
+  // (Rule: constrain at the source). Empty → the server auto-generates from name.
+  const [handle, setHandle] = useState(values?.handle ?? "");
+
   // OTP gate: the owner phone must be proven via Firebase OTP before the
   // application can be submitted. `phoneVerified` is the UX mirror of the
   // server cookie (the real trust gate lives in the action via isPhoneVerified).
@@ -86,6 +90,23 @@ export function ShopRegistrationForm({
           maxLength={120}
           defaultValue={values?.name ?? ""}
           errorText={errors?.name}
+          disabled={pending}
+        />
+        <Input
+          name="handle"
+          label="ลิงก์ร้าน (ไม่บังคับ)"
+          placeholder="เช่น tukta-salon"
+          iconLeft={<Icon name="link" />}
+          inputMode="url"
+          autoCapitalize="none"
+          autoComplete="off"
+          maxLength={30}
+          value={handle}
+          onChange={(e) =>
+            setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/gu, ""))
+          }
+          errorText={errors?.handle}
+          helperText={`ที่อยู่ร้านของคุณ: quego.app/shops/${handle || "ชื่อที่ตั้ง"} · เว้นว่างให้ระบบตั้งให้จากชื่อร้าน`}
           disabled={pending}
         />
         {/* key=ts forces a remount on every failed submit so defaultValue is

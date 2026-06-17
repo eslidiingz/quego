@@ -72,6 +72,26 @@ type RatingRow = {
   rating: number;
 };
 
+/** A featured review for the public homepage testimonials section. */
+export type FeaturedReview = {
+  id: string;
+  rating: number; // 4 or 5 (only high ratings are featured)
+  comment: string; // never blank — featured reviews require a comment
+  reviewerName: string; // ALREADY masked (PDPA), e.g. "สมชาย ก."
+  shopName: string | null; // joined shop name, null if unavailable
+  createdAt: string; // ISO timestamp (created_at)
+};
+
+/** Review row joined with the shop name for the homepage featured list. */
+type FeaturedReviewRow = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  customer_name: string | null;
+  created_at: string;
+  shops: { name: string | null } | null;
+};
+
 // ----- Validation ---------------------------------------------------------
 
 const INVALID_RATING_MESSAGE = "กรุณาให้คะแนน 1–5 ดาว";
@@ -272,4 +292,71 @@ export async function getRatingSummariesForShops(
   }
 
   return summaries;
+}
+
+// ----- Read: homepage testimonials + global aggregate ---------------------
+
+/**
+ * Fetch material for the public homepage's social-proof block in one place:
+ * a short list of "featured" reviews (high rating + a written comment, newest
+ * first) plus a system-wide totals aggregate.
+ *
+ * Featured reviews are the marketing-quality ones: `rating >= 4` AND a non-empty
+ * comment. Reviewer names are masked here (PDPA) and the shop name is joined so
+ * a testimonial can name the ร้าน. Like the other read paths, any infra error
+ * degrades to an empty, zero-rated result rather than throwing — a missing
+ * social-proof block must never break the homepage.
+ */
+export async function getHomepageReviewHighlights(
+  limit = 6,
+): Promise<{
+  featured: FeaturedReview[];
+  totalReviews: number;
+  avgRating: number | null;
+}> {
+  const empty = { featured: [], totalReviews: 0, avgRating: null };
+  const supabase = getSupabaseAdmin();
+
+  // Featured list: high rating + a written comment, newest first, joined to the
+  // shop name. `.not("comment", "is", null)` filters NULL comments at the DB; a
+  // whitespace-only comment is filtered in JS below (cheap, no DB function).
+  const featuredQuery = supabase
+    .from("reviews")
+    .select("id, rating, comment, customer_name, created_at, shops(name)")
+    .gte("rating", 4)
+    .not("comment", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  // Global aggregate over every review (independent of the featured filter).
+  const aggregateQuery = supabase.from("reviews").select("rating");
+
+  const [{ data: featuredData, error: featuredError }, { data: aggData, error: aggError }] =
+    await Promise.all([featuredQuery, aggregateQuery]);
+
+  if (featuredError || aggError || !featuredData || !aggData) {
+    if (featuredError) console.error("getHomepageReviewHighlights featured error:", featuredError);
+    if (aggError) console.error("getHomepageReviewHighlights aggregate error:", aggError);
+    return empty;
+  }
+
+  const featured: FeaturedReview[] = (featuredData as unknown as FeaturedReviewRow[])
+    .map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      comment: (r.comment ?? "").trim(),
+      reviewerName: maskReviewerName(r.customer_name),
+      shopName: r.shops?.name ?? null,
+      createdAt: r.created_at,
+    }))
+    // Drop whitespace-only comments that survived the NULL filter.
+    .filter((r) => r.comment.length > 0);
+
+  const ratings = (aggData as unknown as { rating: number }[]).map((r) => r.rating);
+  const totalReviews = ratings.length;
+  const avgRating = totalReviews
+    ? Math.round((ratings.reduce((acc, n) => acc + n, 0) / totalReviews) * 10) / 10
+    : null;
+
+  return { featured, totalReviews, avgRating };
 }

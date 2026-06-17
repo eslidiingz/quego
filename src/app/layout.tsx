@@ -3,7 +3,7 @@ import { Sora, Anuphan } from "next/font/google";
 import "./globals.css";
 
 /**
- * quego brand typography:
+ * Quego brand typography:
  * - Sora — Latin display / numerals (logo, stat numbers, queue tickets, micro-labels).
  * - Anuphan — Thai-designed family for all prose and Thai headings.
  *
@@ -27,7 +27,7 @@ const anuphan = Anuphan({
 });
 
 export const metadata: Metadata = {
-  title: "quego — ไม่ต้องรอเก้อ แค่กดจอง",
+  title: "Quego — ไม่ต้องรอเก้อ แค่กดจอง",
   description:
     "จองคิวร้านบริการความงามและสุขภาพทั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า ไม่ต้องไปนั่งรอ",
 };

@@ -7,7 +7,7 @@ import { StatusTabs, type TabKey } from "./StatusTabs";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "จัดการร้าน · quego Admin",
+  title: "จัดการร้าน · Quego Admin",
 };
 
 function parseTab(raw: string | undefined): TabKey {

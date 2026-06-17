@@ -123,7 +123,7 @@ export function AdminShell({
             <Icon name={menuOpen ? "close" : "menu"} />
           </button>
           <h1 className="font-display text-headline-md text-on-surface lg:hidden">
-            quego Admin
+            Quego Admin
           </h1>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />

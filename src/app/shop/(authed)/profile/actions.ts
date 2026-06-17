@@ -58,6 +58,12 @@ export async function updateOwnShop(
 
   const fieldErrors = validateShopForm(parsed);
 
+  // Profile requires a handle (every live shop already has one); the shared
+  // validator treats it as optional for registration, so enforce it here.
+  if (!parsed.handle) {
+    fieldErrors.handle = "กรุณากรอกลิงก์ร้าน";
+  }
+
   // OPP-04: the cutoff is a profile-only field (the shared shop-form validator
   // is reused by public registration, which doesn't collect it), so it's parsed
   // + validated here directly.
@@ -84,6 +90,7 @@ export async function updateOwnShop(
 
   const result = await updateOwnShopProfile(session.shopId, {
     name: parsed.name,
+    handle: parsed.handle ?? "",
     categoryId: parsed.categoryId,
     description: parsed.description,
     address: parsed.address,
@@ -102,6 +109,13 @@ export async function updateOwnShop(
         ok: false,
         message: result.message,
         fieldErrors: { categoryId: result.message },
+      };
+    }
+    if (result.field === "handle") {
+      return {
+        ok: false,
+        message: result.message,
+        fieldErrors: { handle: result.message },
       };
     }
     return { ok: false, message: result.message };

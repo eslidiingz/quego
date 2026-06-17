@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
 import { Button, buttonClassName } from "@/components/ui/Button";
@@ -11,7 +11,8 @@ import { BusinessHoursPanel } from "@/components/booking/BusinessHoursPanel";
 import { LiveQueueStatus } from "@/components/booking/LiveQueueStatus";
 import { ServiceList } from "@/components/booking/ServiceList";
 import { ShopReviewsSection } from "@/components/reviews/ShopReviewsSection";
-import { getPublicShopById } from "@/lib/services/shops";
+import { getPublicShopByHandleOrId } from "@/lib/services/shops";
+import { isUuid } from "@/lib/validation/uuid";
 import {
   getShopPublicQueueStatus,
   type ShopQueueStatus,
@@ -60,15 +61,15 @@ function nextOpeningNote(
 }
 
 export async function generateMetadata({ params }: { params: RouteParams }) {
-  const { id } = await params;
-  const shop = await getPublicShopById(id);
+  const { id: param } = await params;
+  const shop = await getPublicShopByHandleOrId(param);
   if (!shop) {
-    return { title: "ไม่พบร้านที่ต้องการ · quego" };
+    return { title: "ไม่พบร้านที่ต้องการ · Quego" };
   }
   return {
-    title: `${shop.name} · quego`,
+    title: `${shop.name} · Quego`,
     description:
-      shop.description ?? `จองคิวร้าน ${shop.name} ผ่าน quego ได้ทันที`,
+      shop.description ?? `จองคิวร้าน ${shop.name} ผ่าน Quego ได้ทันที`,
   };
 }
 
@@ -77,14 +78,22 @@ export default async function ShopDetailPage({
 }: {
   params: RouteParams;
 }) {
-  const { id } = await params;
-  const [shop, queueStatus, reviewData, showCustomerNav] = await Promise.all([
-    getPublicShopById(id),
-    getShopPublicQueueStatus(id),
-    listShopReviews(id),
+  const { id: param } = await params;
+  const shop = await getPublicShopByHandleOrId(param);
+  if (!shop) notFound();
+
+  // Canonicalise the URL: a visitor who arrived via a legacy UUID link or QR is
+  // redirected (once) to the shop's pretty handle, so the address bar, shares,
+  // and SEO all settle on /shops/{handle}.
+  if (isUuid(param) && shop.handle && shop.handle !== param) {
+    redirect(`/shops/${shop.handle}`);
+  }
+
+  const [queueStatus, reviewData, showCustomerNav] = await Promise.all([
+    getShopPublicQueueStatus(shop.id),
+    listShopReviews(shop.id),
     shouldShowCustomerBottomNav(),
   ]);
-  if (!shop) notFound();
 
   const now = getBangkokNow();
   const todayHours = shop.hours.find((h) => h.dayOfWeek === now.dayOfWeek);
@@ -339,7 +348,7 @@ export default async function ShopDetailPage({
         >
           <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <Link
-              href={`/shops/${shop.id}/book`}
+              href={`/shops/${shop.handle ?? shop.id}/book`}
               className={buttonClassName({
                 size: "xl",
                 fullWidth: true,

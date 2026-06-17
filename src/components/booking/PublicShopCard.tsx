@@ -17,6 +17,8 @@ export type ShopCardService = {
 
 export type PublicShopCardProps = {
   id: string;
+  /** Pretty URL handle; falls back to `id` when absent (legacy rows). */
+  handle?: string | null;
   name: string;
   categoryIcon?: string | null;
   /** Short area line (อำเภอ, จังหวัด) — more scannable than a full address. */
@@ -42,6 +44,7 @@ export type PublicShopCardProps = {
  */
 export function PublicShopCard({
   id,
+  handle,
   name,
   categoryIcon,
   province,
@@ -56,7 +59,7 @@ export function PublicShopCard({
 
   return (
     <Link
-      href={`/shops/${id}`}
+      href={`/shops/${handle ?? id}`}
       className={cn(
         "group flex flex-col bg-surface-container-lowest rounded-xl overflow-hidden border border-outline-variant/40 shadow-sm hover:shadow-luxury hover:border-primary/30 transition-all duration-300 ease-out",
         className,
@@ -102,6 +105,17 @@ export function PublicShopCard({
               <span className="font-semibold text-primary">
                 {formatBaht(fromPrice)}
               </span>
+            </p>
+          ) : services.length === 0 ? (
+            /* No services yet: keep card height even and give a clear nudge
+               into the shop instead of leaving a hollow gap. */
+            <p className="inline-flex items-center gap-1 text-label-md font-medium text-primary">
+              ดูบริการในร้าน
+              <Icon
+                name="arrow_forward"
+                size={16}
+                className="transition-transform duration-300 ease-out group-hover:translate-x-0.5"
+              />
             </p>
           ) : null}
         </div>

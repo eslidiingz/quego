@@ -6,7 +6,7 @@ import { StaffManager } from "./StaffManager";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "พนักงาน · quego",
+  title: "พนักงาน · Quego",
 };
 
 export default async function ShopStaffPage() {

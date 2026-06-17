@@ -141,7 +141,7 @@ spacing:
   stack-lg: 40px
 ---
 
-> **Brand note.** The shipping UI brand is **quego** (see the token header in
+> **Brand note.** The shipping UI brand is **Quego** (see the token header in
 > [`src/app/globals.css`](../../src/app/globals.css) and the title in
 > [`src/app/layout.tsx`](../../src/app/layout.tsx)); "Aura Queue" is the design
 > codename for this folder. **The code is the source of truth** — every value in

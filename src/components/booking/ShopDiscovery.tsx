@@ -15,6 +15,8 @@ export type DiscoveryService = { name: string; price: number | null };
 
 export type DiscoveryShop = {
   id: string;
+  /** Pretty URL handle for the card link. */
+  handle: string | null;
   name: string;
   description: string | null;
   address: string | null;
@@ -162,6 +164,7 @@ export function ShopDiscovery({
               <PublicShopCard
                 key={shop.id}
                 id={shop.id}
+                handle={shop.handle}
                 name={shop.name}
                 categoryIcon={categoryIcon}
                 province={shop.province}
@@ -171,9 +174,45 @@ export function ShopDiscovery({
                 rating={shop.rating}
               />
             ))}
+            {/* Fill a sparse last row so the grid never looks hollow — and turn
+               the empty space into an owner-conversion nudge. Shown when the
+               result set is small or doesn't fill the 3-up desktop row. */}
+            {items.length < 3 || items.length % 3 !== 0 ? (
+              <OpenShopCtaCard />
+            ) : null}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Owner-conversion filler tile that ends a sparse grid. Visually distinct from
+ * a shop card (branded teal panel + gold accent) so it reads as an invitation,
+ * not a result. Matches the card grid cell height via `flex` + `justify-between`.
+ */
+function OpenShopCtaCard() {
+  return (
+    <div className="bg-quego-panel rounded-xl p-5 sm:p-6 flex flex-col justify-between gap-5 min-h-[180px] border border-outline-variant/20 shadow-sm">
+      <div className="flex flex-col gap-2">
+        <span className="inline-flex w-11 h-11 items-center justify-center rounded-full bg-on-primary/10 text-secondary-fixed-dim">
+          <Icon name="add_business" size={24} />
+        </span>
+        <h3 className="font-display text-headline-md text-on-primary leading-tight">
+          เปิดร้านของคุณบน quego
+        </h3>
+        <p className="text-label-md text-on-primary/80">
+          รับลูกค้าจองคิวออนไลน์ ฟรี ไม่มีค่าใช้จ่าย
+        </p>
+      </div>
+      <Link
+        href="/shops/register"
+        className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full bg-secondary text-on-secondary text-label-lg font-semibold hover:bg-secondary-fixed-variant transition-colors self-start"
+      >
+        <Icon name="storefront" size={18} />
+        เปิดร้านฟรี
+      </Link>
     </div>
   );
 }

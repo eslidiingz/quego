@@ -50,7 +50,7 @@ export function parseBookingPostback(
 }
 
 const NOT_LINKED_TEXT =
-  "ยังไม่พบบัญชี quego ที่เชื่อมกับ LINE นี้ — เปิดแอป quego ไปที่ " +
+  "ยังไม่พบบัญชี Quego ที่เชื่อมกับ LINE นี้ — เปิดแอป Quego ไปที่ " +
   "โปรไฟล์ › การแจ้งเตือน แล้วกด “เชื่อมต่อ LINE”";
 
 async function replyText(

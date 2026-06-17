@@ -16,7 +16,7 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-outline-variant">
       <div className="max-w-[1280px] mx-auto px-4 md:px-12 h-16 flex items-center justify-between">
-        <Link href="/" aria-label="quego หน้าแรก" className="flex items-center gap-2">
+        <Link href="/" aria-label="Quego หน้าแรก" className="flex items-center gap-2">
           <QuegoWordmark />
         </Link>
         <div className="flex items-center gap-1">

@@ -7,9 +7,9 @@ import { ShopRegistrationForm } from "./ShopRegistrationForm";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "สมัครเป็นร้าน · quego",
+  title: "สมัครเป็นร้าน · Quego",
   description:
-    "เพิ่มร้านของคุณเข้าสู่ระบบ quego เพื่อให้ลูกค้าจองคิวได้สะดวกขึ้น",
+    "เพิ่มร้านของคุณเข้าสู่ระบบ Quego เพื่อให้ลูกค้าจองคิวได้สะดวกขึ้น",
 };
 
 export default async function ShopRegisterPage() {
@@ -39,7 +39,7 @@ export default async function ShopRegisterPage() {
             สำหรับร้าน
           </span>
           <h1 className="font-display text-headline-lg text-on-background mb-2">
-            สมัครเป็นร้านใน quego
+            สมัครเป็นร้านใน Quego
           </h1>
           <p className="text-body-md text-on-surface-variant max-w-xl mx-auto">
             กรอกข้อมูลด้านล่าง ยืนยันเบอร์โทร แล้วตั้งรหัส PIN

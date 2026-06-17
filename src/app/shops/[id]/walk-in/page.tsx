@@ -5,6 +5,7 @@ import { buttonClassName } from "@/components/ui/Button";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { getBookingContext } from "@/lib/services/bookings";
+import { resolveApprovedShopId } from "@/lib/services/shops";
 import { WalkInForm } from "./WalkInForm";
 import { joinWalkInAction } from "./actions";
 
@@ -13,11 +14,12 @@ export const dynamic = "force-dynamic";
 type RouteParams = Promise<{ id: string }>;
 
 export async function generateMetadata({ params }: { params: RouteParams }) {
-  const { id } = await params;
-  const ctx = await getBookingContext(id);
-  if (!ctx) return { title: "เช็คอินหน้าร้าน · quego" };
+  const { id: param } = await params;
+  const shopId = await resolveApprovedShopId(param);
+  const ctx = shopId ? await getBookingContext(shopId) : null;
+  if (!ctx) return { title: "เช็คอินหน้าร้าน · Quego" };
   return {
-    title: `เช็คอินหน้าร้าน ${ctx.shop.name} · quego`,
+    title: `เช็คอินหน้าร้าน ${ctx.shop.name} · Quego`,
   };
 }
 
@@ -39,9 +41,10 @@ export default async function WalkInPage({
   // A per-service QR can pre-select via `?serviceId=`; validated in the form.
   searchParams: Promise<{ serviceId?: string }>;
 }) {
-  const { id } = await params;
+  const { id: param } = await params;
   const sp = await searchParams;
-  const context = await getBookingContext(id);
+  const shopId = await resolveApprovedShopId(param);
+  const context = shopId ? await getBookingContext(shopId) : null;
   if (!context) notFound();
 
   // A shop is bookable only once it has at least one active service.
@@ -53,7 +56,7 @@ export default async function WalkInPage({
 
       <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
         <Link
-          href={`/shops/${id}`}
+          href={`/shops/${param}`}
           className="inline-flex items-center gap-1 text-label-md text-on-surface-variant hover:text-primary transition-colors"
         >
           <Icon name="arrow_back" size={18} />

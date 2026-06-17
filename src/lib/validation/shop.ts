@@ -14,10 +14,18 @@ import {
   isValidSubdistrict,
 } from "@/lib/location/thailand";
 import { isValidThaiPhone } from "@/lib/validation/phone";
+import { isValidHandleFormat, isReservedHandle } from "@/lib/slug";
 
 export type ShopFormFields = {
   name: string;
   categoryId: string;
+  /**
+   * Public URL handle (`/shops/{handle}`). Optional in this shared validator:
+   * registration may leave it blank and let the service auto-generate one, while
+   * the profile-edit action enforces required-ness separately. When present it
+   * must be a valid, non-reserved handle. Stored/compared lowercase.
+   */
+  handle?: string;
   description?: string;
   address?: string;
   /** Thai province (จังหวัด) — canonical name; required. */
@@ -41,6 +49,9 @@ export function parseShopFormData(formData: FormData): ShopFormFields {
   return {
     name: get("name"),
     categoryId: get("categoryId"),
+    // Handles are case-insensitive and stored lowercase; normalise on the way in
+    // so the validator, the DB unique index, and the URL all agree.
+    handle: get("handle").toLowerCase() || undefined,
     description: get("description") || undefined,
     address: get("address") || undefined,
     province: get("province"),
@@ -61,6 +72,19 @@ export function validateShopForm(input: ShopFormFields): ShopFormErrors {
     errors.name = "ชื่อร้านต้องไม่เกิน 120 ตัวอักษร";
 
   if (!input.categoryId) errors.categoryId = "กรุณาเลือกประเภทธุรกิจ";
+
+  // Handle (public URL slug) is optional here — registration may omit it and let
+  // the service auto-generate one; the profile-edit action enforces required-ness
+  // itself. Validate only the SHAPE + reserved words when a value is present;
+  // uniqueness is a DB concern checked in the service layer.
+  if (input.handle) {
+    if (!isValidHandleFormat(input.handle)) {
+      errors.handle =
+        "ลิงก์ร้านใช้ได้เฉพาะ a–z, 0–9 และ - (3–30 ตัว ไม่ขึ้นต้น/ลงท้าย หรือมี - ติดกัน)";
+    } else if (isReservedHandle(input.handle)) {
+      errors.handle = "ลิงก์ร้านนี้เป็นคำสงวน กรุณาเลือกคำอื่น";
+    }
+  }
 
   // Server-side length caps. The client forms set `maxLength`, but that is a
   // browser convenience only — a direct POST to the action bypasses it, and the

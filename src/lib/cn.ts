@@ -2,6 +2,8 @@ import { type ClassValue, clsx } from "clsx";
 import { extendTailwindMerge } from "tailwind-merge";
 
 const fontSizeTokens = [
+  "display-xl",
+  "display-xl-mobile",
   "display-lg",
   "display-lg-mobile",
   "display-sm",

@@ -5,14 +5,14 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 type AuthHeroShellProps = {
   /** Material symbol rendered inside the gradient logo tile. When omitted, the
-   *  tile is not rendered and the title (the quego wordmark) stands alone. */
+   *  tile is not rendered and the title (the Quego wordmark) stands alone. */
   icon?: string;
-  /** Accessible label for the logo tile link (defaults to "quego หน้าแรก"
+  /** Accessible label for the logo tile link (defaults to "Quego หน้าแรก"
    *  so it reads distinctly from the textual back link). */
   iconLabel?: string;
   /** Optional uppercase pill above the title — persona / context cue. */
   eyebrow?: ReactNode;
-  /** Main heading slot — the quego wordmark or a step title. */
+  /** Main heading slot — the Quego wordmark or a step title. */
   title: ReactNode;
   /** Supporting line under the title. */
   subtitle: ReactNode;
@@ -23,7 +23,7 @@ type AuthHeroShellProps = {
 };
 
 /**
- * The shared "luxury" auth screen chrome: the quego teal-and-gold hero
+ * The shared "luxury" auth screen chrome: the Quego teal-and-gold hero
  * background, decorative concentric rings, a gradient logo tile, the
  * centered title block, and the white card that holds the form.
  *
@@ -33,7 +33,7 @@ type AuthHeroShellProps = {
  */
 export function AuthHeroShell({
   icon,
-  iconLabel = "quego หน้าแรก",
+  iconLabel = "Quego หน้าแรก",
   eyebrow,
   title,
   subtitle,
@@ -42,7 +42,7 @@ export function AuthHeroShell({
 }: AuthHeroShellProps) {
   return (
     <main className="relative min-h-screen w-full overflow-hidden bg-quego-hero text-on-primary flex flex-col px-4 py-6 md:py-10">
-      {/* Decorative concentric rings + soft glow — the quego hero signature */}
+      {/* Decorative concentric rings + soft glow — the Quego hero signature */}
       <div
         aria-hidden
         className="pointer-events-none absolute -right-40 -top-32 size-[520px] rounded-full border border-on-primary/10"
