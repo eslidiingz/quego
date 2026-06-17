@@ -21,6 +21,13 @@ import {
   getRatingSummariesForShops,
   type ShopRatingSummary,
 } from "@/lib/services/reviews";
+import {
+  slugify,
+  isValidHandleFormat,
+  isReservedHandle,
+  HANDLE_MAX_LENGTH,
+} from "@/lib/slug";
+import { isUuid } from "@/lib/validation/uuid";
 
 // ----- Types --------------------------------------------------------------
 
@@ -44,6 +51,8 @@ export type CategoryOption = {
 export type CreateShopInput = {
   name: string;
   categoryId: string;
+  /** Public URL handle. Optional: auto-generated from the name when omitted. */
+  handle?: string;
   description?: string;
   address?: string;
   /** Thai province (จังหวัด), canonical name from the location dataset. */
@@ -59,7 +68,11 @@ export type CreateShopInput = {
 };
 
 /** Which unique field clashed, so the form can flag the right input inline. */
-export type ShopDuplicateField = "ownerPhone" | "contactPhone" | "ownerEmail";
+export type ShopDuplicateField =
+  | "ownerPhone"
+  | "contactPhone"
+  | "ownerEmail"
+  | "handle";
 
 export type CreateShopResult =
   | { ok: true; id: string }
@@ -74,6 +87,8 @@ export type CreateShopResult =
 export type ShopListItem = {
   id: string;
   name: string;
+  /** Public URL handle; null only for legacy non-approved rows. */
+  handle: string | null;
   status: ShopStatus;
   category_name: string | null;
   owner_name: string;
@@ -101,7 +116,13 @@ export type UpdateShopInput = CreateShopInput;
 
 export type UpdateShopResult =
   | { ok: true }
-  | { ok: false; code: "not_found" | "category_not_found" | "duplicate" | "unknown"; message: string };
+  | {
+      ok: false;
+      code: "not_found" | "category_not_found" | "duplicate" | "unknown";
+      message: string;
+      /** Set only when the clash/invalid value is the public URL handle. */
+      field?: "handle";
+    };
 
 export type ShopLoginInfo = {
   id: string;
@@ -127,6 +148,8 @@ const PIN_RE = /^\d{6}$/u;
 export type PublicShopDetail = {
   id: string;
   name: string;
+  /** Public URL handle — the canonical segment the detail page redirects to. */
+  handle: string | null;
   description: string | null;
   address: string | null;
   province: string | null;
@@ -148,6 +171,7 @@ export type PublicShopDetail = {
 type ShopDetailRow = {
   id: string;
   name: string;
+  handle: string | null;
   description: string | null;
   address: string | null;
   province: string | null;
@@ -166,22 +190,25 @@ type ShopDetailRow = {
  * for shops that don't exist or aren't `approved` — the page maps that
  * to a 404 / notFound().
  */
-export async function getPublicShopById(
-  id: string,
+export async function getPublicShopByHandleOrId(
+  param: string,
 ): Promise<PublicShopDetail | null> {
   const supabase = getSupabaseAdmin();
 
-  const { data: shopData, error: shopError } = await supabase
+  // `param` is the URL segment: either a custom handle or a raw UUID (legacy
+  // links / QR codes predate handles). Match the right column for each.
+  const base = supabase
     .from("shops")
     .select(
       `
-        id, name, description, address, province, district, subdistrict, contact_phone, service_duration_minutes,
+        id, name, handle, description, address, province, district, subdistrict, contact_phone, service_duration_minutes,
         shop_categories ( id, name, icon )
       `,
     )
-    .eq("id", id)
-    .eq("status", "approved")
-    .maybeSingle();
+    .eq("status", "approved");
+  const { data: shopData, error: shopError } = await (
+    isUuid(param) ? base.eq("id", param) : base.eq("handle", param)
+  ).maybeSingle();
 
   if (shopError || !shopData) return null;
   const row = shopData as unknown as ShopDetailRow;
@@ -190,8 +217,8 @@ export async function getPublicShopById(
     supabase
       .from("shop_business_hours")
       .select("day_of_week, is_open, open_time, close_time")
-      .eq("shop_id", id),
-    listActiveServicesByShop(id),
+      .eq("shop_id", row.id),
+    listActiveServicesByShop(row.id),
   ]);
 
   const byDay = new Map<DayOfWeek, BusinessHour>();
@@ -211,6 +238,7 @@ export async function getPublicShopById(
   return {
     id: row.id,
     name: row.name,
+    handle: row.handle,
     description: row.description,
     address: row.address,
     province: row.province,
@@ -225,6 +253,25 @@ export async function getPublicShopById(
 }
 
 /**
+ * Resolve a public URL segment (handle or UUID) to a shop's canonical UUID, for
+ * approved shops only. Lightweight companion to
+ * {@link getPublicShopByHandleOrId} for routes that already have heavier
+ * id-keyed loaders (the booking/walk-in pages call `getBookingContext(uuid)`).
+ * Returns null when no approved shop matches.
+ */
+export async function resolveApprovedShopId(
+  param: string,
+): Promise<string | null> {
+  const supabase = getSupabaseAdmin();
+  const base = supabase.from("shops").select("id").eq("status", "approved");
+  const { data, error } = await (
+    isUuid(param) ? base.eq("id", param) : base.eq("handle", param)
+  ).maybeSingle();
+  if (error || !data) return null;
+  return data.id;
+}
+
+/**
  * Whether a shop is currently taking walk-ins, derived from today's business
  * hours vs. Bangkok-local "now". `"unknown"` means the shop hasn't configured
  * hours for today — we render no badge rather than guess.
@@ -234,6 +281,8 @@ export type ShopOpenState = "open" | "closed" | "unknown";
 export type PublicShop = {
   id: string;
   name: string;
+  /** Public URL handle for the card link; null only for legacy rows. */
+  handle: string | null;
   description: string | null;
   address: string | null;
   province: string | null;
@@ -297,7 +346,7 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
     supabase
       .from("shops")
       .select(
-        "id, name, description, address, province, district, subdistrict, service_duration_minutes, category_id",
+        "id, name, handle, description, address, province, district, subdistrict, service_duration_minutes, category_id",
       )
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
@@ -347,6 +396,7 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
     list.push({
       id: s.id,
       name: s.name,
+      handle: s.handle,
       description: s.description,
       address: s.address,
       province: s.province,
@@ -399,6 +449,29 @@ export async function listActiveCategories(): Promise<CategoryOption[]> {
  * data, set cookies, or redirect — those concerns belong in the server action.
  * DIP: callers depend on this interface, not on Supabase directly.
  */
+async function generateUniqueHandle(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  seed: string,
+): Promise<string> {
+  // Romanised base from the shop name; pure-Thai names slugify to "" → "ran".
+  let base = slugify(seed).slice(0, 20).replace(/-+$/u, "");
+  if (!isValidHandleFormat(base) || isReservedHandle(base)) base = "ran";
+  // Probe base, then base-2, base-3, … skipping any reserved/invalid candidate.
+  for (let n = 0; n < 50; n++) {
+    const candidate = n === 0 ? base : `${base}-${n + 1}`;
+    if (!isValidHandleFormat(candidate) || isReservedHandle(candidate)) continue;
+    const { data } = await supabase
+      .from("shops")
+      .select("id")
+      .eq("handle", candidate)
+      .limit(1)
+      .maybeSingle();
+    if (!data) return candidate;
+  }
+  // Pathological fallback; the partial unique index is the final race backstop.
+  return `${base}-${Date.now().toString(36)}`.slice(0, HANDLE_MAX_LENGTH);
+}
+
 export async function createShop(input: CreateShopInput): Promise<CreateShopResult> {
   const supabase = getSupabaseAdmin();
 
@@ -492,6 +565,33 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
     }
   }
 
+  // Resolve the public URL handle: use the (validated) one the owner picked, or
+  // auto-generate a unique one from the shop name when they left it blank. A
+  // tampered/invalid value (the form validates shape upstream) is treated as
+  // "blank" rather than persisted malformed.
+  let handle = input.handle?.trim().toLowerCase() ?? "";
+  if (handle && (!isValidHandleFormat(handle) || isReservedHandle(handle))) {
+    handle = "";
+  }
+  if (handle) {
+    const { data: handleClash } = await supabase
+      .from("shops")
+      .select("id")
+      .eq("handle", handle)
+      .limit(1)
+      .maybeSingle();
+    if (handleClash) {
+      return {
+        ok: false,
+        code: "duplicate",
+        field: "handle",
+        message: "ลิงก์ร้านนี้ถูกใช้แล้ว กรุณาเลือกคำอื่น",
+      };
+    }
+  } else {
+    handle = await generateUniqueHandle(supabase, input.name);
+  }
+
   const { data, error } = await supabase
     .from("shops")
     .insert({
@@ -499,6 +599,7 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
       // approval step). OTP-proven phone ownership is the gate, enforced upstream.
       status: "approved",
       name: input.name,
+      handle,
       category_id: input.categoryId,
       description: input.description || null,
       address: input.address || null,
@@ -523,17 +624,21 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
       // Race backstop: map the violated index back to its field for an inline
       // error, falling back to owner_phone (the only always-present unique col).
       const detail = `${error.message} ${error.details ?? ""}`;
-      const field: ShopDuplicateField = detail.includes("contact_phone")
-        ? "contactPhone"
-        : detail.includes("owner_email")
-          ? "ownerEmail"
-          : "ownerPhone";
+      const field: ShopDuplicateField = detail.includes("handle")
+        ? "handle"
+        : detail.includes("contact_phone")
+          ? "contactPhone"
+          : detail.includes("owner_email")
+            ? "ownerEmail"
+            : "ownerPhone";
       const message =
-        field === "contactPhone"
-          ? "เบอร์โทรร้านนี้ถูกใช้กับร้านอื่นในระบบแล้ว"
-          : field === "ownerEmail"
-            ? "อีเมลนี้ถูกใช้กับร้านอื่นในระบบแล้ว"
-            : "เบอร์โทรนี้ถูกใช้สมัครร้านในระบบแล้ว";
+        field === "handle"
+          ? "ลิงก์ร้านนี้ถูกใช้แล้ว กรุณาเลือกคำอื่น"
+          : field === "contactPhone"
+            ? "เบอร์โทรร้านนี้ถูกใช้กับร้านอื่นในระบบแล้ว"
+            : field === "ownerEmail"
+              ? "อีเมลนี้ถูกใช้กับร้านอื่นในระบบแล้ว"
+              : "เบอร์โทรนี้ถูกใช้สมัครร้านในระบบแล้ว";
       return { ok: false, code: "duplicate", field, message };
     }
     return { ok: false, code: "unknown", message: error.message };
@@ -547,6 +652,7 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
 type ShopRow = {
   id: string;
   name: string;
+  handle: string | null;
   status: ShopStatus;
   owner_name: string;
   owner_phone: string;
@@ -577,7 +683,7 @@ export async function listShops(filter?: {
     .from("shops")
     .select(
       `
-        id, name, status,
+        id, name, handle, status,
         owner_name, owner_phone, owner_email,
         contact_phone, description, address, province, district, subdistrict,
         rejection_reason, service_duration_minutes, created_at, reviewed_at,
@@ -597,6 +703,7 @@ export async function listShops(filter?: {
   return (data as unknown as ShopRow[]).map((r) => ({
     id: r.id,
     name: r.name,
+    handle: r.handle,
     status: r.status,
     category_name: r.shop_categories?.name ?? null,
     owner_name: r.owner_name,
@@ -706,7 +813,7 @@ export async function getShopById(id: string): Promise<ShopListItem | null> {
     .from("shops")
     .select(
       `
-        id, name, status,
+        id, name, handle, status,
         owner_name, owner_phone, owner_email,
         contact_phone, description, address, province, district, subdistrict,
         rejection_reason, service_duration_minutes, created_at, reviewed_at,
@@ -722,6 +829,7 @@ export async function getShopById(id: string): Promise<ShopListItem | null> {
   return {
     id: r.id,
     name: r.name,
+    handle: r.handle,
     status: r.status,
     category_name: r.shop_categories?.name ?? null,
     owner_name: r.owner_name,
@@ -772,6 +880,8 @@ export async function getShopCategoryRef(
 // ----- Shop-owner self-edit -----------------------------------------------
 
 export type UpdateOwnShopInput = Omit<UpdateShopInput, "ownerPhone"> & {
+  /** Public URL handle — required on edit (every live shop already has one). */
+  handle: string;
   /** OPP-04: hours before a slot a customer may still reschedule/cancel (0–168). */
   rescheduleCancelCutoffHours: number;
 };
@@ -807,10 +917,39 @@ export async function updateOwnShopProfile(
     };
   }
 
+  // Public URL handle: validated upstream by the profile action; re-checked here
+  // as a backstop. Uniqueness excludes this shop's own row so re-saving an
+  // unchanged handle is a no-op, not a self-collision.
+  const handle = input.handle.trim().toLowerCase();
+  if (!isValidHandleFormat(handle) || isReservedHandle(handle)) {
+    return {
+      ok: false,
+      code: "unknown",
+      message: "ลิงก์ร้านไม่ถูกต้อง",
+      field: "handle",
+    };
+  }
+  const { data: handleClash } = await supabase
+    .from("shops")
+    .select("id")
+    .eq("handle", handle)
+    .neq("id", shopId)
+    .limit(1)
+    .maybeSingle();
+  if (handleClash) {
+    return {
+      ok: false,
+      code: "duplicate",
+      field: "handle",
+      message: "ลิงก์ร้านนี้ถูกใช้แล้ว กรุณาเลือกคำอื่น",
+    };
+  }
+
   const { error: updateError } = await supabase
     .from("shops")
     .update({
       name: input.name,
+      handle,
       category_id: input.categoryId,
       description: input.description || null,
       address: input.address || null,
@@ -826,6 +965,15 @@ export async function updateOwnShopProfile(
 
   if (updateError) {
     if (updateError.code === "23505") {
+      const detail = `${updateError.message} ${updateError.details ?? ""}`;
+      if (detail.includes("handle")) {
+        return {
+          ok: false,
+          code: "duplicate",
+          field: "handle",
+          message: "ลิงก์ร้านนี้ถูกใช้แล้ว กรุณาเลือกคำอื่น",
+        };
+      }
       return {
         ok: false,
         code: "duplicate",

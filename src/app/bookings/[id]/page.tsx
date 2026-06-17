@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 type RouteParams = Promise<{ id: string }>;
 
 export const metadata = {
-  title: "ยืนยันการจอง · quego",
+  title: "ยืนยันการจอง · Quego",
 };
 
 const STATUS_LABEL: Record<

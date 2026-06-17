@@ -3,19 +3,52 @@ import { Icon } from "@/components/ui/Icon";
 import { ShopDiscovery } from "@/components/booking/ShopDiscovery";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingHero } from "@/components/landing/LandingHero";
+import { TrustBand } from "@/components/landing/TrustBand";
+import { ValueProps } from "@/components/landing/ValueProps";
+import { Testimonials } from "@/components/landing/Testimonials";
+import { ForShopOwners } from "@/components/landing/ForShopOwners";
+import { HomeFAQ } from "@/components/landing/HomeFAQ";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { CustomerBottomNav } from "@/components/layout/CustomerBottomNav";
 import { listPublicShopsByCategory } from "@/lib/services/shops";
+import { getHomepageReviewHighlights } from "@/lib/services/reviews";
 import { shouldShowCustomerBottomNav } from "@/lib/auth/customer-bottom-nav";
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://quego.app";
+
 export const metadata = {
-  title: "quego — ไม่ต้องรอเก้อ แค่กดจอง",
+  metadataBase: new URL(SITE_URL),
+  title: "Quego — ไม่ต้องรอเก้อ แค่กดจอง",
   description:
     "จองคิวร้านบริการความงามและสุขภาพทั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า ไม่ต้องไปนั่งรอ",
+  keywords: [
+    "จองคิว",
+    "จองคิวร้านเสริมสวย",
+    "จองคิวออนไลน์",
+    "ดูคิวเรียลไทม์",
+    "ร้านความงาม",
+    "ร้านนวด สปา",
+    "quego",
+  ],
+  openGraph: {
+    type: "website",
+    locale: "th_TH",
+    siteName: "Quego",
+    title: "Quego — ไม่ต้องรอเก้อ แค่กดจอง",
+    description:
+      "จองคิวร้านบริการความงามและสุขภาพทั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า ไม่ต้องไปนั่งรอ",
+    url: SITE_URL,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Quego — ไม่ต้องรอเก้อ แค่กดจอง",
+    description:
+      "จองคิวร้านบริการความงามและสุขภาพทั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า",
+  },
 };
 
 export default async function HomePage({
@@ -29,10 +62,11 @@ export default async function HomePage({
     subdistrict?: string | string[];
   }>;
 }) {
-  const [groups, params, showCustomerNav] = await Promise.all([
+  const [groups, params, showCustomerNav, reviewHighlights] = await Promise.all([
     listPublicShopsByCategory(),
     searchParams,
     shouldShowCustomerBottomNav(),
+    getHomepageReviewHighlights(),
   ]);
 
   const first = (v?: string | string[]) => (Array.isArray(v) ? v[0] : v ?? "");
@@ -70,13 +104,24 @@ export default async function HomePage({
         initialSubdistrict={initialSubdistrict}
       />
 
+      {/* Social proof immediately under the hero (self-guards on empty) */}
+      <TrustBand
+        shopCount={shopCount}
+        categoryCount={groups.length}
+        totalReviews={reviewHighlights.totalReviews}
+        avgRating={reviewHighlights.avgRating}
+      />
+
       {/* Real, bookable shops — the hero search + category pills jump here */}
       <section
         id="shops"
         className="scroll-mt-20 max-w-[1180px] mx-auto w-full px-4 md:px-12 pt-12 md:pt-16"
       >
         <div className="mb-6">
-          <h2 className="font-headline font-semibold text-[24px] sm:text-[30px] tracking-tight text-on-background">
+          <p className="text-label-sm font-medium uppercase tracking-wide text-primary">
+            ค้นหาร้าน
+          </p>
+          <h2 className="font-headline font-semibold text-headline-lg sm:text-display-lg tracking-tight text-on-background mt-1">
             {sectionTitle}
           </h2>
           <p className="text-body-sm text-on-surface-variant mt-1">
@@ -103,7 +148,11 @@ export default async function HomePage({
         )}
       </div>
 
+      <ValueProps />
       <HowItWorks />
+      <Testimonials items={reviewHighlights.featured} />
+      <ForShopOwners />
+      <HomeFAQ />
       <LandingFooter />
 
       {showCustomerNav ? <CustomerBottomNav /> : null}
@@ -113,13 +162,13 @@ export default async function HomePage({
 
 function EmptyState() {
   return (
-    <div className="bg-surface-container-lowest border border-dashed border-outline-variant rounded-2xl p-12 text-center max-w-2xl mx-auto">
+    <div className="bg-surface-container-lowest border border-dashed border-outline-variant rounded-xl p-12 text-center max-w-2xl mx-auto">
       <div className="w-16 h-16 mx-auto rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant mb-4">
         <Icon name="storefront" size={32} />
       </div>
       <p className="text-body-md text-on-surface">ยังไม่มีร้านในระบบ</p>
       <p className="text-label-md text-on-surface-variant mt-1">
-        เป็นคนแรกที่สมัครและเปิดร้านบน quego
+        เป็นคนแรกที่สมัครและเปิดร้านบน Quego
       </p>
       <Link
         href="/shops/register"

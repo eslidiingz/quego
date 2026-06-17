@@ -5,7 +5,7 @@ import { CategoriesTable, type CategoryRow } from "./CategoriesTable";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "หมวดหมู่ร้าน · quego Admin",
+  title: "หมวดหมู่ร้าน · Quego Admin",
 };
 
 export default async function CategoriesPage() {

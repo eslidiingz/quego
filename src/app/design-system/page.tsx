@@ -11,9 +11,9 @@ import {
 import { ComponentGallery } from "./_components/ComponentGallery";
 
 export const metadata: Metadata = {
-  title: "quego · Design System",
+  title: "Quego · Design System",
   description:
-    "Living design system ของ quego — tokens, typography และ component จริงทั้งหมด ออกแบบแบบ mobile-first",
+    "Living design system ของ Quego — tokens, typography และ component จริงทั้งหมด ออกแบบแบบ mobile-first",
   // Internal reference surface — keep it out of search indexes.
   robots: { index: false, follow: false },
 };
@@ -148,7 +148,7 @@ export default function DesignSystemPage() {
           <p className="text-label-sm uppercase tracking-[0.3em] text-white/70">
             Living design system
           </p>
-          <h1 className="mt-2 font-display text-display-lg">quego</h1>
+          <h1 className="mt-2 font-display text-display-lg">Quego</h1>
           <p className="mt-3 max-w-prose text-body-md text-white/80">
             แหล่งอ้างอิงเดียวของทีม — token, typography และ component
             ทุกตัว render จากโค้ดจริงใน <code className="text-white">globals.css</code> และ{" "}
@@ -179,7 +179,7 @@ export default function DesignSystemPage() {
           id="principles"
           eyebrow="Foundations"
           title="หลักการ"
-          description="กติกาที่ทุก surface ของ quego ยึดร่วมกัน — สรุปจาก convention จริงของโปรเจกต์"
+          description="กติกาที่ทุก surface ของ Quego ยึดร่วมกัน — สรุปจาก convention จริงของโปรเจกต์"
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PRINCIPLES.map((p) => (

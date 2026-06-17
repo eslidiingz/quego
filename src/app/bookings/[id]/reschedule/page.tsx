@@ -14,7 +14,7 @@ import { RescheduleForm } from "./RescheduleForm";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "เลื่อนเวลาการจอง · quego",
+  title: "เลื่อนเวลาการจอง · Quego",
 };
 
 type RouteParams = Promise<{ id: string }>;

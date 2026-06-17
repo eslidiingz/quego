@@ -28,6 +28,8 @@ export function EditProfileForm({
     null,
   );
   const [toastOpen, setToastOpen] = useState(false);
+  // Controlled to constrain input to handle-safe chars as the owner types.
+  const [handle, setHandle] = useState(shop.handle ?? "");
 
   useEffect(() => {
     // Standard "react to server-action settling" pattern. The rule treats
@@ -67,6 +69,24 @@ export function EditProfileForm({
             defaultValue={shop.name}
             maxLength={120}
             errorText={errors?.name}
+            disabled={pending}
+          />
+          <Input
+            name="handle"
+            label="ลิงก์ร้าน"
+            required
+            placeholder="เช่น tukta-salon"
+            iconLeft={<Icon name="link" />}
+            inputMode="url"
+            autoCapitalize="none"
+            autoComplete="off"
+            maxLength={30}
+            value={handle}
+            onChange={(e) =>
+              setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/gu, ""))
+            }
+            errorText={errors?.handle}
+            helperText={`ที่อยู่ร้าน: quego.app/shops/${handle || "ชื่อร้าน"} · ใช้ a–z, 0–9 และขีด (-)`}
             disabled={pending}
           />
           <Select
@@ -126,7 +146,7 @@ export function EditProfileForm({
         <Section
           icon="badge"
           title="ผู้ติดต่อ"
-          description="ข้อมูลที่ทีมงาน quego ใช้ติดต่อกลับ"
+          description="ข้อมูลที่ทีมงาน Quego ใช้ติดต่อกลับ"
         >
           <Input
             name="ownerName"
@@ -143,7 +163,7 @@ export function EditProfileForm({
             value={shop.owner_phone}
             readOnly
             disabled
-            helperText="หากต้องการเปลี่ยนเบอร์โทรนี้ ติดต่อทีมงาน quego"
+            helperText="หากต้องการเปลี่ยนเบอร์โทรนี้ ติดต่อทีมงาน Quego"
           />
           <Input
             name="ownerEmail"

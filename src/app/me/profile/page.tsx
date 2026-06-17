@@ -13,7 +13,7 @@ import { changeCustomerPinAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "โปรไฟล์ของฉัน · quego",
+  title: "โปรไฟล์ของฉัน · Quego",
 };
 
 type SearchParams = Promise<{ tab?: string; notice?: string }>;

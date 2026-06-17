@@ -10,7 +10,7 @@ import { AuditLogTable } from "./AuditLogTable";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "บันทึกการกระทำ · quego Admin",
+  title: "บันทึกการกระทำ · Quego Admin",
 };
 
 /** Action codes the filter UI may select — validated against the page input. */

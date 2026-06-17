@@ -10,7 +10,7 @@ import { ShareTools } from "./ShareTools";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "แชร์ร้าน · quego",
+  title: "แชร์ร้าน · Quego",
 };
 
 export default async function ShopSharePage() {
@@ -21,11 +21,14 @@ export default async function ShopSharePage() {
     redirect("/login?tab=shop&notice=session-expired");
   }
 
-  const shopUrl = absoluteUrl(`/shops/${shop.id}`);
-  const bookingUrl = absoluteUrl(`/shops/${shop.id}/book`);
+  // Prefer the pretty handle for everything we print/share; fall back to the
+  // UUID only for the (legacy) case of a shop without one.
+  const slug = shop.handle ?? shop.id;
+  const shopUrl = absoluteUrl(`/shops/${slug}`);
+  const bookingUrl = absoluteUrl(`/shops/${slug}/book`);
   // OPP-08: the in-shop walk-in self-join deep link — printed and posted at the
   // counter so customers scan to join today's queue themselves.
-  const walkInUrl = absoluteUrl(`/shops/${shop.id}/walk-in`);
+  const walkInUrl = absoluteUrl(`/shops/${slug}/walk-in`);
   // Server-side PNG data-URLs; rendered as <img> and reused for the download.
   const [qrDataUrl, walkInQrDataUrl] = await Promise.all([
     QRCode.toDataURL(shopUrl, {

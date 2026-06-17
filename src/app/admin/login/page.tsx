@@ -3,7 +3,7 @@ import { LoginForm } from "./LoginForm";
 import { FlashToast } from "@/components/ui/FlashToast";
 
 export const metadata = {
-  title: "เข้าสู่ระบบผู้ดูแล · quego",
+  title: "เข้าสู่ระบบผู้ดูแล · Quego",
 };
 
 type SearchParams = Promise<{ next?: string; notice?: string }>;
@@ -25,11 +25,11 @@ export default async function AdminLoginPage({
         eyebrow="ผู้ดูแลระบบ"
         title={
           <h1 className="font-display font-semibold text-[34px] leading-none tracking-tight text-on-primary">
-            quego<span className="text-secondary">.</span>
+            Quego<span className="text-secondary">.</span>
           </h1>
         }
-        subtitle="แผงควบคุมสำหรับทีมงาน quego เท่านั้น"
-        footer={`© ${new Date().getFullYear()} quego · Premium Queue Concierge`}
+        subtitle="แผงควบคุมสำหรับทีมงาน Quego เท่านั้น"
+        footer={`© ${new Date().getFullYear()} Quego · Premium Queue Concierge`}
       >
         <LoginForm next={safeNext} />
       </AuthHeroShell>
