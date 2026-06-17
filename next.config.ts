@@ -2,10 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
-  // firebase-admin (server-side OTP ID-token verification) pulls in gRPC /
-  // optional native deps that must NOT be bundled — keep it an external Node
-  // require at runtime instead of letting Turbopack trace into it.
-  serverExternalPackages: ["firebase-admin"],
   // SEC-05: baseline HTTP security headers on every route (defense-in-depth).
   async headers() {
     return [
