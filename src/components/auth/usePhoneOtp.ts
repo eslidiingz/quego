@@ -185,21 +185,20 @@ export function usePhoneOtp(
         typeof err === "object" && err !== null && "code" in err
           ? String((err as { code?: unknown }).code ?? "")
           : "";
-      // A wrong or expired code is normal user input, not a bug — don't log it
-      // (Next's dev overlay surfaces every console.error as an "issue"). Only
-      // genuinely unexpected failures get logged.
-      if (
-        code !== "auth/invalid-verification-code" &&
-        code !== "auth/code-expired"
-      ) {
-        console.error("OTP confirm failed:", err);
-      }
       setPhase("sent");
-      setError(
-        code === "auth/code-expired"
-          ? "รหัส OTP หมดอายุ กรุณาขอรหัสใหม่"
-          : "รหัส OTP ไม่ถูกต้อง กรุณาลองใหม่",
-      );
+      if (code === "auth/invalid-verification-code") {
+        // A wrong code is normal user input, not a bug — don't log it (Next's
+        // dev overlay surfaces every console.error as an "issue").
+        setError("รหัส OTP ไม่ถูกต้อง กรุณาลองใหม่");
+      } else if (code === "auth/code-expired") {
+        setError("รหัส OTP หมดอายุ กรุณาขอรหัสใหม่");
+      } else {
+        // Anything without a Firebase auth code — a thrown server action, a
+        // network failure — is NOT a wrong OTP. Don't blame the user's (correct)
+        // code for a server-side fault; log it for diagnosis and say so plainly.
+        console.error("OTP confirm failed:", err);
+        setError("ยืนยัน OTP ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+      }
       return false;
     }
   }

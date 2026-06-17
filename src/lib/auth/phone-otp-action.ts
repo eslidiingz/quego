@@ -42,6 +42,14 @@ export async function verifyPhoneOtpAction(
     return { ok: false, message: "ยืนยัน OTP ไม่สำเร็จ กรุณาลองใหม่" };
   }
 
-  await setPhoneVerified(verified.phone);
+  try {
+    await setPhoneVerified(verified.phone);
+  } catch (err) {
+    // The only throw here is a misconfigured ADMIN_SESSION_SECRET (the verified
+    // cookie can't be signed). Never let it bubble up as an uncaught 500 — the
+    // client would mislabel that as a wrong OTP. Log it for ops, fail cleanly.
+    console.error("setPhoneVerified failed:", err);
+    return { ok: false, message: "ยืนยัน OTP ไม่สำเร็จ กรุณาลองใหม่ภายหลัง" };
+  }
   return { ok: true, phone: verified.phone };
 }
