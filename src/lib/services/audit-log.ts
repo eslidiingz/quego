@@ -28,6 +28,7 @@ export type AuditAction =
   | "shop.impersonate"
   | "category.create"
   | "category.update"
+  | "category.toggle_active"
   | "category.delete"
   | "preset.create"
   | "preset.update"

@@ -22,6 +22,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   "shop.impersonate": "เข้าสู่ระบบแทนร้าน",
   "category.create": "เพิ่มหมวดหมู่",
   "category.update": "แก้ไขหมวดหมู่",
+  "category.toggle_active": "เปิด/ปิดหมวดหมู่",
   "category.delete": "ลบหมวดหมู่",
   "preset.create": "เพิ่มบริการ preset",
   "preset.update": "แก้ไขบริการ preset",

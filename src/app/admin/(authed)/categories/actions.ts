@@ -12,6 +12,9 @@ export type CategoryFormState = {
   fieldErrors?: { name?: string; slug?: string; icon?: string; sort_order?: string };
 } | null;
 
+/** Imperative-action result (toggle/delete) — no field-level errors. */
+export type CategoryActionResult = { ok: boolean; message?: string };
+
 function slugify(input: string): string {
   return input
     .toLowerCase()
@@ -148,6 +151,38 @@ export async function updateCategory(
 
   revalidatePath("/admin/categories");
   return { ok: true, message: "อัปเดตเรียบร้อย" };
+}
+
+export async function setCategoryActiveAction(
+  id: string,
+  isActive: boolean,
+): Promise<CategoryActionResult> {
+  const session = await requireAdminSession();
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("shop_categories")
+    .update({ is_active: isActive, updated_by: session.adminId })
+    .eq("id", id);
+
+  if (error) {
+    // Log the real DB detail server-side; keep the client message generic.
+    console.error("setCategoryActiveAction error:", error);
+    return { ok: false, message: "อัปเดตสถานะไม่สำเร็จ" };
+  }
+
+  after(() =>
+    writeAuditLog({
+      adminId: session.adminId,
+      action: "category.toggle_active",
+      entityType: "category",
+      entityId: id,
+      meta: { isActive },
+    }),
+  );
+
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin");
+  return { ok: true };
 }
 
 export async function deleteCategory(id: string): Promise<CategoryFormState> {
