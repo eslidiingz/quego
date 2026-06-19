@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { SiteAuthLink } from "@/components/layout/SiteAuthLink";
-import { buttonClassName } from "@/components/ui/Button";
 import { QuegoWordmark } from "@/components/ui/QuegoWordmark";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
@@ -13,10 +12,6 @@ const ANCHOR_LINKS: { label: string; href: string }[] = [
 /**
  * Quego top navigation — sticky, frosted, brand wordmark + section links and
  * the shared auth entry point.
- *
- * The "สำหรับร้าน" entry is promoted out of the anchor list into a ghost button
- * so it (a) reads as a distinct, higher-emphasis action than the section links
- * and (b) stays visible on mobile, where the anchor links collapse.
  *
  * SRP: chrome + navigation only. Auth state lives entirely in SiteAuthLink
  * (DIP — this component never reads a session).
@@ -37,9 +32,6 @@ export function LandingNav() {
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2">
-        <Link href="/shops/register" className={buttonClassName({ variant: "ghost", size: "sm" })}>
-          สำหรับร้าน
-        </Link>
         <ThemeToggle />
         <SiteAuthLink />
       </div>

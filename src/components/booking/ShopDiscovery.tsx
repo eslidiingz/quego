@@ -9,6 +9,7 @@ import {
   PublicShopCard,
   type ShopOpenState,
 } from "@/components/booking/PublicShopCard";
+import { shopImageUrl } from "@/lib/r2/url";
 import type { ShopRatingSummary } from "@/lib/services/reviews";
 
 export type DiscoveryService = { name: string; price: number | null };
@@ -28,6 +29,10 @@ export type DiscoveryShop = {
   openState: ShopOpenState;
   /** Average rating + count for the card badge. */
   rating: ShopRatingSummary;
+  /** R2 object key for the shop logo; null → category-icon fallback on the card. */
+  logo_key: string | null;
+  /** R2 object key for the shop cover; null → gradient-banner fallback on the card. */
+  cover_key: string | null;
 };
 
 export type DiscoveryGroup = {
@@ -167,6 +172,8 @@ export function ShopDiscovery({
                 handle={shop.handle}
                 name={shop.name}
                 categoryIcon={categoryIcon}
+                logoUrl={shopImageUrl(shop.logo_key)}
+                coverUrl={shopImageUrl(shop.cover_key)}
                 province={shop.province}
                 district={shop.district}
                 services={shop.services}
@@ -200,7 +207,7 @@ function OpenShopCtaCard() {
           <Icon name="add_business" size={24} />
         </span>
         <h3 className="font-display text-headline-md text-on-primary leading-tight">
-          เปิดร้านของคุณบน quego
+          เปิดร้านของคุณบน Quego
         </h3>
         <p className="text-label-md text-on-primary/80">
           รับลูกค้าจองคิวออนไลน์ ฟรี ไม่มีค่าใช้จ่าย

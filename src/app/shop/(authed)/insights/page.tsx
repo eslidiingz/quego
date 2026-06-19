@@ -86,19 +86,13 @@ export default async function ShopReportPage({
             delta={deltas.revenue}
           />
 
-          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <MetricTile
               label="การจองทั้งหมด"
               value={`${insights.totalBookings}`}
               sub="ไม่รวมที่ยกเลิก"
               tone="primary"
               delta={<DeltaChip delta={deltas.totalBookings} />}
-            />
-            <MetricTile
-              label="อัตราเต็มคิว"
-              value={pct(insights.fillRate)}
-              sub={fillRateSub(insights.lineMinutes, insights.capacity, insights.hasFilter)}
-              tone="success"
             />
             <MetricTile
               label="อัตรายกเลิก"
@@ -161,13 +155,6 @@ export default async function ShopReportPage({
       )}
     </div>
   );
-}
-
-/** Sub-line for the fill-rate tile, with a filter-scope hint when narrowed. */
-function fillRateSub(lineMinutes: number, capacity: number, hasFilter: boolean): string {
-  if (lineMinutes <= 0) return "ตั้งเวลาทำการเพื่อคำนวณ";
-  if (hasFilter) return "ตามตัวกรองปัจจุบัน";
-  return `เทียบเวลาทำการ × ${capacity} สาย`;
 }
 
 function ReportSection({

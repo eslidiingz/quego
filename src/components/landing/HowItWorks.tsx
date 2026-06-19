@@ -42,7 +42,7 @@ const STEPS: Step[] = [
  */
 export function HowItWorks() {
   return (
-    <section id="how" className="bg-surface-container-low mt-12 md:mt-16">
+    <section id="how" className="bg-surface-container-low">
       <div className="max-w-[1180px] mx-auto w-full px-4 md:px-12 py-14 md:py-18">
         <div className="mb-8">
           <h2 className="font-headline font-semibold text-headline-lg sm:text-display-lg tracking-tight text-on-background">
@@ -84,23 +84,16 @@ export function HowItWorks() {
                 พร้อมเริ่มแล้วใช่ไหม
               </h3>
               <p className="text-body-sm text-on-surface-variant mt-1">
-                ค้นหาร้านที่ใช่ หรือเปิดร้านของคุณเองบน Quego ได้เลยวันนี้
+                ค้นหาร้านที่ใช่ แล้วจองคิวได้เลยวันนี้
               </p>
             </div>
-            <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto sm:shrink-0">
+            <div className="flex w-full sm:w-auto sm:shrink-0">
               <Link
                 href="#shops"
                 className={buttonClassName({ variant: "primary", size: "lg", className: "w-full sm:w-auto" })}
               >
                 <Icon name="search" size={18} />
                 ค้นหาร้าน
-              </Link>
-              <Link
-                href="/shops/register"
-                className={buttonClassName({ variant: "outline", size: "lg", className: "w-full sm:w-auto" })}
-              >
-                <Icon name="storefront" size={18} />
-                เปิดร้านกับ Quego
               </Link>
             </div>
           </div>

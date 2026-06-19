@@ -68,42 +68,28 @@ export function PresetsManager({
           onClick={() => setCreateOpen(true)}
           rounded="full"
           iconLeft={<Icon name="add" />}
+          fullWidth
+          className="sm:w-auto"
         >
           เพิ่มบริการ preset
         </Button>
       </div>
 
-      <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-        {presets.length === 0 ? (
-          <EmptyState onAdd={() => setCreateOpen(true)} />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-surface-container-low border-b border-outline-variant">
-                <tr className="text-label-sm uppercase tracking-wider text-on-surface-variant">
-                  <th className="px-6 py-3 w-12">#</th>
-                  <th className="px-6 py-3">บริการ</th>
-                  <th className="px-6 py-3">ระยะเวลา</th>
-                  <th className="px-6 py-3 hidden sm:table-cell">ราคา</th>
-                  <th className="px-6 py-3">ใช้งาน</th>
-                  <th className="px-6 py-3 w-28 text-right">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {presets.map((preset) => (
-                  <PresetRow
-                    key={preset.id}
-                    preset={preset}
-                    onEdit={() => setEditing(preset)}
-                    onDelete={() => setDeleteTarget({ id: preset.id, name: preset.name })}
-                    onToggleError={(msg) => showToast("error", msg)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {presets.length === 0 ? (
+        <EmptyState onAdd={() => setCreateOpen(true)} />
+      ) : (
+        <ul className="space-y-3">
+          {presets.map((preset) => (
+            <PresetRow
+              key={preset.id}
+              preset={preset}
+              onEdit={() => setEditing(preset)}
+              onDelete={() => setDeleteTarget({ id: preset.id, name: preset.name })}
+              onToggleError={(msg) => showToast("error", msg)}
+            />
+          ))}
+        </ul>
+      )}
 
       <PresetFormDialog
         open={createOpen}
@@ -148,40 +134,44 @@ function PresetRow({
   const [pending, startTransition] = useTransition();
 
   return (
-    <tr
+    <li
       className={
-        "border-b border-outline-variant/40 last:border-b-0 hover:bg-surface-container-low/50 transition-colors " +
-        (preset.isActive ? "" : "opacity-60")
+        "bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:p-5 flex items-start gap-3 transition-colors " +
+        (preset.isActive ? "" : "opacity-70")
       }
     >
-      <td className="px-6 py-4 text-body-md text-on-surface-variant">
-        {preset.sortOrder + 1}
-      </td>
-      <td className="px-6 py-4">
-        <div className="min-w-0">
-          <span className="font-medium text-on-surface block">{preset.name}</span>
-          {preset.description ? (
-            <span className="text-label-sm text-on-surface-variant line-clamp-1">
-              {preset.description}
-            </span>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <span className="text-label-sm font-bold text-on-surface-variant tabular-nums shrink-0">
+            #{preset.sortOrder + 1}
+          </span>
+          <h3 className="font-display font-bold text-headline-sm text-on-surface leading-tight truncate">
+            {preset.name}
+          </h3>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Chip variant="neutral" size="sm">
+            {preset.durationMinutes} นาที
+          </Chip>
+          {preset.price != null ? (
+            <Chip variant="success" size="sm">
+              {formatBaht(preset.price)}
+            </Chip>
+          ) : null}
+          {!preset.isActive ? (
+            <Chip variant="neutral" size="sm">
+              ปิดอยู่
+            </Chip>
           ) : null}
         </div>
-      </td>
-      <td className="px-6 py-4">
-        <Chip variant="neutral" size="sm">
-          {preset.durationMinutes} นาที
-        </Chip>
-      </td>
-      <td className="px-6 py-4 hidden sm:table-cell">
-        {preset.price != null ? (
-          <Chip variant="success" size="sm">
-            {formatBaht(preset.price)}
-          </Chip>
-        ) : (
-          <span className="text-on-surface-variant">—</span>
-        )}
-      </td>
-      <td className="px-6 py-4">
+        {preset.description ? (
+          <p className="text-label-md text-on-surface-variant/60 line-clamp-2">
+            {preset.description}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col items-end gap-2 shrink-0">
         <Switch
           checked={preset.isActive}
           disabled={pending}
@@ -196,34 +186,32 @@ function PresetRow({
             });
           }}
         />
-      </td>
-      <td className="px-6 py-4">
-        <div className="flex justify-end items-center gap-1">
+        <div className="flex items-center">
           <button
             type="button"
             onClick={onEdit}
-            aria-label="แก้ไข"
-            className="inline-flex items-center justify-center size-10 rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors"
+            aria-label="แก้ไข preset"
+            className="inline-flex items-center justify-center size-9 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
           >
-            <Icon name="edit" />
+            <Icon name="edit" size={18} />
           </button>
           <button
             type="button"
             onClick={onDelete}
-            aria-label="ลบ"
-            className="inline-flex items-center justify-center size-10 rounded-full text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors"
+            aria-label="ลบ preset"
+            className="inline-flex items-center justify-center size-9 rounded-full text-error hover:bg-error-container/40 transition-colors"
           >
-            <Icon name="delete" />
+            <Icon name="delete" size={18} />
           </button>
         </div>
-      </td>
-    </tr>
+      </div>
+    </li>
   );
 }
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="p-12 text-center">
+    <div className="bg-surface-container-lowest border border-dashed border-outline-variant rounded-xl p-8 md:p-12 text-center">
       <div className="w-16 h-16 mx-auto rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant mb-4">
         <Icon name="stacks" size={32} />
       </div>
