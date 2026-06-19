@@ -102,9 +102,9 @@ export function AuditLogTable({
 
   return (
     <div className="space-y-6">
-      {/* Entity-type filter row */}
+      {/* Entity-type filter row — scrolls horizontally on phones, wraps on sm+ */}
       <nav
-        className="flex flex-wrap gap-1 p-1 bg-surface-container-low rounded-2xl border border-outline-variant"
+        className="flex flex-nowrap sm:flex-wrap gap-1 p-1 bg-surface-container-low rounded-2xl border border-outline-variant overflow-x-auto no-scrollbar"
         aria-label="กรองตามประเภท"
       >
         <FilterPill
@@ -122,9 +122,9 @@ export function AuditLogTable({
         ))}
       </nav>
 
-      {/* Action filter row */}
+      {/* Action filter row — scrolls horizontally on phones, wraps on sm+ */}
       <nav
-        className="flex flex-wrap gap-1 p-1 bg-surface-container-low rounded-2xl border border-outline-variant"
+        className="flex flex-nowrap sm:flex-wrap gap-1 p-1 bg-surface-container-low rounded-2xl border border-outline-variant overflow-x-auto no-scrollbar"
         aria-label="กรองตามการกระทำ"
       >
         <FilterPill
@@ -160,20 +160,29 @@ export function AuditLogTable({
         ) : null}
       </div>
 
-      <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-        {entries.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="w-16 h-16 mx-auto rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant mb-4">
-              <Icon name="history" size={32} />
-            </div>
-            <p className="text-body-md text-on-surface">ยังไม่มีบันทึกการกระทำ</p>
-            <p className="text-label-md text-on-surface-variant mt-1">
-              การกระทำของผู้ดูแลจะถูกบันทึกที่นี่โดยอัตโนมัติ
-            </p>
+      {entries.length === 0 ? (
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-12 text-center">
+          <div className="w-16 h-16 mx-auto rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant mb-4">
+            <Icon name="history" size={32} />
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+          <p className="text-body-md text-on-surface">ยังไม่มีบันทึกการกระทำ</p>
+          <p className="text-label-md text-on-surface-variant mt-1">
+            การกระทำของผู้ดูแลจะถูกบันทึกที่นี่โดยอัตโนมัติ
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Mobile: card list (the table's columns don't fit a phone width) */}
+          <ul className="space-y-3 md:hidden">
+            {entries.map((entry) => (
+              <AuditLogCard key={entry.id} entry={entry} />
+            ))}
+          </ul>
+
+          {/* Desktop / tablet: full table */}
+          <div className="hidden md:block bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
               <thead className="bg-surface-container-low border-b border-outline-variant">
                 <tr className="text-label-sm uppercase tracking-wider text-on-surface-variant">
                   <th className="px-6 py-3">เวลา</th>
@@ -229,10 +238,66 @@ export function AuditLogTable({
                   );
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
+  );
+}
+
+/**
+ * Mobile rendering of one audit entry. The desktop table hides the
+ * type/detail columns on narrow screens, so the card surfaces every field in a
+ * stacked layout that reads comfortably at a phone width.
+ */
+function AuditLogCard({ entry }: { entry: AuditLogEntry }) {
+  const meta = formatMetaSummary(entry.meta);
+  return (
+    <li className="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-body-md font-medium text-on-surface">
+            {thaiActionLabel(entry.action)}
+          </p>
+          {entry.summary ? (
+            <p className="text-label-sm text-on-surface-variant mt-0.5 break-words">
+              {entry.summary}
+            </p>
+          ) : null}
+        </div>
+        <span className="shrink-0 text-label-sm text-on-surface-variant whitespace-nowrap tabular-nums">
+          {formatBangkokTimestamp(entry.createdAt)}
+        </span>
+      </div>
+
+      <dl className="space-y-1.5 border-t border-outline-variant/40 pt-3 text-label-md">
+        <div className="flex items-center gap-2 text-on-surface-variant">
+          <Icon name="person" size={16} className="shrink-0" />
+          <span className="text-on-surface">
+            {entry.adminName ?? "ผู้ดูแลระบบ"}
+          </span>
+          {entry.adminPhone ? (
+            <span className="tabular-nums">· {entry.adminPhone}</span>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2 text-on-surface-variant">
+          <Icon name="sell" size={16} className="shrink-0" />
+          <span>{thaiEntityLabel(entry.entityType)}</span>
+          {entry.entityId ? (
+            <span className="font-mono text-on-surface-variant/70">
+              {entry.entityId.slice(0, 8)}
+            </span>
+          ) : null}
+        </div>
+        {meta ? (
+          <div className="flex items-start gap-2 text-on-surface-variant">
+            <Icon name="info" size={16} className="shrink-0 mt-0.5" />
+            <span className="break-words">{meta}</span>
+          </div>
+        ) : null}
+      </dl>
+    </li>
   );
 }
