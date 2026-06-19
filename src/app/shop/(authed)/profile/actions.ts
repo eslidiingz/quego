@@ -5,6 +5,9 @@ import { requireShopSession } from "@/lib/auth/shop-session-server";
 import {
   changeShopPin,
   updateOwnShopProfile,
+  setShopLogo,
+  setShopCover,
+  type ShopImageSlot,
 } from "@/lib/services/shops";
 import { unlinkShopLine } from "@/lib/services/shop-line";
 import type {
@@ -281,5 +284,68 @@ export async function unlinkShopLineAction(): Promise<UnlinkShopLineState> {
   }
   revalidatePath("/shop/profile");
   return { ok: true };
+}
+
+// ----- Shop images: logo + cover -----------------------------------------
+
+/**
+ * Result of a logo/cover mutation. `slot` is echoed back so the form knows
+ * which field the toast/error belongs to (both fields drive one action).
+ */
+export type UpdateShopImagesState =
+  | { ok: true; slot: ShopImageSlot }
+  | { ok: false; slot: ShopImageSlot | null; message: string }
+  | null;
+
+/**
+ * Upload the shop's logo/cover. Kept SEPARATE from `updateOwnShop` so a
+ * text-only profile save never re-uploads images and an image change never
+ * re-validates the whole text form (SRP — mirrors the hours/PIN/LINE split).
+ *
+ * An uploaded image can be replaced but never cleared: there is deliberately no
+ * remove path, so the shop always keeps a logo/cover once one is set.
+ *
+ * Security: shopId comes from the verified session (never the form); the
+ * client-supplied `slot`/`file` are re-validated, and the service re-checks the
+ * file's magic bytes + size. The client crops to a fixed size before upload, so
+ * the payload is small, but the caps are still enforced server-side.
+ *
+ * FormData contract (set by ShopImagesForm): `slot` = "logo" | "cover";
+ * `file` carries the cropped image blob.
+ */
+export async function updateShopImagesAction(
+  _prev: UpdateShopImagesState,
+  formData: FormData,
+): Promise<UpdateShopImagesState> {
+  const session = await requireShopSession();
+
+  const slotRaw = String(formData.get("slot") ?? "");
+  const slot: ShopImageSlot | null =
+    slotRaw === "logo" || slotRaw === "cover" ? slotRaw : null;
+  if (!slot) {
+    return { ok: false, slot: null, message: "คำขอไม่ถูกต้อง" };
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, slot, message: "ไม่พบไฟล์รูปภาพ" };
+  }
+  const result =
+    slot === "logo"
+      ? await setShopLogo(session.shopId, file)
+      : await setShopCover(session.shopId, file);
+
+  if (!result.ok) {
+    return { ok: false, slot, message: result.message };
+  }
+
+  // The owner's own surfaces + every public surface that renders the shop.
+  // `/shops/[id]` is the ONLY public shop route (handle + UUID both resolve
+  // through this one dynamic segment), so the "page" revalidation covers both.
+  revalidatePath("/shop/profile");
+  revalidatePath("/shop");
+  revalidatePath("/");
+  revalidatePath("/shops/[id]", "page");
+  return { ok: true, slot };
 }
 

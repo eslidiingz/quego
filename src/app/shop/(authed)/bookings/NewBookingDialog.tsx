@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -149,11 +149,36 @@ export function NewBookingDialog({
     name.trim().length > 0 &&
     phoneValid;
 
+  // Section anchors so each pick can lead the eye to the next step — the same
+  // guided-scroll UX as the customer-facing BookingForm, except here the
+  // scrollable ancestor is the modal body (body scroll is locked while open).
+  const staffSectionRef = useRef<HTMLDivElement>(null);
+  const dateSectionRef = useRef<HTMLDivElement>(null);
+  const timeSectionRef = useRef<HTMLDivElement>(null);
+  const infoSectionRef = useRef<HTMLDivElement>(null);
+
+  // Smooth-scroll a step's section to the top once React has committed the
+  // DOM (rAF), so each pick leads the eye to the next step. Inside the modal
+  // the nearest scrollable ancestor is the dialog body (page scroll is locked
+  // while it's open), so this scrolls within the modal — same UX as the
+  // customer-facing BookingForm.
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
+    requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
   const handleSelectService = (svc: BookingService) => {
     setSelectedServiceKey(serviceKey(svc));
     setSelectedStaffId(null);
     setSelectedDate(null);
     setSelectedSlot(null);
+    // Scroll to the staff step when this service has assignable staff,
+    // otherwise straight to the date step. Mirrors `showStaffStep`.
+    const willShowStaff =
+      svc.staffIds !== null &&
+      context.staff.some((s) => svc.staffIds!.includes(s.id));
+    scrollToSection(willShowStaff ? staffSectionRef : dateSectionRef);
   };
 
   const handleSelectStaff = (staffId: string | null) => {
@@ -161,11 +186,18 @@ export function NewBookingDialog({
     // Staff choice changes which slots are free — reset downstream picks.
     setSelectedDate(null);
     setSelectedSlot(null);
+    scrollToSection(dateSectionRef);
   };
 
   const handleSelectDate = (dateYmd: string) => {
     setSelectedDate(dateYmd);
     setSelectedSlot(null);
+    scrollToSection(timeSectionRef);
+  };
+
+  const handleSelectSlot = (time: string) => {
+    setSelectedSlot(time);
+    scrollToSection(infoSectionRef);
   };
 
   // Step numbers shift as optional steps (service, staff) appear before the
@@ -241,97 +273,105 @@ export function NewBookingDialog({
           ) : null}
 
           {showStaffStep ? (
-            <Section step={staffStepNum} title="เลือกผู้ให้บริการ">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <StaffCard
-                  name="ใครก็ได้"
-                  subtitle="จัดช่างที่ว่างให้"
-                  icon="groups"
-                  selected={selectedStaffId === null}
-                  onClick={() => handleSelectStaff(null)}
-                />
-                {capableStaff.map((member) => (
+            <div ref={staffSectionRef} className="scroll-mt-4">
+              <Section step={staffStepNum} title="เลือกผู้ให้บริการ">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   <StaffCard
-                    key={member.id}
-                    name={member.name}
-                    subtitle={member.role ?? undefined}
-                    icon="person"
-                    selected={selectedStaffId === member.id}
-                    onClick={() => handleSelectStaff(member.id)}
+                    name="ใครก็ได้"
+                    subtitle="จัดช่างที่ว่างให้"
+                    icon="groups"
+                    selected={selectedStaffId === null}
+                    onClick={() => handleSelectStaff(null)}
                   />
-                ))}
-              </div>
-            </Section>
+                  {capableStaff.map((member) => (
+                    <StaffCard
+                      key={member.id}
+                      name={member.name}
+                      subtitle={member.role ?? undefined}
+                      icon="person"
+                      selected={selectedStaffId === member.id}
+                      onClick={() => handleSelectStaff(member.id)}
+                    />
+                  ))}
+                </div>
+              </Section>
+            </div>
           ) : null}
 
-          <Section step={stepBase + 1} title="เลือกวัน">
-            {!selectedService ? (
-              <EmptyHint icon="design_services" message="เลือกบริการก่อน" />
-            ) : (
-              <div className="grid grid-cols-4 gap-2">
-                {days.map((d) => (
-                  <DateChip
-                    key={d.dateYmd}
-                    day={d}
-                    selected={d.dateYmd === selectedDate}
-                    onClick={() => handleSelectDate(d.dateYmd)}
-                  />
-                ))}
-              </div>
-            )}
-          </Section>
+          <div ref={dateSectionRef} className="scroll-mt-4">
+            <Section step={stepBase + 1} title="เลือกวัน">
+              {!selectedService ? (
+                <EmptyHint icon="design_services" message="เลือกบริการก่อน" />
+              ) : (
+                <div className="grid grid-cols-4 gap-2">
+                  {days.map((d) => (
+                    <DateChip
+                      key={d.dateYmd}
+                      day={d}
+                      selected={d.dateYmd === selectedDate}
+                      onClick={() => handleSelectDate(d.dateYmd)}
+                    />
+                  ))}
+                </div>
+              )}
+            </Section>
+          </div>
 
-          <Section
-            step={stepBase + 2}
-            title="เลือกเวลา"
-            hint={
-              selectedService && selectedDay?.status === "available"
-                ? `บริการครั้งละ ${selectedService.durationMinutes} นาที`
-                : undefined
-            }
-          >
-            {!selectedDate ? (
-              <EmptyHint icon="event" message="ยังไม่ได้เลือกวัน" />
-            ) : selectedDay?.status === "closed" ? (
-              <EmptyHint icon="event_busy" message="ร้านปิดในวันนี้" />
-            ) : slots.length === 0 ? (
-              <EmptyHint icon="schedule" message="ไม่มีรอบให้บริการในวันนี้" />
-            ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {slots.map((s) => (
-                  <SlotButton
-                    key={s.time}
-                    slot={s}
-                    selected={s.time === selectedSlot}
-                    onClick={() => setSelectedSlot(s.time)}
-                  />
-                ))}
-              </div>
-            )}
-          </Section>
+          <div ref={timeSectionRef} className="scroll-mt-4">
+            <Section
+              step={stepBase + 2}
+              title="เลือกเวลา"
+              hint={
+                selectedService && selectedDay?.status === "available"
+                  ? `บริการครั้งละ ${selectedService.durationMinutes} นาที`
+                  : undefined
+              }
+            >
+              {!selectedDate ? (
+                <EmptyHint icon="event" message="ยังไม่ได้เลือกวัน" />
+              ) : selectedDay?.status === "closed" ? (
+                <EmptyHint icon="event_busy" message="ร้านปิดในวันนี้" />
+              ) : slots.length === 0 ? (
+                <EmptyHint icon="schedule" message="ไม่มีรอบให้บริการในวันนี้" />
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {slots.map((s) => (
+                    <SlotButton
+                      key={s.time}
+                      slot={s}
+                      selected={s.time === selectedSlot}
+                      onClick={() => handleSelectSlot(s.time)}
+                    />
+                  ))}
+                </div>
+              )}
+            </Section>
+          </div>
 
-          <Section step={stepBase + 3} title="ข้อมูลลูกค้า">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                name="customerName"
-                label="ชื่อ"
-                placeholder="ชื่อจริงหรือชื่อเล่น"
-                required
-                maxLength={100}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoComplete="off"
-              />
-              <PhoneInput
-                name="customerPhone"
-                label="เบอร์โทร"
-                placeholder="0812345678 (ไม่บังคับ)"
-                value={phone}
-                onChange={(digits) => setPhone(digits)}
-                helperText="ไม่บังคับกรอก"
-              />
-            </div>
-          </Section>
+          <div ref={infoSectionRef} className="scroll-mt-4">
+            <Section step={stepBase + 3} title="ข้อมูลลูกค้า">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  name="customerName"
+                  label="ชื่อ"
+                  placeholder="ชื่อจริงหรือชื่อเล่น"
+                  required
+                  maxLength={100}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoComplete="off"
+                />
+                <PhoneInput
+                  name="customerPhone"
+                  label="เบอร์โทร"
+                  placeholder="0812345678 (ไม่บังคับ)"
+                  value={phone}
+                  onChange={(digits) => setPhone(digits)}
+                  helperText="ไม่บังคับกรอก"
+                />
+              </div>
+            </Section>
+          </div>
 
           {state && !state.ok ? (
             <div className="bg-error-container/30 border border-error/20 text-on-error-container rounded-xl p-4 flex items-start gap-3">

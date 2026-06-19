@@ -86,7 +86,7 @@ function HomeSkeleton() {
 function ShopCardSkeleton() {
   return (
     <div className="flex flex-col bg-surface-container-lowest rounded-xl overflow-hidden border border-outline-variant/40 shadow-sm">
-      <Skeleton className="h-20 sm:h-28 w-full rounded-none" />
+      <Skeleton className="aspect-[8/3] w-full rounded-none" />
       <div className="p-3 sm:p-4 flex flex-col gap-3">
         <Skeleton className="h-5 w-3/4" />
         <Skeleton className="h-3.5 w-1/2" />

@@ -28,6 +28,12 @@ import {
   HANDLE_MAX_LENGTH,
 } from "@/lib/slug";
 import { isUuid } from "@/lib/validation/uuid";
+import { putObject, deleteObject } from "@/lib/r2/client";
+import {
+  validateImageFile,
+  MAX_LOGO_BYTES,
+  MAX_COVER_BYTES,
+} from "@/lib/validation/media";
 
 // ----- Types --------------------------------------------------------------
 
@@ -110,6 +116,10 @@ export type ShopListItem = {
    * it; the admin list projections leave it undefined.
    */
   reschedule_cancel_cutoff_hours?: number;
+  /** R2 object key for the shop logo/avatar (1:1). NULL = none → icon fallback. */
+  logo_key: string | null;
+  /** R2 object key for the shop cover/banner (~8:3). NULL = none → gradient fallback. */
+  cover_key: string | null;
 };
 
 export type UpdateShopInput = CreateShopInput;
@@ -166,6 +176,10 @@ export type PublicShopDetail = {
   services: BookableService[];
   category: { id: string; name: string; icon: string | null };
   hours: BusinessHour[];
+  /** R2 object key for the shop logo/avatar (1:1). NULL = none → icon fallback. */
+  logo_key: string | null;
+  /** R2 object key for the shop cover/banner (~8:3). NULL = none → gradient fallback. */
+  cover_key: string | null;
 };
 
 type ShopDetailRow = {
@@ -179,6 +193,8 @@ type ShopDetailRow = {
   subdistrict: string | null;
   contact_phone: string | null;
   service_duration_minutes: number;
+  logo_key: string | null;
+  cover_key: string | null;
   shop_categories: { id: string; name: string; icon: string | null } | null;
 };
 
@@ -201,7 +217,7 @@ export async function getPublicShopByHandleOrId(
     .from("shops")
     .select(
       `
-        id, name, handle, description, address, province, district, subdistrict, contact_phone, service_duration_minutes,
+        id, name, handle, description, address, province, district, subdistrict, contact_phone, service_duration_minutes, logo_key, cover_key,
         shop_categories ( id, name, icon )
       `,
     )
@@ -249,6 +265,8 @@ export async function getPublicShopByHandleOrId(
     services,
     category: row.shop_categories ?? { id: "", name: "—", icon: null },
     hours,
+    logo_key: row.logo_key,
+    cover_key: row.cover_key,
   };
 }
 
@@ -295,6 +313,10 @@ export type PublicShop = {
   openState: ShopOpenState;
   /** Aggregate star rating from completed-booking reviews. */
   rating: ShopRatingSummary;
+  /** R2 object key for the shop logo/avatar (1:1). NULL = none → icon fallback. */
+  logo_key: string | null;
+  /** R2 object key for the shop cover/banner (~8:3). NULL = none → gradient fallback. */
+  cover_key: string | null;
 };
 
 export type CategoryWithShops = {
@@ -346,7 +368,7 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
     supabase
       .from("shops")
       .select(
-        "id, name, handle, description, address, province, district, subdistrict, service_duration_minutes, category_id",
+        "id, name, handle, description, address, province, district, subdistrict, service_duration_minutes, category_id, logo_key, cover_key",
       )
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
@@ -406,6 +428,8 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
       services: servicesByShop.get(s.id) ?? [],
       openState: openByShop.get(s.id) ?? "unknown",
       rating: ratingByShop.get(s.id) ?? { average: 0, count: 0 },
+      logo_key: s.logo_key,
+      cover_key: s.cover_key,
     });
     shopsByCategory.set(s.category_id, list);
   }
@@ -668,6 +692,8 @@ type ShopRow = {
   created_at: string;
   reviewed_at: string | null;
   reschedule_cancel_cutoff_hours: number;
+  logo_key: string | null;
+  cover_key: string | null;
   shop_categories: { name: string } | null;
 };
 
@@ -687,7 +713,7 @@ export async function listShops(filter?: {
         owner_name, owner_phone, owner_email,
         contact_phone, description, address, province, district, subdistrict,
         rejection_reason, service_duration_minutes, created_at, reviewed_at,
-        reschedule_cancel_cutoff_hours,
+        reschedule_cancel_cutoff_hours, logo_key, cover_key,
         shop_categories ( name )
       `,
     )
@@ -720,6 +746,8 @@ export async function listShops(filter?: {
     created_at: r.created_at,
     reviewed_at: r.reviewed_at,
     reschedule_cancel_cutoff_hours: r.reschedule_cancel_cutoff_hours,
+    logo_key: r.logo_key,
+    cover_key: r.cover_key,
   }));
 }
 
@@ -817,7 +845,7 @@ export async function getShopById(id: string): Promise<ShopListItem | null> {
         owner_name, owner_phone, owner_email,
         contact_phone, description, address, province, district, subdistrict,
         rejection_reason, service_duration_minutes, created_at, reviewed_at,
-        reschedule_cancel_cutoff_hours,
+        reschedule_cancel_cutoff_hours, logo_key, cover_key,
         shop_categories ( name )
       `,
     )
@@ -846,6 +874,8 @@ export async function getShopById(id: string): Promise<ShopListItem | null> {
     created_at: r.created_at,
     reviewed_at: r.reviewed_at,
     reschedule_cancel_cutoff_hours: r.reschedule_cancel_cutoff_hours,
+    logo_key: r.logo_key,
+    cover_key: r.cover_key,
   };
 }
 
@@ -1208,3 +1238,110 @@ export async function changeShopPin(
 // booking fallback for shops that haven't built a per-service catalogue
 // (see getBookingContext). The per-service catalogue (shop_services) is the
 // source of truth for durations everywhere customer-facing.
+
+// ----- Shop images (logo + cover) -----------------------------------------
+
+/** Which image slot a shop-image mutation targets. */
+export type ShopImageSlot = "logo" | "cover";
+
+const IMAGE_COLUMN: Record<ShopImageSlot, "logo_key" | "cover_key"> = {
+  logo: "logo_key",
+  cover: "cover_key",
+};
+
+const IMAGE_MAX_BYTES: Record<ShopImageSlot, number> = {
+  logo: MAX_LOGO_BYTES,
+  cover: MAX_COVER_BYTES,
+};
+
+/**
+ * Upload a shop's logo/cover to R2 and point the row's `{slot}_key` at it.
+ *
+ * SRP: validate → PUT new object → update row → best-effort delete of the
+ * previous object. Ownership is enforced by the caller passing a `shopId` from
+ * the verified session plus the `.eq("id", shopId)` filter here — a shop can
+ * never touch another's row (same idiom as updateOwnShopProfile). Order matters:
+ * PUT-new, then update-row, then delete-old, so a mid-flight failure leaves a
+ * harmless orphan object rather than a row pointing at a deleted key. Each
+ * replace mints a fresh timestamped key, so the CDN never serves a stale image.
+ * Errors surface as generic Thai messages — raw R2/DB detail is never leaked.
+ */
+async function setShopImage(
+  shopId: string,
+  slot: ShopImageSlot,
+  file: File,
+): Promise<UpdateShopResult> {
+  const column = IMAGE_COLUMN[slot];
+  const validation = await validateImageFile(file, {
+    maxBytes: IMAGE_MAX_BYTES[slot],
+  });
+  if (!validation.ok) {
+    return { ok: false, code: "unknown", message: validation.message };
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data: existing, error: readError } = await supabase
+    .from("shops")
+    .select(`id, ${column}`)
+    .eq("id", shopId)
+    .maybeSingle();
+  if (readError) {
+    return { ok: false, code: "unknown", message: readError.message };
+  }
+  if (!existing) {
+    return { ok: false, code: "not_found", message: "ไม่พบร้านในระบบ" };
+  }
+  const previousKey =
+    (existing as Record<string, string | null>)[column] ?? null;
+
+  const key = `shops/${shopId}/${slot}-${Date.now()}.${validation.ext}`;
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await putObject(key, bytes, validation.mime);
+  } catch (error) {
+    console.error("setShopImage put error:", error);
+    return {
+      ok: false,
+      code: "unknown",
+      message: "อัปโหลดรูปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    };
+  }
+
+  const { error: updateError } = await supabase
+    .from("shops")
+    .update({ [column]: key })
+    .eq("id", shopId);
+  if (updateError) {
+    // Row didn't take the new key — drop the just-uploaded orphan so storage
+    // doesn't leak, then report a generic failure.
+    await deleteObject(key).catch(() => {});
+    console.error("setShopImage update error:", updateError);
+    return {
+      ok: false,
+      code: "unknown",
+      message: "บันทึกรูปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    };
+  }
+
+  if (previousKey && previousKey !== key) {
+    await deleteObject(previousKey).catch(() => {});
+  }
+  return { ok: true };
+}
+
+/** Set the shop's logo (1:1 avatar). See {@link setShopImage}. */
+export async function setShopLogo(
+  shopId: string,
+  file: File,
+): Promise<UpdateShopResult> {
+  return setShopImage(shopId, "logo", file);
+}
+
+/** Set the shop's cover banner (~8:3). See {@link setShopImage}. */
+export async function setShopCover(
+  shopId: string,
+  file: File,
+): Promise<UpdateShopResult> {
+  return setShopImage(shopId, "cover", file);
+}
+

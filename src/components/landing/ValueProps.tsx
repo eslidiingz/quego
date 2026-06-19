@@ -44,7 +44,7 @@ export function ValueProps() {
     <section className="px-4 md:px-12 py-14 md:py-18">
       <div className="max-w-[1180px] mx-auto w-full">
         <div className="mb-8 max-w-[640px]">
-          <span className="text-label-sm font-medium uppercase tracking-wide text-primary">
+          <span className="text-label-sm font-medium tracking-wide text-primary">
             ทำไมต้อง Quego
           </span>
           <h2 className="font-headline font-semibold text-[24px] sm:text-[30px] tracking-tight text-on-background mt-2">

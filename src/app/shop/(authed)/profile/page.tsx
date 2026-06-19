@@ -9,6 +9,7 @@ import { FlashToast } from "@/components/ui/FlashToast";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ProfileTabs, type ProfileTab } from "./ProfileTabs";
 import { EditProfileForm } from "./EditProfileForm";
+import { ShopImagesForm } from "./ShopImagesForm";
 import { BusinessHoursForm } from "./BusinessHoursForm";
 import { ShopLineCard } from "./ShopLineCard";
 import { changeShopPinAction } from "./actions";
@@ -71,7 +72,10 @@ export default async function ShopProfilePage({
       <ProfileTabs active={tab} />
 
       {tab === "info" && (
-        <EditProfileForm shop={shop} categories={categories} />
+        <div className="space-y-stack-md">
+          <ShopImagesForm shop={shop} />
+          <EditProfileForm shop={shop} categories={categories} />
+        </div>
       )}
       {tab === "hours" && (
         <BusinessHoursForm hours={hours} shopId={session.shopId} />

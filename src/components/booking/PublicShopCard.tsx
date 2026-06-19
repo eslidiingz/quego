@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { formatBaht } from "@/lib/baht";
 import { Icon } from "@/components/ui/Icon";
+import { Avatar } from "@/components/ui/Avatar";
 import { Chip } from "@/components/ui/Chip";
 import { ShopRatingBadge } from "@/components/reviews/ShopRatingBadge";
 import type { ShopRatingSummary } from "@/lib/services/reviews";
@@ -21,6 +22,10 @@ export type PublicShopCardProps = {
   handle?: string | null;
   name: string;
   categoryIcon?: string | null;
+  /** Public logo image URL; null falls back to the category icon. */
+  logoUrl?: string | null;
+  /** Public cover image URL; null falls back to the gradient banner. */
+  coverUrl?: string | null;
   /** Short area line (อำเภอ, จังหวัด) — more scannable than a full address. */
   province?: string | null;
   district?: string | null;
@@ -47,6 +52,8 @@ export function PublicShopCard({
   handle,
   name,
   categoryIcon,
+  logoUrl,
+  coverUrl,
   province,
   district,
   services = [],
@@ -65,11 +72,27 @@ export function PublicShopCard({
         className,
       )}
     >
-      <div className="relative h-20 sm:h-28 bg-luxury-gradient flex items-center justify-center">
-        <Icon
-          name={categoryIcon ?? "storefront"}
-          className="text-on-primary opacity-90 text-[34px] sm:text-[44px] transition-transform duration-300 ease-out group-hover:scale-110"
-        />
+      <div
+        className={cn(
+          // Match the profile image-management view: a full ~8:3 cover band
+          // (proportional to card width) rather than a hard-cropped fixed strip.
+          "relative aspect-[8/3] flex items-center justify-center",
+          coverUrl ? "bg-surface-container-high" : "bg-luxury-gradient",
+        )}
+      >
+        {coverUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={coverUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
+          />
+        ) : (
+          <Icon
+            name={categoryIcon ?? "storefront"}
+            className="text-on-primary opacity-90 text-[34px] sm:text-[44px] transition-transform duration-300 ease-out group-hover:scale-110"
+          />
+        )}
         {openState !== "unknown" ? (
           <OpenStateBadge state={openState} />
         ) : null}
@@ -79,9 +102,24 @@ export function PublicShopCard({
             className="absolute top-2 right-2 sm:top-3 sm:right-3"
           />
         ) : null}
+        {logoUrl ? (
+          <Avatar
+            src={logoUrl}
+            alt=""
+            size="xl"
+            className="absolute -bottom-6 left-3 sm:left-4 [&>div]:ring-2 [&>div]:ring-surface-container-lowest [&>div]:shadow-tinted"
+          />
+        ) : null}
       </div>
 
-      <div className="p-3 sm:p-4 flex flex-col gap-2 flex-1">
+      <div
+        className={cn(
+          "p-3 sm:p-4 flex flex-col gap-2 flex-1",
+          // When a logo overlaps the banner, drop the content below it so the
+          // shop name never collides with the avatar.
+          logoUrl ? "pt-8 sm:pt-9" : null,
+        )}
+      >
         <div className="flex flex-col gap-0.5">
           <h3 className="font-display text-body-md sm:text-headline-md text-on-surface leading-tight line-clamp-2">
             {name}

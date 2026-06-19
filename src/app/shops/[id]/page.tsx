@@ -12,6 +12,7 @@ import { LiveQueueStatus } from "@/components/booking/LiveQueueStatus";
 import { ServiceList } from "@/components/booking/ServiceList";
 import { ShopReviewsSection } from "@/components/reviews/ShopReviewsSection";
 import { getPublicShopByHandleOrId } from "@/lib/services/shops";
+import { shopImageUrl } from "@/lib/r2/url";
 import { isUuid } from "@/lib/validation/uuid";
 import {
   getShopPublicQueueStatus,
@@ -123,6 +124,12 @@ export default async function ShopDetailPage({
   // booking-decision input, so surface it up top instead of only at page end.
   const heroArea = [shop.district, shop.province].filter(Boolean).join(", ");
 
+  // Facebook-style hero imagery. Both null today for every shop, so the hero
+  // gracefully falls back to the brand gradient cover + category-icon logo with
+  // ZERO visual change until a shop actually uploads images.
+  const coverUrl = shopImageUrl(shop.cover_key);
+  const logoUrl = shopImageUrl(shop.logo_key);
+
   const hasContact = Boolean(
     shop.address || shop.province || shop.contact_phone,
   );
@@ -162,71 +169,110 @@ export default async function ShopDetailPage({
           กลับหน้าค้นหา
         </Link>
 
-        {/* Hero */}
-        <section className="relative overflow-hidden rounded-xl bg-luxury-gradient text-on-primary shadow-luxury p-6 md:p-10">
-          <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
-            <span className="w-16 h-16 md:w-20 md:h-20 rounded-lg bg-on-primary/15 backdrop-blur-sm flex items-center justify-center shrink-0">
-              <Icon
-                name={shop.category.icon ?? "storefront"}
-                className="text-on-primary"
-                size={40}
-              />
-            </span>
-            <div className="flex-1 space-y-2">
-              <p className="text-label-sm uppercase tracking-widest opacity-80">
-                {shop.category.name}
-              </p>
-              <h1 className="font-display text-headline-lg leading-tight">
-                {shop.name}
-              </h1>
-              {heroArea ? (
-                <p className="flex items-center gap-1.5 text-label-md text-on-primary/85">
-                  <Icon name="location_on" size={15} />
-                  {heroArea}
-                </p>
-              ) : null}
-              <div className="flex items-center gap-2 flex-wrap pt-1">
-                {isOpenNow ? (
-                  <Chip variant="success" size="sm" pulse>
-                    เปิดอยู่ตอนนี้
-                  </Chip>
-                ) : (
-                  <Chip variant="neutral" size="sm">
-                    ปิดแล้ว
-                  </Chip>
+        {/* Hero — Facebook-style cover band + overlapping logo. The cover is a
+            photo when uploaded, else the brand gradient; the logo is a circular
+            avatar when uploaded, else the category icon. Metadata reflows below
+            the logo so it reads cleanly on a white card regardless of cover. */}
+        <section className="overflow-hidden rounded-xl border border-outline-variant/40 bg-surface-container-lowest shadow-luxury">
+          {/* Cover band */}
+          <div
+            className={cn(
+              "relative h-40 md:h-56",
+              coverUrl ? "bg-surface-container-high" : "bg-luxury-gradient",
+            )}
+          >
+            {coverUrl ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={coverUrl}
+                  alt={`ภาพหน้าปกร้าน ${shop.name}`}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+                {/* Scrim — keeps the overlapping logo's ring and any future
+                    over-cover text legible against a bright photo. */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+              </>
+            ) : null}
+
+            {/* Logo, overlapping the cover's bottom-left. */}
+            <div className="absolute -bottom-10 md:-bottom-12 left-5 md:left-8">
+              <span
+                className={cn(
+                  "flex items-center justify-center overflow-hidden rounded-full ring-4 ring-surface-container-lowest shadow-tinted",
+                  "w-20 h-20 md:w-24 md:h-24",
+                  logoUrl ? "bg-surface-container-high" : "bg-luxury-gradient",
                 )}
-                {shop.services.length > 0 ? (
-                  // Glass pill (not a Chip) — a primary-tinted chip would vanish
-                  // against the teal hero gradient (same color). Matches the
-                  // icon container's bg-on-primary/15 frosted treatment.
-                  <span className="inline-flex items-center gap-1 rounded-full bg-on-primary/15 backdrop-blur-sm px-2.5 py-0.5 text-label-sm font-semibold uppercase tracking-wider text-on-primary">
-                    {shop.services.length} บริการ
+              >
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoUrl}
+                    alt={`โลโก้ร้าน ${shop.name}`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <Icon
+                    name={shop.category.icon ?? "storefront"}
+                    className="text-on-primary"
+                    size={40}
+                  />
+                )}
+              </span>
+            </div>
+          </div>
+
+          {/* Metadata — sits below the logo, on the white card surface. */}
+          <div className="px-5 md:px-8 pt-12 md:pt-14 pb-6 space-y-2">
+            <p className="text-label-sm uppercase tracking-widest text-on-surface-variant">
+              {shop.category.name}
+            </p>
+            <h1 className="font-display text-headline-lg leading-tight text-on-surface">
+              {shop.name}
+            </h1>
+            {heroArea ? (
+              <p className="flex items-center gap-1.5 text-label-md text-on-surface-variant">
+                <Icon name="location_on" size={15} />
+                {heroArea}
+              </p>
+            ) : null}
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              {isOpenNow ? (
+                <Chip variant="success" size="sm" pulse>
+                  เปิดอยู่ตอนนี้
+                </Chip>
+              ) : (
+                <Chip variant="neutral" size="sm">
+                  ปิดแล้ว
+                </Chip>
+              )}
+              {shop.services.length > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-label-sm font-semibold uppercase tracking-wider text-primary">
+                  {shop.services.length} บริการ
+                </span>
+              ) : null}
+              {reviewData.summary.count > 0 ? (
+                <span
+                  role="img"
+                  aria-label={`คะแนนเฉลี่ย ${reviewData.summary.average.toFixed(1)} จาก 5 ดาว จาก ${reviewData.summary.count} รีวิว`}
+                  className="inline-flex items-center gap-1 rounded-full bg-tertiary/10 px-2.5 py-0.5 text-label-sm font-semibold text-tertiary"
+                >
+                  <Icon name="star" filled size={14} className="text-tertiary" />
+                  <span className="tabular-nums">
+                    {reviewData.summary.average.toFixed(1)}
                   </span>
-                ) : null}
-                {reviewData.summary.count > 0 ? (
-                  // Same glass treatment; gold star reads clearly on the teal hero.
-                  <span
-                    role="img"
-                    aria-label={`คะแนนเฉลี่ย ${reviewData.summary.average.toFixed(1)} จาก 5 ดาว จาก ${reviewData.summary.count} รีวิว`}
-                    className="inline-flex items-center gap-1 rounded-full bg-on-primary/15 backdrop-blur-sm px-2.5 py-0.5 text-label-sm font-semibold text-on-primary"
-                  >
-                    <Icon name="star" filled size={14} className="text-tertiary-fixed-dim" />
-                    <span className="tabular-nums">
-                      {reviewData.summary.average.toFixed(1)}
-                    </span>
-                    <span className="font-normal opacity-80 tabular-nums">
-                      ({reviewData.summary.count})
-                    </span>
+                  <span className="font-normal text-on-surface-variant tabular-nums">
+                    ({reviewData.summary.count})
                   </span>
-                ) : null}
-              </div>
-              {todayTimeNote ? (
-                <p className="flex items-center gap-1.5 text-label-md text-on-primary/85 pt-1">
-                  <Icon name="schedule" size={15} />
-                  {todayTimeNote}
-                </p>
+                </span>
               ) : null}
             </div>
+            {todayTimeNote ? (
+              <p className="flex items-center gap-1.5 text-label-md text-on-surface-variant pt-1">
+                <Icon name="schedule" size={15} />
+                {todayTimeNote}
+              </p>
+            ) : null}
           </div>
         </section>
 

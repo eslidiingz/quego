@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { buttonClassName } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
 import { QuegoWordmark } from "@/components/ui/QuegoWordmark";
 
 type FootCol = { title: string; links: { label: string; href: string }[] };
@@ -18,15 +16,9 @@ const COLS: FootCol[] = [
     title: "สำหรับร้าน",
     links: [
       { label: "เปิดร้านกับ Quego", href: "/#for-owners" },
-      { label: "ลงทะเบียนร้าน", href: "/shops/register" },
       { label: "เข้าสู่ระบบร้าน", href: "/shop/login" },
     ],
   },
-];
-
-const CONTACTS: { icon: string; label: string; href: string }[] = [
-  { icon: "chat", label: "@quego", href: "https://line.me/R/ti/p/@quego" },
-  { icon: "mail", label: "hello@quego.app", href: "mailto:hello@quego.app" },
 ];
 
 /**
@@ -43,27 +35,6 @@ export function LandingFooter() {
             <p className="text-body-sm text-inverse-on-surface/60 dark:text-on-surface-variant mt-2.5">
               ระบบจองคิวสำหรับร้านบริการความงามและสุขภาพทั่วประเทศไทย
             </p>
-
-            <div className="mt-5 flex flex-col gap-2.5">
-              {CONTACTS.map((c) => (
-                <a
-                  key={c.label}
-                  href={c.href}
-                  className="inline-flex items-center gap-2 text-body-sm text-inverse-on-surface/70 hover:text-primary-fixed-dim dark:text-on-surface-variant dark:hover:text-primary transition-colors"
-                >
-                  <Icon name={c.icon} size={18} />
-                  {c.label}
-                </a>
-              ))}
-            </div>
-
-            <Link
-              href="/shops/register"
-              className={buttonClassName({ variant: "secondary", size: "sm", className: "mt-5" })}
-            >
-              <Icon name="storefront" size={16} />
-              เปิดร้านกับ Quego
-            </Link>
           </div>
 
           <nav className="flex flex-wrap gap-x-14 gap-y-8">
