@@ -1,1 +1,0 @@
-alter table public.shop_staff_services enable row level security;
