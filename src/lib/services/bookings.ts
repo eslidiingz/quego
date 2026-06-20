@@ -43,6 +43,7 @@ import {
   pushBookingCancellationToCustomer,
 } from "@/lib/services/line-linking";
 import { accrueBookingCredit } from "@/lib/services/loyalty";
+import { accruePromotionStamps } from "@/lib/services/promotions";
 import { isPastChangeCutoff } from "@/lib/booking/cutoff";
 
 // Re-export so server callers can import {BookingContext} from this module
@@ -1100,6 +1101,10 @@ export async function updateBookingStatus(
     const phone = data.customer_phone;
     const price = priceFromDb(data.service_price);
     after(() => accrueBookingCredit(bookingId, phone, price));
+    // Same fire-and-forget pattern for stamp-card promotions: award a stamp
+    // toward every active stamp card the shop runs. Idempotent per
+    // (promotion, booking); never throws.
+    after(() => accruePromotionStamps(bookingId, shopId, phone));
   }
 
   return { ok: true };

@@ -6,6 +6,7 @@ import {
   type InsightsBooking,
   type InsightsStaff,
   type InsightsService,
+  type InsightsExpense,
 } from "./aggregate";
 import type { BusinessHour, DayOfWeek } from "@/lib/booking/slot-math";
 
@@ -53,6 +54,91 @@ function makeStaff(id: string, name: string): InsightsStaff {
 function makeService(id: string, name: string): InsightsService {
   return { id, name };
 }
+
+/** Build one InsightsExpense; overrides win over the active defaults. */
+function makeExpense(overrides: Partial<InsightsExpense> = {}): InsightsExpense {
+  return {
+    expenseDate: "2026-06-01",
+    category: "อื่นๆ",
+    amount: 100,
+    ...overrides,
+  };
+}
+
+describe("computeShopInsights — expenses, net profit & margin", () => {
+  const base = {
+    rangeDays: 1,
+    windowDates: [day("2026-06-01", 1)],
+    hours: makeHours(),
+    staff: [] as InsightsStaff[],
+    services: [] as InsightsService[],
+  };
+
+  it("sums expenses, computes net profit and margin", () => {
+    const result = computeShopInsights({
+      ...base,
+      bookings: [makeBooking({ price: 1000, status: "completed" })],
+      expenses: [
+        makeExpense({ category: "ค่าเช่าร้าน", amount: 300 }),
+        makeExpense({ category: "ค่าอุปกรณ์/วัสดุ", amount: 200 }),
+      ],
+    });
+    expect(result.revenue).toBe(1000);
+    expect(result.expensesTotal).toBe(500);
+    expect(result.netProfit).toBe(500);
+    expect(result.profitMargin).toBeCloseTo(0.5);
+  });
+
+  it("returns a negative net profit and null margin when there is no revenue", () => {
+    const result = computeShopInsights({
+      ...base,
+      bookings: [],
+      expenses: [makeExpense({ amount: 250 })],
+    });
+    expect(result.revenue).toBe(0);
+    expect(result.expensesTotal).toBe(250);
+    expect(result.netProfit).toBe(-250);
+    expect(result.profitMargin).toBeNull();
+  });
+
+  it("groups expenses by category, ranked by amount desc", () => {
+    const result = computeShopInsights({
+      ...base,
+      bookings: [],
+      expenses: [
+        makeExpense({ category: "ค่าเช่าร้าน", amount: 100 }),
+        makeExpense({ category: "ค่าเช่าร้าน", amount: 50 }),
+        makeExpense({ category: "ค่าพนักงาน", amount: 400 }),
+      ],
+    });
+    expect(result.expensesByCategory).toEqual([
+      { category: "ค่าพนักงาน", amount: 400, count: 1 },
+      { category: "ค่าเช่าร้าน", amount: 150, count: 2 },
+    ]);
+  });
+
+  it("folds a blank category into ไม่ระบุหมวด", () => {
+    const result = computeShopInsights({
+      ...base,
+      bookings: [],
+      expenses: [makeExpense({ category: "  ", amount: 75 })],
+    });
+    expect(result.expensesByCategory).toEqual([
+      { category: "ไม่ระบุหมวด", amount: 75, count: 1 },
+    ]);
+  });
+
+  it("defaults to zero expenses when none are supplied", () => {
+    const result = computeShopInsights({
+      ...base,
+      bookings: [makeBooking({ price: 100, status: "completed" })],
+    });
+    expect(result.expensesTotal).toBe(0);
+    expect(result.netProfit).toBe(100);
+    expect(result.profitMargin).toBe(1);
+    expect(result.expensesByCategory).toEqual([]);
+  });
+});
 
 // --- parseRange --------------------------------------------------------------
 
@@ -786,6 +872,10 @@ describe("computeShopInsights — hasData & window bounds", () => {
         },
       ],
       revenueByService: [],
+      expensesTotal: 0,
+      netProfit: 0,
+      profitMargin: null,
+      expensesByCategory: [],
       hasData: false,
       hasFilter: false,
       filteredToZero: false,

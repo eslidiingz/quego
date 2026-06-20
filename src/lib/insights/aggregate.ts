@@ -53,6 +53,14 @@ export type InsightsStaff = { id: string; name: string };
 /** A shop service, for resolving revenue-by-service names. */
 export type InsightsService = { id: string; name: string };
 
+/** One recorded expense projected to the fields the report needs. */
+export type InsightsExpense = {
+  /** YYYY-MM-DD. */
+  expenseDate: string;
+  category: string;
+  amount: number;
+};
+
 export type BusyHourBucket = {
   /** Hour of day, 0–23. */
   hour: number;
@@ -77,12 +85,19 @@ export type RevenueByService = {
   bookingCount: number;
 };
 
+/** One expense category ranked by total amount spent (amount desc). */
+export type ExpenseByCategory = {
+  category: string;
+  amount: number;
+  count: number;
+};
+
 export type ShopInsights = {
   /** Length of the window in days (informational; calendar windows vary). */
   rangeDays: number;
   /** Oldest date in window (YYYY-MM-DD). */
   windowStart: string;
-  /** Newest date in window — yesterday (YYYY-MM-DD). */
+  /** Newest date in window — today for rolling/"this month" ranges (YYYY-MM-DD). */
   windowEnd: string;
   /** Active bookings (confirmed+completed) in the window. */
   totalBookings: number;
@@ -105,6 +120,14 @@ export type ShopInsights = {
   revenueByStaff: RevenueByStaff[];
   /** Per-service rows ranked by revenue desc. */
   revenueByService: RevenueByService[];
+  /** Total expenses (฿) recorded in the window. */
+  expensesTotal: number;
+  /** revenue − expensesTotal (฿); may be negative (a loss). */
+  netProfit: number;
+  /** netProfit ÷ revenue (0–1+); null when revenue is 0 (no base). */
+  profitMargin: number | null;
+  /** Per-category expense rows ranked by amount desc. */
+  expensesByCategory: ExpenseByCategory[];
   /** False when there were no bookings at all (active or cancelled) in the window. */
   hasData: boolean;
   /** True when a staff/service filter is currently applied. */
@@ -136,6 +159,8 @@ export function computeShopInsights(input: {
   staff: InsightsStaff[];
   /** All shop services (active or not) for revenue-by-service name resolution. */
   services?: InsightsService[];
+  /** Expenses recorded in the window (already date-scoped by the caller). */
+  expenses?: InsightsExpense[];
   filterStaffIds?: string[];
   filterServiceIds?: string[];
 }): ShopInsights {
@@ -146,6 +171,7 @@ export function computeShopInsights(input: {
     bookings,
     staff,
     services = [],
+    expenses = [],
     filterStaffIds = [],
     filterServiceIds = [],
   } = input;
@@ -216,12 +242,14 @@ export function computeShopInsights(input: {
     staffCount.set(b.staffId, (staffCount.get(b.staffId) ?? 0) + 1);
     serviceCount.set(b.serviceId, (serviceCount.get(b.serviceId) ?? 0) + 1);
 
-    // The window is always past dates, so any non-cancelled booking was served
-    // (no-show is folded into cancelled). Count revenue across all active
+    // The window is (almost) all past dates, where any non-cancelled booking was
+    // served (no-show is folded into cancelled). Count revenue across all active
     // bookings — not just those a shop bothered to mark "completed" — so the
     // figure tracks `totalBookings`/fill-rate instead of reading ฿0 whenever
-    // completion isn't diligently recorded. Skip null prices for revenue but
-    // still count the booking above.
+    // completion isn't diligently recorded. Today is now included for parity with
+    // the overview, so it may carry a few not-yet-served confirmed bookings; they
+    // count as booked revenue, which is acceptable for a rolling total. Skip null
+    // prices for revenue but still count the booking above.
     if (b.price != null) {
       revenue += b.price;
       staffRevenue.set(b.staffId, (staffRevenue.get(b.staffId) ?? 0) + b.price);
@@ -282,6 +310,17 @@ export function computeShopInsights(input: {
     serviceCount,
   });
 
+  // --- Expenses: a flat total + net profit + per-category breakdown. Expenses
+  //     are shop-wide (no staff/service dimension), so the staff/service filter
+  //     does not narrow them; the caller hides these blocks under an active
+  //     filter so a full expense total is never paired with filtered revenue. ---
+  let expensesTotal = 0;
+  for (const e of expenses) expensesTotal += e.amount;
+  expensesTotal = Math.round(expensesTotal * 100) / 100;
+  const netProfit = Math.round((revenue - expensesTotal) * 100) / 100;
+  const profitMargin = revenue > 0 ? netProfit / revenue : null;
+  const expensesByCategory = buildExpensesByCategory(expenses);
+
   return {
     rangeDays,
     windowStart: windowDates[0]?.dateYmd ?? "",
@@ -297,6 +336,10 @@ export function computeShopInsights(input: {
     peakHour,
     revenueByStaff,
     revenueByService,
+    expensesTotal,
+    netProfit,
+    profitMargin,
+    expensesByCategory,
     hasData: totalAll > 0,
     hasFilter,
     // True only when the window genuinely has bookings but the filter hid them.
@@ -380,4 +423,33 @@ function buildRevenueByService({
   }
 
   return rows.sort((a, b) => b.revenue - a.revenue);
+}
+
+/**
+ * Per-category expense rows ranked by total amount spent (amount desc). Groups
+ * by the category text verbatim; a blank category folds into "ไม่ระบุหมวด".
+ * Only categories that actually appear in the (windowed) expenses are returned.
+ */
+function buildExpensesByCategory(
+  expenses: InsightsExpense[],
+): ExpenseByCategory[] {
+  const amountByCat = new Map<string, number>();
+  const countByCat = new Map<string, number>();
+
+  for (const e of expenses) {
+    const category = e.category.trim() || "ไม่ระบุหมวด";
+    amountByCat.set(category, (amountByCat.get(category) ?? 0) + e.amount);
+    countByCat.set(category, (countByCat.get(category) ?? 0) + 1);
+  }
+
+  const rows: ExpenseByCategory[] = [];
+  for (const [category, amount] of amountByCat) {
+    rows.push({
+      category,
+      amount: Math.round(amount * 100) / 100,
+      count: countByCat.get(category) ?? 0,
+    });
+  }
+
+  return rows.sort((a, b) => b.amount - a.amount);
 }

@@ -96,15 +96,18 @@ export function getBangkokDateWindow(
 }
 
 /**
- * Build a window of PAST Bangkok calendar dates ending YESTERDAY. Today is a
- * partial day and is deliberately excluded so analytics (fill rate, etc.) over
- * the window aren't skewed by an in-progress day. Returns `days` entries
- * ordered oldest→newest: `[today-days, …, today-1]`.
+ * Build a window of recent Bangkok calendar dates ending TODAY (inclusive).
+ * Returns `days` entries ordered oldest→newest: `[today-(days-1), …, today]`.
+ * Today is a partial, in-progress day but is INCLUDED so the report's rolling
+ * totals reconcile with the live "ยอดวันนี้" figure on the shop overview
+ * (which also counts today). Fill-rate over the window is therefore slightly
+ * understated on the current day — an acceptable trade for owner-visible
+ * consistency, and fill-rate isn't surfaced on the report anyway.
  *
- * Mirror of `getBangkokDateWindow` but pointing backwards — used by the shop
- * insights dashboard (OPP-19).
+ * Mirror of `getBangkokDateWindow` (which counts forward) but anchored to end at
+ * today — used by the shop insights dashboard (OPP-19) for the 7/30/90 presets.
  */
-export function getBangkokPastDates(
+export function getBangkokRecentDates(
   days: number,
   at: Date = new Date(),
 ): { dateYmd: string; dayOfWeek: BangkokNow["dayOfWeek"] }[] {
@@ -112,8 +115,8 @@ export function getBangkokPastDates(
   const [y, m, d] = today.split("-").map(Number);
   const base = Date.UTC(y, m - 1, d);
   const out: { dateYmd: string; dayOfWeek: BangkokNow["dayOfWeek"] }[] = [];
-  // i counts down from `days` to 1 → oldest first, excluding today (i = 0).
-  for (let i = days; i >= 1; i -= 1) {
+  // i counts down from days-1 to 0 → oldest first, today last (i = 0).
+  for (let i = days - 1; i >= 0; i -= 1) {
     const day = new Date(base - i * 24 * 60 * 60 * 1000);
     const ymd = `${day.getUTCFullYear()}-${String(day.getUTCMonth() + 1).padStart(2, "0")}-${String(day.getUTCDate()).padStart(2, "0")}`;
     out.push({
@@ -148,22 +151,22 @@ function datesBetween(
 }
 
 /**
- * The current Bangkok calendar month from its 1st up to and including
- * YESTERDAY (today is a partial day, excluded for consistency with the
- * full-days analytics model). When today is the 1st the window is empty —
- * returns `[]`, which callers must handle gracefully.
+ * The current Bangkok calendar month from its 1st up to and including TODAY
+ * (month-to-date). Today is a partial day but is INCLUDED so the "เดือนนี้"
+ * report reconciles with the live "ยอดวันนี้" figure on the shop overview.
+ * Always returns at least one entry (today is always ≥ the 1st), so callers
+ * never need to special-case an empty window.
  *
  * Used by the shop report (รายงานร้าน) "เดือนนี้" preset.
  */
-export function getBangkokMonthToYesterday(
+export function getBangkokMonthToDate(
   at: Date = new Date(),
 ): { dateYmd: string; dayOfWeek: BangkokNow["dayOfWeek"] }[] {
   const today = getBangkokToday(at);
   const [y, m, d] = today.split("-").map(Number);
-  if (d <= 1) return []; // today is the 1st → no full past days this month
   const firstMs = Date.UTC(y, m - 1, 1);
-  const yesterdayMs = Date.UTC(y, m - 1, d - 1);
-  return datesBetween(firstMs, yesterdayMs);
+  const todayMs = Date.UTC(y, m - 1, d);
+  return datesBetween(firstMs, todayMs);
 }
 
 /**

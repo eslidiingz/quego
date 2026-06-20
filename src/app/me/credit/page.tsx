@@ -6,9 +6,11 @@ import {
   listLoyaltyLedger,
   getOrCreateReferralCode,
 } from "@/lib/services/loyalty";
+import { getCustomerStampCards } from "@/lib/services/promotions";
 import { absoluteUrl } from "@/lib/url";
 import { CreditHistory } from "./CreditHistory";
 import { ReferralCard } from "./ReferralCard";
+import { StampCards } from "./StampCards";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +23,11 @@ export default async function MyCreditPage() {
 
   // Each loyalty read lazily releases any now-eligible referrals first, so the
   // balance + history reflect freshly-earned rewards without a background job.
-  const [{ balance }, entries, referralCode] = await Promise.all([
+  const [{ balance }, entries, referralCode, stampCards] = await Promise.all([
     getLoyaltyBalance(session.phone),
     listLoyaltyLedger(session.phone),
     getOrCreateReferralCode(session.phone),
+    getCustomerStampCards(session.phone),
   ]);
 
   const referralUrl = referralCode ? absoluteUrl(`/login?ref=${referralCode}`) : "";
@@ -50,6 +53,8 @@ export default async function MyCreditPage() {
           </p>
         </div>
       </section>
+
+      <StampCards cards={stampCards} />
 
       {referralUrl ? (
         <ReferralCard referralUrl={referralUrl} referralCode={referralCode} />
