@@ -80,7 +80,7 @@ export function ServiceManager({
         title="บริการ"
         description="เพิ่มและจัดการบริการของร้าน เช่น ตัดผม ทำสี ดัดวอลลุ่ม ระยะเวลาของแต่ละบริการกำหนดรอบเวลาที่ลูกค้าจองได้"
         action={
-          <Button size="sm" onClick={openAdd}>
+          <Button size="sm" iconLeft={<Icon name="add" size={18} />} onClick={openAdd}>
             เพิ่มบริการ
           </Button>
         }
