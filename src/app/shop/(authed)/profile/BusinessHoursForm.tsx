@@ -13,8 +13,6 @@ import { updateBusinessHours, type UpdateHoursState } from "./actions";
 // into the client bundle.
 const DAYS_OF_WEEK: DayOfWeek[] = [0, 1, 2, 3, 4, 5, 6];
 
-const EVERY_DAY_STORAGE_KEY = "lq.shop.everyDayMode";
-
 // Mon → Sun display order (working week first, then weekend).
 const DISPLAY_ORDER: { day: DayOfWeek; label: string }[] = [
   { day: 1, label: "จันทร์" },
@@ -79,23 +77,27 @@ function buildPerDayFromHours(hours: BusinessHour[]): PerDayState {
  *   `day_*` inputs so the server sees the same FormData layout.
  * - **Per-day mode**: 7 day rows, each with its own toggle + times.
  *
- * The per-day state is preserved across every-day toggles via a localStorage
- * snapshot keyed by shopId. So if the owner saves a uniform every-day
- * schedule that overwrites the DB, toggling back to per-day mode restores
- * the previous per-day setup rather than mirroring the every-day times.
+ * All state derives from the server-loaded `hours` — the DB is the single
+ * source of truth (the page is `force-dynamic`, so `hours` is always the
+ * freshly-read schedule). Per-day values live in React state and stay intact
+ * across mode toggles within a session (the rows are only hidden, not
+ * unmounted), so switching back and forth never loses what the owner typed.
+ *
+ * NOTHING is persisted to browser storage. A refresh before pressing save
+ * must render exactly what's in the DB — never a half-edited toggle state the
+ * owner never committed (that previously made an unsaved "open every day"
+ * flip look like it had been saved).
  *
  * The server action stays single-purpose: parse 7 days and persist. The
  * mode branching is a presentation-layer convenience.
  */
 export function BusinessHoursForm({
   hours,
-  shopId,
 }: {
   hours: BusinessHour[];
-  shopId: string;
+  /** Reserved for future per-shop logic; the form is driven entirely by `hours`. */
+  shopId?: string;
 }) {
-  const PER_DAY_SNAPSHOT_KEY = `lq.shop.${shopId}.perDaySnapshot`;
-
   const [state, formAction, pending] = useActionState<UpdateHoursState, FormData>(
     updateBusinessHours,
     null,
@@ -107,10 +109,10 @@ export function BusinessHoursForm({
     if (state?.ok) setToastOpen(true);
   }, [state]);
 
-  // Per-day state initialised from the server snapshot. The mount effect
-  // below may override this with a localStorage snapshot if the user is
-  // currently in every-day mode (so toggling off restores their original
-  // per-day setup, not the uniform every-day data the server has).
+  // Every piece of state below is seeded from the server-loaded `hours` (the
+  // freshly-read DB schedule). Per-day values live in React state and survive
+  // mode toggles within the session because the rows are hidden, not
+  // unmounted — so no browser-storage snapshot is needed to preserve them.
   const [perDay, setPerDay] = useState<PerDayState>(() =>
     buildPerDayFromHours(hours),
   );
@@ -120,73 +122,11 @@ export function BusinessHoursForm({
   const [everyDayOpen, setEveryDayOpen] = useState(initialEveryDay.openTime);
   const [everyDayClose, setEveryDayClose] = useState(initialEveryDay.closeTime);
 
-  // After hydration, restore the user's persisted toggle + per-day snapshot.
-  // This runs once on mount so the initial SSR/CSR render matches (no
-  // hydration mismatch); the override flips into place imperceptibly fast.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const modeStored = window.sessionStorage.getItem(EVERY_DAY_STORAGE_KEY);
-    const everyDayActive = modeStored === "true";
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (modeStored !== null) setEveryDayMode(everyDayActive);
-
-    // Only consult the per-day snapshot when every-day mode is active —
-    // otherwise the server's per-day data is authoritative (it's what the
-    // user just saved in per-day mode).
-    if (everyDayActive) {
-      const snapshotStored = window.localStorage.getItem(PER_DAY_SNAPSHOT_KEY);
-      if (!snapshotStored) return;
-      try {
-        const snapshot = JSON.parse(snapshotStored) as Partial<PerDayState>;
-        if (snapshot && typeof snapshot === "object") {
-          setPerDay((prev) => ({ ...prev, ...snapshot }));
-        }
-      } catch {
-        /* corrupt snapshot — fall back to current state */
-      }
-    }
-    // PER_DAY_SNAPSHOT_KEY depends on shopId which is stable for the
-    // component lifetime; keep the effect a one-shot mount restore.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Mirror the toggle into sessionStorage on every change.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.sessionStorage.setItem(EVERY_DAY_STORAGE_KEY, String(everyDayMode));
-  }, [everyDayMode]);
-
-  /**
-   * Toggle handler: when entering every-day, snapshot current per-day to
-   * localStorage; when leaving, restore the snapshot if one exists. This
-   * is what makes per-day data survive a "save while in every-day mode"
-   * that uniformly overwrites the DB.
-   */
-  const handleToggleEveryDayMode = () => {
-    const next = !everyDayMode;
-    if (typeof window !== "undefined") {
-      if (next) {
-        window.localStorage.setItem(
-          PER_DAY_SNAPSHOT_KEY,
-          JSON.stringify(perDay),
-        );
-      } else {
-        const stored = window.localStorage.getItem(PER_DAY_SNAPSHOT_KEY);
-        if (stored) {
-          try {
-            const snapshot = JSON.parse(stored) as Partial<PerDayState>;
-            if (snapshot && typeof snapshot === "object") {
-              setPerDay((prev) => ({ ...prev, ...snapshot }));
-            }
-          } catch {
-            /* corrupt snapshot — keep current state */
-          }
-        }
-      }
-    }
-    setEveryDayMode(next);
-  };
+  // Flip between every-day and per-day mode. Nothing is persisted: an unsaved
+  // toggle must not survive a refresh, or the form would show a schedule the
+  // owner never actually saved. The per-day rows keep their React state across
+  // the toggle, so switching back and forth never loses typed-in times.
+  const handleToggleEveryDayMode = () => setEveryDayMode((prev) => !prev);
 
   const errors = state && !state.ok ? state.fieldErrors : undefined;
   const submitError =

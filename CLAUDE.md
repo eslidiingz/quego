@@ -34,6 +34,13 @@ visual treatments.
   See "Data access" below.
 - **`jose`** for session JWTs (HS256), **`node:crypto` scrypt** for password /
   PIN hashing ([src/lib/auth/password.ts](src/lib/auth/password.ts)).
+- **Vitest** (`node` environment) for the pure-logic unit suite — see "Testing".
+- **Integrations**, each isolated in its own `src/lib/*` module and keyed off
+  `.env.local`: **LINE** Messaging API + LINE Login for notifications and account
+  linking ([src/lib/line/](src/lib/line)), **Firebase** phone-OTP for signup
+  verification ([src/lib/firebase/](src/lib/firebase)), **Cloudflare R2** (via the
+  S3 SDK) for shop image storage ([src/lib/r2/](src/lib/r2)), and **`qrcode`** for
+  shareable shop QR codes.
 
 ### Environment variables
 
@@ -47,6 +54,25 @@ Copy [.env.example](.env.example) → `.env.local`. Required:
   shop, customer) plus the short-lived login-intent cookies; they are
   separated by the `aud` claim, not by key. Rotating it invalidates every
   active session. (Despite the name, it is not admin-only.)
+- `NEXT_PUBLIC_SITE_URL` — canonical origin used to build shareable absolute
+  links + QR codes (no trailing slash). Falls back to `$VERCEL_URL`, then
+  `localhost:4000`.
+
+The integrations have their own env groups, **all documented inline in
+[.env.example](.env.example)** (read it before touching them — the comments carry
+go-live security hardening you can't infer from code):
+
+- **LINE** — `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` (Messaging API,
+  server-only), `LINE_LOGIN_CHANNEL_ID` / `LINE_LOGIN_CHANNEL_SECRET` (LINE
+  Login OAuth), `NEXT_PUBLIC_LINE_OA_BASIC_ID` (public deep-link).
+- **Firebase** phone-OTP — `NEXT_PUBLIC_FIREBASE_*` web config only. There is **no
+  service-account secret**: the server verifies the OTP ID token (RS256) with
+  `jose` against Google's public keys. The Firebase Admin SDK was deliberately
+  removed (it failed under the Turbopack serverless build).
+- **Cloudflare R2** — `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
+  / `R2_BUCKET` / `R2_ENDPOINT` (server-only write creds) and
+  `NEXT_PUBLIC_R2_PUBLIC_BASE_URL` (public read host). The DB stores the object
+  **key**, never the URL, so the public host can change without a data migration.
 
 ## Commands (always use pnpm)
 
@@ -55,6 +81,12 @@ pnpm dev              # Next.js dev server (Turbopack) → http://localhost:4000
 pnpm build            # Production build (Turbopack)
 pnpm start            # Serve the production build
 pnpm lint             # ESLint (next/core-web-vitals + typescript)
+pnpm test             # Vitest, run-once (CI mode)
+pnpm test:watch       # Vitest, watch mode
+
+# Run a single test file or filter by name:
+pnpm test src/lib/booking/slot-math.test.ts
+pnpm test -t "rejects overlapping slot"
 ```
 
 
@@ -65,24 +97,37 @@ src/
 ├── proxy.ts            # Next.js 16 middleware (renamed!) — route-guards every persona area
 ├── app/                # App Router routes, grouped by persona (see "Routing" below)
 │   ├── page.tsx        # Customer home / shop discovery
-│   ├── shops/          # Public: shop detail, booking form, registration
-│   ├── me/             # Customer-authed area ("my queue")
-│   ├── login/          # Unified customer/shop step-1 login
-│   ├── shop/           # Shop-owner area — (authed)/ subtree + /shop/login
-│   ├── admin/          # Admin area — (authed)/ subtree + /admin/login
-│   ├── bookings/[id]/  # Public booking confirmation (UUID-gated)
+│   ├── shops/          # Public: shop detail, booking + walk-in forms, registration
+│   ├── me/             # Customer-authed area (bookings, profile, credit, waitlist)
+│   ├── login/          # Unified customer/shop step-1 login (+ /login/pin)
+│   ├── shop/           # Shop-owner area — (authed)/ subtree, (display)/ kiosk, /shop/login
+│   ├── admin/          # Admin area — (authed)/ subtree (shops, categories, presets, audit) + /admin/login
+│   ├── bookings/[id]/  # Public booking confirmation + reschedule (UUID-gated)
+│   ├── api/            # Route handlers: LINE webhook + shop/customer LINE OAuth callbacks
+│   ├── design-system/  # Live token/component gallery (dev reference)
 │   ├── globals.css     # ALL design tokens live here (Tailwind v4 @theme)
 │   └── layout.tsx      # IBM Plex Sans Thai + Material Symbols, lang="th"
-├── components/         # ui/ (primitives) · booking/ · layout/ · admin/ · shop/
+├── components/         # ui/ · booking/ · layout/ · admin/ · shop/ · auth/ · landing/ · reviews/
 ├── lib/
 │   ├── cn.ts           # cn() — clsx + extended tailwind-merge (see gotcha below)
-│   ├── auth/           # session.ts (JWT core) + *-session-server.ts + password.ts
-│   ├── services/       # Server-only data layer (shops, bookings, customers, …)
+│   ├── auth/           # session.ts (JWT core) + *-session-server.ts + password.ts + lockout.ts
+│   ├── services/       # Server-only data layer (shops, bookings, staff, loyalty, reviews, line-*, …)
 │   ├── supabase/       # admin.ts — cached service-role client
-│   ├── booking/        # slot-math.ts — pure, browser-safe slot generation
+│   ├── booking/        # slot-math.ts — pure, browser-safe slot generation (+ period/cutoff/queue)
 │   ├── time/           # bangkok.ts — "what time is it in ICT?" helpers
-│   └── validation/     # shop.ts — shared input validators
+│   ├── validation/     # shared input validators (shop, phone, uuid)
+│   ├── line/           # LINE Messaging/Login: signature, client, flex builders, commands, oauth
+│   ├── firebase/       # Firebase phone-OTP ID-token verification (jose, no Admin SDK)
+│   ├── r2/             # Cloudflare R2 (S3 SDK) image upload + magic-byte validation
+│   ├── loyalty/        # Loyalty credit + referral math
+│   ├── waitlist/       # Waitlist eligibility
+│   ├── insights/       # Shop analytics aggregation (pure)
+│   ├── location/       # Thailand province/district/subdistrict data
+│   ├── security/       # Rate-limiting
+│   └── customer/       # Customer-side helpers
+├── supabase/migrations/ # In-repo schema baseline (see "Database schema")
 design/                 # Source HTML mockups + screenshots + DESIGN.md
+docs/                   # product/ (PRDs, backlog) + marketing/ strategy
 ```
 
 Folders under `app/<persona>/(authed)/` are **route groups** — the `(authed)`
@@ -155,6 +200,15 @@ get/set/destroy and the `require*Session()` redirect helpers.
   `impersonatedBy` claim (`createImpersonationSession`); the shop UI renders
   [ImpersonationBanner](src/components/shop/ImpersonationBanner.tsx) and routes
   sign-out back to `/admin`.
+- **Phone ownership at signup** is proved separately, via **Firebase phone-OTP**
+  (browser → Firebase → ID token → server verifies with `jose`). This gates
+  *registration*, not session login; `shops.phone_verified_at` records it. The
+  OTP SMS path bypasses the server rate limiter, so console-side hardening (App
+  Check, +66-only region policy, quotas) is mandatory before go-live — see
+  [.env.example](.env.example).
+- **LINE account linking** is orthogonal to auth: shops and customers each link
+  a LINE userId (`/api/{shop,customer}/line/connect` → `…/callback` OAuth, or a
+  short-lived link code) so the Messaging API can push notifications to them.
 
 ### Data access — service layer over a service-role client
 
@@ -171,8 +225,13 @@ always in [src/lib/services/](src/lib/services). Conventions to preserve:
   input: e.g. `updateBookingStatus` filters `.eq("id").eq("shop_id")` with the
   `shopId` taken from the verified session, so a shop can't touch another's row.
 - Writes **re-validate end-to-end** server-side (see `createBooking`) — the
-  client picker's rules are a UX convenience, not a trust boundary. A partial
-  unique index is the final backstop for slot races (Postgres `23505`).
+  client picker's rules are a UX convenience, not a trust boundary. The final
+  backstop for slot races is a pair of **GiST `EXCLUDE` overlap constraints** on
+  `bookings` (`bookings_no_overlap_noassign` for shop-wide slots,
+  `bookings_no_overlap_staff` per assigned staff lane), which raise Postgres
+  `23P01` (also tolerant of `23505`). `createBooking` catches that, frees the
+  lane, and retries the next free staff — so a concurrent double-book loses the
+  race instead of corrupting the calendar.
 - **Phone number is the customer identity key.** Bookings link to a customer by
   `bookings.customer_phone`, not a FK — so anonymous bookings, shop-made
   bookings, and authenticated bookings all surface under one phone.
@@ -193,13 +252,48 @@ projects "now" into ICT (`getBangkokToday`, `getBangkokNow`, `getBangkokDateWind
 pure and shared client+server via [src/lib/booking/slot-math.ts](src/lib/booking/slot-math.ts)
 so the picker and the validator can never disagree about which times exist.
 
+### Testing
+
+[vitest.config.ts](vitest.config.ts) runs `src/**/*.test.ts` in a **`node`**
+environment. The suite is **pure-logic only** — slot math, Bangkok time, insights
+aggregation, validators, loyalty/waitlist rules, auth hashing/lockout, and the
+LINE signature/format/command helpers. There is **no DOM, no React-render, and no
+DB** in tests; don't reach for jsdom or a live Supabase.
+
+Two aliases make this work (mirroring how the app imports): `@/…` → `src/…`, and
+**`server-only` → [test/empty.ts](test/empty.ts)** (an empty stub). The stub lets
+a test import the *pure* exports of a `server-only` module (e.g. session signing,
+LINE HMAC verification) without dragging in the RSC-only runtime. Co-locate tests
+next to the unit (`foo.ts` → `foo.test.ts`); keep anything DB- or
+request-dependent out of them.
+
 ### Database schema
 
-The schema (`admins`, `customers`, `shops`, `shop_categories`,
-`shop_business_hours`, `bookings`) lives in the **remote Supabase project**, not
-in repo migrations. Inspect/alter it via the Supabase MCP tools (`list_tables`,
-`apply_migration`) rather than expecting SQL files locally. A super-admin is
-seeded directly in Supabase (phone `08XXXXXXXX`).
+The schema now lives **in-repo** under
+[supabase/migrations/](supabase/migrations) — the 60 incremental migrations were
+consolidated into a single baseline,
+`20260620000000_baseline_schema.sql`, which is the source of truth. Apply it to a
+fresh Supabase project (it `CREATE EXTENSION`s `btree_gist`, required by the
+booking overlap constraints and **not** present by default on new projects).
+Inspect/alter the live DB via the Supabase MCP tools (`list_tables`,
+`apply_migration`); add new changes as **new dated migration files**, don't edit
+the baseline. A super-admin is seeded directly in Supabase (phone `08XXXXXXXX`).
+
+The table set (~19) groups by domain:
+
+- **Core** — `admins`, `customers`, `shops`, `shop_categories`,
+  `shop_business_hours`, `bookings`.
+- **Catalog & staff** — `shop_services`, `shop_staff`, `shop_staff_services`,
+  `category_service_presets` (admin-curated service templates per category).
+- **Engagement** — `reviews`, `loyalty_ledger` + `referrals` (idempotent credit
+  entries; unique indexes keep one entry per booking/kind and per referral),
+  `waitlist_entries`, `shop_customer_notes`.
+- **LINE** — `line_link_codes`, `line_message_log` (dedups inbound by
+  `line_message_id`).
+- **Ops** — `admin_audit_logs`, `rate_limits`.
+
+`bookings` carries a `time_range` and optional `staff_id`; identity is still the
+denormalized `customer_phone` (no FK) — see the Data-access note above.
 
 ## Gotchas
 
