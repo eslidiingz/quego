@@ -52,6 +52,7 @@ export type ShopStatus = "approved" | "rejected";
 export type CategoryOption = {
   id: string;
   name: string;
+  slug: string;
 };
 
 export type CreateShopInput = {
@@ -453,7 +454,7 @@ export async function listActiveCategories(): Promise<CategoryOption[]> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("shop_categories")
-    .select("id, name")
+    .select("id, name, slug")
     .eq("is_active", true)
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
