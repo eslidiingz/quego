@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
-import { Select } from "@/components/ui/Select";
+import { CategoryPicker } from "./CategoryPicker";
 import { LocationSearchPicker } from "@/components/ui/LocationSearchPicker";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Modal } from "@/components/ui/Modal";
@@ -109,28 +109,12 @@ export function ShopRegistrationForm({
           helperText={`ที่อยู่ร้านของคุณ: quego.app/shops/${handle || "ชื่อที่ตั้ง"} · เว้นว่างให้ระบบตั้งให้จากชื่อร้าน`}
           disabled={pending}
         />
-        {/* key=ts forces a remount on every failed submit so defaultValue is
-            re-applied even when the same category is submitted twice in a row.
-            React 19 does not re-apply <select defaultValue> on re-render (unlike
-            <input>), so this is the only compiler-safe way to restore the value. */}
-        <Select
-          key={state?.ts ?? 0}
-          name="categoryId"
-          label="ประเภทธุรกิจ"
-          required
+        <CategoryPicker
+          categories={categories}
+          defaultValue={values?.categoryId ?? ""}
           errorText={errors?.categoryId}
           disabled={pending}
-          defaultValue={values?.categoryId ?? ""}
-        >
-          <option value="" disabled>
-            เลือกประเภทธุรกิจ
-          </option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
+        />
         <Textarea
           name="description"
           label="คำอธิบายสั้นๆ"
