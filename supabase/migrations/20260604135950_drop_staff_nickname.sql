@@ -1,1 +1,0 @@
-ALTER TABLE shop_staff DROP COLUMN IF EXISTS nickname;
