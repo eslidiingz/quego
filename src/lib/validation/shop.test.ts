@@ -9,9 +9,13 @@ import {
   parseServiceFormData,
   validateServiceForm,
   hasServiceErrors,
+  parseExpenseFormData,
+  validateExpenseForm,
+  hasExpenseErrors,
   type ShopFormFields,
   type StaffFormFields,
   type ServiceFormFields,
+  type ExpenseFormFields,
 } from "./shop";
 
 // A genuinely valid (province → district → subdistrict) triple straight from
@@ -600,5 +604,115 @@ describe("hasServiceErrors", () => {
 
   it("is true when at least one key is present", () => {
     expect(hasServiceErrors({ name: "กรุณากรอกชื่อบริการ" })).toBe(true);
+  });
+});
+
+// ----- Expense --------------------------------------------------------------
+
+function validExpense(
+  overrides: Partial<ExpenseFormFields> = {},
+): ExpenseFormFields {
+  return {
+    category: "ค่าเช่าร้าน",
+    amount: "1500",
+    expenseDate: "2026-06-20",
+    note: undefined,
+    ...overrides,
+  };
+}
+
+describe("validateExpenseForm", () => {
+  it("returns no errors for a valid expense", () => {
+    const errors = validateExpenseForm(validExpense());
+    expect(errors).toEqual({});
+    expect(hasExpenseErrors(errors)).toBe(false);
+  });
+
+  it("requires a category", () => {
+    expect(validateExpenseForm(validExpense({ category: "" })).category).toBe(
+      "กรุณาเลือกหรือระบุหมวดหมู่",
+    );
+  });
+
+  it("caps category at 80 characters", () => {
+    expect(
+      validateExpenseForm(validExpense({ category: "x".repeat(81) })).category,
+    ).toBe("หมวดหมู่ต้องไม่เกิน 80 ตัวอักษร");
+  });
+
+  it("requires an amount", () => {
+    expect(validateExpenseForm(validExpense({ amount: "" })).amount).toBe(
+      "กรุณากรอกจำนวนเงิน",
+    );
+  });
+
+  it("rejects a zero or negative amount", () => {
+    expect(validateExpenseForm(validExpense({ amount: "0" })).amount).toBe(
+      "จำนวนเงินต้องเป็นตัวเลขมากกว่า 0",
+    );
+    expect(validateExpenseForm(validExpense({ amount: "-5" })).amount).toBe(
+      "จำนวนเงินต้องเป็นตัวเลขมากกว่า 0",
+    );
+  });
+
+  it("rejects an amount with more than 2 decimal places", () => {
+    expect(validateExpenseForm(validExpense({ amount: "1.005" })).amount).toBe(
+      "จำนวนเงินมีทศนิยมได้ไม่เกิน 2 ตำแหน่ง",
+    );
+  });
+
+  it("accepts an amount with exactly 2 decimal places", () => {
+    expect(
+      validateExpenseForm(validExpense({ amount: "1.50" })).amount,
+    ).toBeUndefined();
+  });
+
+  it("requires a date", () => {
+    expect(
+      validateExpenseForm(validExpense({ expenseDate: "" })).expenseDate,
+    ).toBe("กรุณาเลือกวันที่");
+  });
+
+  it("rejects a malformed or impossible date", () => {
+    expect(
+      validateExpenseForm(validExpense({ expenseDate: "2026-6-1" })).expenseDate,
+    ).toBe("วันที่ไม่ถูกต้อง");
+    expect(
+      validateExpenseForm(validExpense({ expenseDate: "2026-02-30" }))
+        .expenseDate,
+    ).toBe("วันที่ไม่ถูกต้อง");
+  });
+
+  it("caps note at 500 characters", () => {
+    expect(
+      validateExpenseForm(validExpense({ note: "n".repeat(501) })).note,
+    ).toBe("หมายเหตุต้องไม่เกิน 500 ตัวอักษร");
+  });
+});
+
+describe("parseExpenseFormData", () => {
+  it("trims fields and collapses an empty note to undefined", () => {
+    const fd = new FormData();
+    fd.set("category", "  ค่าเช่าร้าน  ");
+    fd.set("amount", "  1500  ");
+    fd.set("expenseDate", "  2026-06-20  ");
+    fd.set("note", "   ");
+
+    const parsed = parseExpenseFormData(fd);
+
+    expect(parsed.category).toBe("ค่าเช่าร้าน");
+    expect(parsed.amount).toBe("1500");
+    expect(parsed.expenseDate).toBe("2026-06-20");
+    expect(parsed.note).toBeUndefined();
+  });
+});
+
+describe("hasExpenseErrors", () => {
+  it("is false for an empty errors object", () => {
+    expect(hasExpenseErrors({})).toBe(false);
+  });
+
+  it("is true when at least one key is present", () => {
+    expect(hasExpenseErrors({ amount: "กรุณากรอกจำนวนเงิน" })).toBe(true);
   });
 });

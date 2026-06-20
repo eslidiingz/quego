@@ -15,6 +15,10 @@ import {
 } from "@/lib/location/thailand";
 import { isValidThaiPhone } from "@/lib/validation/phone";
 import { isValidHandleFormat, isReservedHandle } from "@/lib/slug";
+import {
+  MIN_REQUIRED_STAMPS,
+  MAX_REQUIRED_STAMPS,
+} from "@/lib/promotions/stamp-card";
 
 export type ShopFormFields = {
   name: string;
@@ -279,5 +283,152 @@ export function validateServiceForm(input: ServiceFormFields): ServiceFormErrors
 }
 
 export function hasServiceErrors(errors: ServiceFormErrors): boolean {
+  return Object.keys(errors).length > 0;
+}
+
+// ----- Expense (ค่าใช้จ่าย) form --------------------------------------------
+
+export type ExpenseFormFields = {
+  /** Free-text category (preset label or a custom one the owner typed). */
+  category: string;
+  /** Raw string from the form input; validated/parsed to a number below. */
+  amount: string;
+  /** "YYYY-MM-DD". */
+  expenseDate: string;
+  note?: string;
+};
+
+export type ExpenseFormErrors = Partial<
+  Record<"category" | "amount" | "expenseDate" | "note", string>
+>;
+
+/** True for a real "YYYY-MM-DD" calendar date (round-trips through Date.UTC). */
+function isValidYmd(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return (
+    dt.getUTCFullYear() === y &&
+    dt.getUTCMonth() === m - 1 &&
+    dt.getUTCDate() === d
+  );
+}
+
+export function parseExpenseFormData(formData: FormData): ExpenseFormFields {
+  const get = (key: string) => String(formData.get(key) ?? "").trim();
+  return {
+    category: get("category"),
+    amount: get("amount"),
+    expenseDate: get("expenseDate"),
+    note: get("note") || undefined,
+  };
+}
+
+export function validateExpenseForm(
+  input: ExpenseFormFields,
+): ExpenseFormErrors {
+  const errors: ExpenseFormErrors = {};
+
+  if (!input.category) {
+    errors.category = "กรุณาเลือกหรือระบุหมวดหมู่";
+  } else if (input.category.length > 80) {
+    errors.category = "หมวดหมู่ต้องไม่เกิน 80 ตัวอักษร";
+  }
+
+  // Amount must be a positive number with at most two decimal places.
+  if (!input.amount) {
+    errors.amount = "กรุณากรอกจำนวนเงิน";
+  } else {
+    const amount = Number(input.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      errors.amount = "จำนวนเงินต้องเป็นตัวเลขมากกว่า 0";
+    } else if (Math.round(amount * 100) !== amount * 100) {
+      errors.amount = "จำนวนเงินมีทศนิยมได้ไม่เกิน 2 ตำแหน่ง";
+    } else if (amount > 100_000_000) {
+      errors.amount = "จำนวนเงินสูงเกินไป";
+    }
+  }
+
+  if (!input.expenseDate) {
+    errors.expenseDate = "กรุณาเลือกวันที่";
+  } else if (!isValidYmd(input.expenseDate)) {
+    errors.expenseDate = "วันที่ไม่ถูกต้อง";
+  }
+
+  if (input.note && input.note.length > 500) {
+    errors.note = "หมายเหตุต้องไม่เกิน 500 ตัวอักษร";
+  }
+
+  return errors;
+}
+
+export function hasExpenseErrors(errors: ExpenseFormErrors): boolean {
+  return Object.keys(errors).length > 0;
+}
+
+// ----- Promotion (โปรโมชั่น) form -------------------------------------------
+
+export type PromotionFormFields = {
+  /** Promotion name, e.g. "บัตรสะสมแต้มตัดผม". */
+  title: string;
+  /** What the customer earns, e.g. "ตัดผมฟรี 1 ครั้ง". */
+  reward: string;
+  /** Raw string from the form input; validated/parsed to an integer below. */
+  requiredStamps: string;
+  description?: string;
+  isActive: boolean;
+};
+
+export type PromotionFormErrors = Partial<
+  Record<"title" | "reward" | "requiredStamps" | "description", string>
+>;
+
+export function parsePromotionFormData(
+  formData: FormData,
+): PromotionFormFields {
+  const get = (key: string) => String(formData.get(key) ?? "").trim();
+  return {
+    title: get("title"),
+    reward: get("reward"),
+    requiredStamps: get("requiredStamps"),
+    description: get("description") || undefined,
+    // The form always renders the active toggle, so an unchecked box (which
+    // submits no value) means "paused". Treat only an explicit on/true/1 as active.
+    isActive: ["on", "true", "1"].includes(get("isActive").toLowerCase()),
+  };
+}
+
+export function validatePromotionForm(
+  input: PromotionFormFields,
+): PromotionFormErrors {
+  const errors: PromotionFormErrors = {};
+
+  if (!input.title) errors.title = "กรุณากรอกชื่อโปรโมชั่น";
+  else if (input.title.length > 120)
+    errors.title = "ชื่อโปรโมชั่นต้องไม่เกิน 120 ตัวอักษร";
+
+  if (!input.reward) errors.reward = "กรุณากรอกสิทธิ์ที่ลูกค้าจะได้รับ";
+  else if (input.reward.length > 120)
+    errors.reward = "สิทธิ์ที่ได้รับต้องไม่เกิน 120 ตัวอักษร";
+
+  // Required stamps must be an integer within the supported band.
+  if (!input.requiredStamps) {
+    errors.requiredStamps = "กรุณากรอกจำนวนครั้งที่ต้องสะสม";
+  } else {
+    const n = Number(input.requiredStamps);
+    if (!Number.isInteger(n)) {
+      errors.requiredStamps = "จำนวนครั้งต้องเป็นจำนวนเต็ม";
+    } else if (n < MIN_REQUIRED_STAMPS || n > MAX_REQUIRED_STAMPS) {
+      errors.requiredStamps = `จำนวนครั้งต้องอยู่ระหว่าง ${MIN_REQUIRED_STAMPS}–${MAX_REQUIRED_STAMPS}`;
+    }
+  }
+
+  if (input.description && input.description.length > 500)
+    errors.description = "รายละเอียดต้องไม่เกิน 500 ตัวอักษร";
+
+  return errors;
+}
+
+export function hasPromotionErrors(errors: PromotionFormErrors): boolean {
   return Object.keys(errors).length > 0;
 }

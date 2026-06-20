@@ -18,6 +18,8 @@ const navItems = [
   { href: "/shop/insights", label: "รายงานร้าน", icon: "insights" },
   { href: "/shop/staff", label: "พนักงาน", icon: "group" },
   { href: "/shop/services", label: "บริการ", icon: "stacks" },
+  { href: "/shop/promotions", label: "โปรโมชั่น", icon: "card_giftcard" },
+  { href: "/shop/expenses", label: "ค่าใช้จ่าย", icon: "receipt_long" },
   { href: "/shop/profile", label: "ข้อมูลร้าน", icon: "storefront" },
   { href: "/shop/share", label: "แชร์ร้าน", icon: "share" },
 ];
