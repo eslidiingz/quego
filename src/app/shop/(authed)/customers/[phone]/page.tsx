@@ -51,7 +51,15 @@ export default async function ShopCustomerPage({
       <PageHeader
         eyebrow="ลูกค้า"
         title={title}
-        description={`เบอร์โทร ${formatPhone(phone)} · ประวัติการใช้บริการที่ร้านของคุณ`}
+        description={
+          <span className="flex flex-col gap-1">
+            <span className="flex items-center gap-1.5">
+              <Icon name="phone" size={14} className="shrink-0" />
+              {formatPhone(phone)}
+            </span>
+            <span>ประวัติการใช้บริการที่ร้านของคุณ</span>
+          </span>
+        }
       />
 
       {/* ── Summary tiles ─────────────────────────────────────────── */}
