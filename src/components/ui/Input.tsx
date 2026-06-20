@@ -4,7 +4,7 @@ import { RequiredMark } from "./RequiredMark";
 
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
-  helperText?: string;
+  helperText?: React.ReactNode;
   errorText?: string;
   iconLeft?: React.ReactNode;
   iconRight?: React.ReactNode;

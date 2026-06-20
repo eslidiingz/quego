@@ -86,7 +86,12 @@ export function EditProfileForm({
               setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/gu, ""))
             }
             errorText={errors?.handle}
-            helperText={`ที่อยู่ร้าน: quego.app/shops/${handle || "ชื่อร้าน"} · ใช้ a–z, 0–9 และขีด (-)`}
+            helperText={
+              <span className="flex flex-col gap-0.5">
+                <span>ที่อยู่ร้าน: quego.app/shops/{handle || "ชื่อร้าน"}</span>
+                <span className="text-outline">ใช้ a–z, 0–9 และขีด (-)</span>
+              </span>
+            }
             disabled={pending}
           />
           <Select
