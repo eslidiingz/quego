@@ -1,8 +1,9 @@
 "use client";
 
-import { Fragment, useActionState, useEffect, useState } from "react";
+import { Fragment, useActionState, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
+import { Modal } from "@/components/ui/Modal";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import type { BusinessHour, DayOfWeek } from "@/lib/services/business-hours";
@@ -88,6 +89,11 @@ function buildPerDayFromHours(hours: BusinessHour[]): PerDayState {
  * owner never committed (that previously made an unsaved "open every day"
  * flip look like it had been saved).
  *
+ * Because every-day mode mirrors all 7 days *open* on submit, saving it would
+ * silently reopen any day the owner had set to closed. A confirm modal gates
+ * that case, naming the days that would be reopened, so the schedule is never
+ * overwritten by accident — the one-tap "open all 7 days" path is preserved.
+ *
  * The server action stays single-purpose: parse 7 days and persist. The
  * mode branching is a presentation-layer convenience.
  */
@@ -128,6 +134,39 @@ export function BusinessHoursForm({
   // the toggle, so switching back and forth never loses typed-in times.
   const handleToggleEveryDayMode = () => setEveryDayMode((prev) => !prev);
 
+  // Overwrite guard. "เปิดทุกวัน" mirrors all 7 days open on submit, so saving
+  // in every-day mode silently flips any closed day back to open. We list the
+  // days that would be reopened and ask before the schedule is overwritten —
+  // the owner keeps the one-tap "open all 7 days" path, just never by accident.
+  const formRef = useRef<HTMLFormElement>(null);
+  const bypassConfirmRef = useRef(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const forcedOpenDays = everyDayMode
+    ? DISPLAY_ORDER.filter(({ day }) => !perDay[day].isOpen)
+    : [];
+  const needsOverwriteConfirm = forcedOpenDays.length > 0;
+
+  // Gate the native form action. The confirm path re-submits with a bypass flag
+  // so the second pass runs the server action normally — keeping useActionState's
+  // `pending` and progressive submission intact (no imperative dispatch needed).
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    if (bypassConfirmRef.current) {
+      bypassConfirmRef.current = false;
+      return;
+    }
+    if (needsOverwriteConfirm) {
+      event.preventDefault();
+      setConfirmOpen(true);
+    }
+  };
+
+  const handleConfirmOverwrite = () => {
+    bypassConfirmRef.current = true;
+    setConfirmOpen(false);
+    formRef.current?.requestSubmit();
+  };
+
   const errors = state && !state.ok ? state.fieldErrors : undefined;
   const submitError =
     state && !state.ok && !state.fieldErrors ? state.message : null;
@@ -146,7 +185,13 @@ export function BusinessHoursForm({
         />
       ) : null}
 
-      <form action={formAction} className="space-y-4" noValidate>
+      <form
+        ref={formRef}
+        action={formAction}
+        onSubmit={handleSubmit}
+        className="space-y-4"
+        noValidate
+      >
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm">
           {/* Mode toggle — button-based to keep visual purely React-driven. */}
           <div className="p-4 md:p-6 flex items-center justify-between gap-4 border-b border-outline-variant/30">
@@ -242,6 +287,45 @@ export function BusinessHoursForm({
           </Button>
         </div>
       </form>
+
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="ยืนยันการเปิดทุกวัน"
+        size="sm"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmOpen(false)}
+            >
+              ยกเลิก
+            </Button>
+            <Button type="button" onClick={handleConfirmOverwrite}>
+              เปิดทุกวันและบันทึก
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3 text-body-md text-on-surface-variant">
+          <p>
+            คุณตั้ง{" "}
+            <span className="font-medium text-on-surface">
+              {forcedOpenDays.map((d) => `วัน${d.label}`).join(" · ")}
+            </span>{" "}
+            ไว้เป็นวันหยุด การบันทึกแบบ “เปิดทุกวัน”
+            จะเปลี่ยนให้วันเหล่านี้กลับมาเปิดด้วยเวลา{" "}
+            <span className="font-medium text-on-surface">
+              {everyDayOpen}–{everyDayClose}
+            </span>
+          </p>
+          <p>
+            หากต้องการคงวันหยุดไว้ ให้ปิดสวิตช์ “เปิดทุกวัน”
+            แล้วปรับเวลาทีละวันแทน
+          </p>
+        </div>
+      </Modal>
     </>
   );
 }

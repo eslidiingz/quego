@@ -415,6 +415,12 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
 
   const shopsByCategory = new Map<string, PublicShop[]>();
   for (const s of shopRows) {
+    // A shop with no active services has nothing bookable to show — hide its
+    // card from discovery rather than render a dead-end. Categories left with
+    // zero visible shops are then dropped by the empty-group filter below.
+    const services = servicesByShop.get(s.id) ?? [];
+    if (services.length === 0) continue;
+
     const list = shopsByCategory.get(s.category_id) ?? [];
     list.push({
       id: s.id,
@@ -426,7 +432,7 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
       district: s.district,
       subdistrict: s.subdistrict,
       service_duration_minutes: s.service_duration_minutes,
-      services: servicesByShop.get(s.id) ?? [],
+      services,
       openState: openByShop.get(s.id) ?? "unknown",
       rating: ratingByShop.get(s.id) ?? { average: 0, count: 0 },
       logo_key: s.logo_key,

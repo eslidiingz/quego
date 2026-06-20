@@ -58,26 +58,16 @@ export function ShareTools({
 
   return (
     <div className="space-y-stack-md">
-      {/* Shop link — primary share target */}
-      <section className={CARD}>
-        <h2 className="text-label-lg font-bold text-on-surface mb-1 flex items-center gap-2">
-          <Icon name="link" size={20} className="text-primary" />
-          ลิงก์ร้านของคุณ
-        </h2>
-        <p className="text-label-md text-on-surface-variant mb-4">
-          แชร์ลิงก์นี้ให้ลูกค้าเพื่อเปิดหน้าร้านและจองคิว
-        </p>
-        <CopyField value={shopUrl} id="share-shop-url" />
-      </section>
-
-      {/* QR code of the shop link */}
+      {/* Shop link + its QR — primary share target, bundled in one card like
+          the in-shop check-in section below. */}
       <section className={CARD}>
         <h2 className="text-label-lg font-bold text-on-surface mb-1 flex items-center gap-2">
           <Icon name="qr_code_2" size={20} className="text-primary" />
-          QR Code
+          QR และลิงก์ร้านของคุณ
         </h2>
         <p className="text-label-md text-on-surface-variant mb-4">
-          ให้ลูกค้าสแกนเพื่อเปิดหน้าร้าน เหมาะกับโพสต์โซเชียลหรือป้ายในร้าน
+          ให้ลูกค้าสแกน QR หรือแชร์ลิงก์เพื่อเปิดหน้าร้านและจองคิว
+          เหมาะกับโพสต์โซเชียลหรือป้ายในร้าน
         </p>
         <div className="flex flex-col items-center gap-4">
           <div className="rounded-xl border border-outline-variant bg-white p-4">
@@ -102,6 +92,9 @@ export function ShareTools({
           >
             ดาวน์โหลด QR
           </Button>
+        </div>
+        <div className="mt-4">
+          <CopyField value={shopUrl} id="share-shop-url" />
         </div>
       </section>
 
