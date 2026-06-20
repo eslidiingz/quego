@@ -4,8 +4,8 @@ import {
   getBangkokToday,
   dayOfWeekFor,
   getBangkokDateWindow,
-  getBangkokPastDates,
-  getBangkokMonthToYesterday,
+  getBangkokRecentDates,
+  getBangkokMonthToDate,
   getBangkokLastMonth,
 } from "./bangkok";
 
@@ -160,93 +160,90 @@ describe("getBangkokDateWindow", () => {
   });
 });
 
-describe("getBangkokPastDates", () => {
+describe("getBangkokRecentDates", () => {
   it("returns exactly `days` entries", () => {
-    const past = getBangkokPastDates(7, new Date("2026-06-07T03:00:00Z"));
-    expect(past).toHaveLength(7);
+    const recent = getBangkokRecentDates(7, new Date("2026-06-07T03:00:00Z"));
+    expect(recent).toHaveLength(7);
   });
 
-  it("ends at YESTERDAY and excludes today, oldest→newest", () => {
-    // Bangkok today = 2026-06-07, so the window ends 2026-06-06.
-    const past = getBangkokPastDates(3, new Date("2026-06-07T03:00:00Z"));
-    expect(past.map((e) => e.dateYmd)).toEqual([
-      "2026-06-04",
+  it("ends at TODAY and includes it, oldest→newest", () => {
+    // Bangkok today = 2026-06-07, so a 3-day window is 06-05 … 06-07.
+    const recent = getBangkokRecentDates(3, new Date("2026-06-07T03:00:00Z"));
+    expect(recent.map((e) => e.dateYmd)).toEqual([
       "2026-06-05",
       "2026-06-06",
+      "2026-06-07",
     ]);
   });
 
-  it("does not contain today's Bangkok date", () => {
+  it("contains today's Bangkok date as the last entry", () => {
     const at = new Date("2026-06-07T03:00:00Z");
     const today = getBangkokToday(at); // "2026-06-07"
-    const past = getBangkokPastDates(14, at);
-    expect(past.map((e) => e.dateYmd)).not.toContain(today);
+    const recent = getBangkokRecentDates(14, at);
+    expect(recent[recent.length - 1].dateYmd).toBe(today);
+    expect(recent.map((e) => e.dateYmd)).toContain(today);
   });
 
-  it("excludes the rolled-over Bangkok today for a late-UTC instant", () => {
-    // 18:00 UTC on 2026-06-07 is 2026-06-08 in Bangkok, so the last past entry
-    // is 2026-06-07, never 2026-06-08.
-    const past = getBangkokPastDates(2, new Date("2026-06-07T18:00:00Z"));
-    expect(past.map((e) => e.dateYmd)).toEqual(["2026-06-06", "2026-06-07"]);
+  it("uses the rolled-over Bangkok today as the last entry for a late-UTC instant", () => {
+    // 18:00 UTC on 2026-06-07 is 2026-06-08 in Bangkok, so the last entry is
+    // 2026-06-08, never 2026-06-07.
+    const recent = getBangkokRecentDates(2, new Date("2026-06-07T18:00:00Z"));
+    expect(recent.map((e) => e.dateYmd)).toEqual(["2026-06-07", "2026-06-08"]);
   });
 
   it("crosses a month boundary backwards", () => {
-    // Bangkok today = 2026-06-02; a 5-day past window reaches back into May.
-    const past = getBangkokPastDates(5, new Date("2026-06-02T05:00:00Z"));
-    expect(past.map((e) => e.dateYmd)).toEqual([
-      "2026-05-28",
+    // Bangkok today = 2026-06-02; a 5-day window reaches back into May.
+    const recent = getBangkokRecentDates(5, new Date("2026-06-02T05:00:00Z"));
+    expect(recent.map((e) => e.dateYmd)).toEqual([
       "2026-05-29",
       "2026-05-30",
       "2026-05-31",
       "2026-06-01",
+      "2026-06-02",
     ]);
   });
 
   it("crosses a month boundary backwards from the first of a month", () => {
-    // Bangkok today = 2026-03-01; the prior 3 days are the tail of February.
-    const past = getBangkokPastDates(3, new Date("2026-03-01T05:00:00Z"));
-    expect(past.map((e) => e.dateYmd)).toEqual([
-      "2026-02-26",
+    // Bangkok today = 2026-03-01; the prior 2 days are the tail of February.
+    const recent = getBangkokRecentDates(3, new Date("2026-03-01T05:00:00Z"));
+    expect(recent.map((e) => e.dateYmd)).toEqual([
       "2026-02-27",
       "2026-02-28",
+      "2026-03-01",
     ]);
   });
 
   it("keeps each entry's dayOfWeek consistent with dayOfWeekFor", () => {
-    const past = getBangkokPastDates(10, new Date("2026-06-02T05:00:00Z"));
-    for (const entry of past) {
+    const recent = getBangkokRecentDates(10, new Date("2026-06-02T05:00:00Z"));
+    for (const entry of recent) {
       expect(entry.dayOfWeek).toBe(dayOfWeekFor(entry.dateYmd));
     }
   });
 });
 
-describe("getBangkokMonthToYesterday", () => {
-  it("spans the 1st up to and including yesterday", () => {
-    // Bangkok 'today' = 2026-06-15 → window is 06-01 … 06-14 (14 days).
-    const window = getBangkokMonthToYesterday(new Date("2026-06-15T05:00:00Z"));
-    expect(window).toHaveLength(14);
+describe("getBangkokMonthToDate", () => {
+  it("spans the 1st up to and including today", () => {
+    // Bangkok 'today' = 2026-06-15 → window is 06-01 … 06-15 (15 days).
+    const window = getBangkokMonthToDate(new Date("2026-06-15T05:00:00Z"));
+    expect(window).toHaveLength(15);
     expect(window[0].dateYmd).toBe("2026-06-01");
-    expect(window[window.length - 1].dateYmd).toBe("2026-06-14");
+    expect(window[window.length - 1].dateYmd).toBe("2026-06-15");
   });
 
-  it("returns a single day (the 1st) when today is the 2nd", () => {
-    const window = getBangkokMonthToYesterday(new Date("2026-06-02T05:00:00Z"));
+  it("returns a single day (the 1st) when today is the 1st", () => {
+    const window = getBangkokMonthToDate(new Date("2026-06-01T05:00:00Z"));
     expect(window.map((d) => d.dateYmd)).toEqual(["2026-06-01"]);
   });
 
-  it("returns an empty window when today is the 1st", () => {
-    const window = getBangkokMonthToYesterday(new Date("2026-06-01T05:00:00Z"));
-    expect(window).toEqual([]);
-  });
-
-  it("returns empty when the ICT offset rolls a late-UTC instant to the 1st", () => {
-    // 2026-05-31T18:00Z = 2026-06-01T01:00 ICT → Bangkok day is the 1st → empty.
-    const window = getBangkokMonthToYesterday(new Date("2026-05-31T18:00:00Z"));
-    expect(window).toEqual([]);
+  it("includes the rolled-over Bangkok day when a late-UTC instant lands on the 1st", () => {
+    // 2026-05-31T18:00Z = 2026-06-01T01:00 ICT → Bangkok day is the 1st → just
+    // the 1st (never empty).
+    const window = getBangkokMonthToDate(new Date("2026-05-31T18:00:00Z"));
+    expect(window.map((d) => d.dateYmd)).toEqual(["2026-06-01"]);
   });
 
   it("derives each entry's dayOfWeek consistently with dayOfWeekFor", () => {
-    const window = getBangkokMonthToYesterday(new Date("2026-06-15T05:00:00Z"));
+    const window = getBangkokMonthToDate(new Date("2026-06-15T05:00:00Z"));
     for (const entry of window) {
       expect(entry.dayOfWeek).toBe(dayOfWeekFor(entry.dateYmd));
     }

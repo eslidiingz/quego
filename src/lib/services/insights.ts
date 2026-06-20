@@ -1,8 +1,8 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
-  getBangkokPastDates,
-  getBangkokMonthToYesterday,
+  getBangkokRecentDates,
+  getBangkokMonthToDate,
   getBangkokLastMonth,
 } from "@/lib/time/bangkok";
 import {
@@ -15,6 +15,7 @@ import {
   type InsightsBooking,
   type InsightsStaff,
   type InsightsService,
+  type InsightsExpense,
   type InsightsRange,
   type ShopInsights,
 } from "@/lib/insights/aggregate";
@@ -41,6 +42,8 @@ export type InsightsDeltas = {
   revenue: number | null;
   totalBookings: number | null;
   avgTicket: number | null;
+  expensesTotal: number | null;
+  netProfit: number | null;
 };
 
 /** A selectable option for the filter sheet. */
@@ -71,23 +74,24 @@ function priceFromDb(value: number | string | null): number | null {
 }
 
 /**
- * Resolve a range key to its current window dates (oldest→newest, excluding
- * today). Calendar windows ("month"/"lastmonth") read the Bangkok clock here;
- * the pure aggregate stays clock-free.
+ * Resolve a range key to its current window dates (oldest→newest, INCLUDING
+ * today) so the report reconciles with the overview's live "ยอดวันนี้" figure.
+ * Calendar windows ("month"/"lastmonth") read the Bangkok clock here; the pure
+ * aggregate stays clock-free. "lastmonth" is always a complete past month.
  */
 function resolveWindow(range: InsightsRange): WindowDate[] {
   switch (range) {
     case "7":
-      return getBangkokPastDates(7);
+      return getBangkokRecentDates(7);
     case "90":
-      return getBangkokPastDates(90);
+      return getBangkokRecentDates(90);
     case "month":
-      return getBangkokMonthToYesterday();
+      return getBangkokMonthToDate();
     case "lastmonth":
       return getBangkokLastMonth();
     case "30":
     default:
-      return getBangkokPastDates(30);
+      return getBangkokRecentDates(30);
   }
 }
 
@@ -148,6 +152,7 @@ export async function getShopReport(
     { data: hoursData, error: hoursError },
     { data: staffData, error: staffError },
     { data: servicesData, error: servicesError },
+    { data: expensesData, error: expensesError },
   ] = await Promise.all([
     // ALL statuses — cancelled rows are needed for the cancellation rate.
     supabase
@@ -179,6 +184,14 @@ export async function getShopReport(
       .eq("shop_id", shopId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
+    // Expenses across the same window — aggregated into net profit. Shop-wide,
+    // so no staff/service scoping here.
+    supabase
+      .from("shop_expenses")
+      .select("expense_date, category, amount")
+      .eq("shop_id", shopId)
+      .gte("expense_date", queryStart)
+      .lte("expense_date", queryEnd),
   ]);
 
   // Surface query failures loudly. Without this, the `?? []` fallbacks below
@@ -196,6 +209,9 @@ export async function getShopReport(
   if (servicesError) {
     throw new Error(`insights: services query failed: ${servicesError.message}`);
   }
+  if (expensesError) {
+    throw new Error(`insights: expenses query failed: ${expensesError.message}`);
+  }
 
   const allBookings: InsightsBooking[] = (bookingsData ?? []).flatMap((b) => {
     // Validate the DB status BEFORE narrowing it to the analytics union: an
@@ -212,6 +228,18 @@ export async function getShopReport(
         serviceId: (b.service_id as string | null) ?? null,
         status: status as InsightsBooking["status"],
         price: priceFromDb(b.service_price as number | string | null),
+      },
+    ];
+  });
+
+  const allExpenses: InsightsExpense[] = (expensesData ?? []).flatMap((e) => {
+    const amount = priceFromDb(e.amount as number | string | null);
+    if (amount == null) return [];
+    return [
+      {
+        expenseDate: e.expense_date as string,
+        category: (e.category as string) ?? "",
+        amount,
       },
     ];
   });
@@ -252,6 +280,8 @@ export async function getShopReport(
   const compareDateSet = new Set(compareWindow.map((d) => d.dateYmd));
   const currentBookings = allBookings.filter((b) => currentDateSet.has(b.bookingDate));
   const compareBookings = allBookings.filter((b) => compareDateSet.has(b.bookingDate));
+  const currentExpenses = allExpenses.filter((e) => currentDateSet.has(e.expenseDate));
+  const compareExpenses = allExpenses.filter((e) => compareDateSet.has(e.expenseDate));
 
   const insights = computeShopInsights({
     rangeDays: currentWindow.length,
@@ -260,6 +290,7 @@ export async function getShopReport(
     bookings: currentBookings,
     staff,
     services,
+    expenses: currentExpenses,
     filterStaffIds,
     filterServiceIds,
   });
@@ -272,6 +303,7 @@ export async function getShopReport(
     bookings: compareBookings,
     staff,
     services,
+    expenses: compareExpenses,
     filterStaffIds,
     filterServiceIds,
   });
@@ -280,6 +312,8 @@ export async function getShopReport(
     revenue: delta(insights.revenue, prior.revenue),
     totalBookings: delta(insights.totalBookings, prior.totalBookings),
     avgTicket: delta(insights.avgTicket, prior.avgTicket),
+    expensesTotal: delta(insights.expensesTotal, prior.expensesTotal),
+    netProfit: delta(insights.netProfit, prior.netProfit),
   };
 
   return {

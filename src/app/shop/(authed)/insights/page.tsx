@@ -14,6 +14,8 @@ import { DeltaChip } from "@/components/shop/insights/DeltaChip";
 import { RevenueByStaffList } from "@/components/shop/insights/RevenueByStaffList";
 import { RevenueByServiceList } from "@/components/shop/insights/RevenueByServiceList";
 import { BusyByHourChart } from "@/components/shop/insights/BusyByHourChart";
+import { NetProfitCard } from "@/components/shop/insights/NetProfitCard";
+import { ExpensesByCategoryList } from "@/components/shop/insights/ExpensesByCategoryList";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +78,7 @@ export default async function ShopReportPage({
 
       {insights.filteredToZero ? (
         <FilteredToZeroState range={range} />
-      ) : !insights.hasData ? (
+      ) : !insights.hasData && insights.expensesTotal <= 0 ? (
         <EmptyState canExpand={range !== "90"} />
       ) : (
         <>
@@ -108,6 +110,47 @@ export default async function ShopReportPage({
               delta={<DeltaChip delta={deltas.avgTicket} />}
             />
           </section>
+
+          {/* Expenses are shop-wide (no staff/service dimension), so the
+              profit/expense blocks only show when no staff/service filter is
+              active — never pairing a full expense total with filtered revenue. */}
+          {!insights.hasFilter ? (
+            <>
+              <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <NetProfitCard
+                  netProfit={insights.netProfit}
+                  profitMargin={insights.profitMargin}
+                  delta={deltas.netProfit}
+                />
+                <MetricTile
+                  label="รายจ่ายทั้งหมด"
+                  value={formatBaht(insights.expensesTotal)}
+                  sub="ในช่วงเวลาที่เลือก"
+                  tone="error"
+                  delta={<DeltaChip delta={deltas.expensesTotal} />}
+                />
+              </section>
+
+              <ReportSection
+                title="รายจ่ายตามหมวดหมู่"
+                sub="หมวดที่ใช้จ่ายมากที่สุด"
+              >
+                {insights.expensesByCategory.length > 0 ? (
+                  <ExpensesByCategoryList rows={insights.expensesByCategory} />
+                ) : (
+                  <p className="text-body-md text-on-surface-variant">
+                    ยังไม่มีค่าใช้จ่ายในช่วงนี้{" "}
+                    <Link
+                      href="/shop/expenses"
+                      className="font-semibold text-primary hover:text-primary-container"
+                    >
+                      เพิ่มค่าใช้จ่าย
+                    </Link>
+                  </p>
+                )}
+              </ReportSection>
+            </>
+          ) : null}
 
           <ReportSection
             title="รายได้ตามพนักงาน"
