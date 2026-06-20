@@ -4,8 +4,8 @@ import { useActionState, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
-import { Select } from "@/components/ui/Select";
 import { LocationSearchPicker } from "@/components/ui/LocationSearchPicker";
+import { CategoryPicker } from "@/app/shops/register/CategoryPicker";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Toast } from "@/components/ui/Toast";
 import { Icon } from "@/components/ui/Icon";
@@ -66,6 +66,7 @@ export function EditProfileForm({
             name="name"
             label="ชื่อร้าน"
             required
+            placeholder="เช่น The Velvet Roast Coffee"
             defaultValue={shop.name}
             maxLength={120}
             errorText={errors?.name}
@@ -94,26 +95,16 @@ export function EditProfileForm({
             }
             disabled={pending}
           />
-          <Select
-            name="categoryId"
-            label="ประเภทธุรกิจ"
-            required
+          <CategoryPicker
+            categories={categories}
             defaultValue={categoryDefault}
             errorText={errors?.categoryId}
             disabled={pending}
-          >
-            <option value="" disabled>
-              เลือกประเภทธุรกิจ
-            </option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
+          />
           <Textarea
             name="description"
             label="คำอธิบายสั้นๆ"
+            placeholder="บอกเล่าจุดเด่นและประสบการณ์ที่ลูกค้าจะได้รับ..."
             rows={3}
             defaultValue={shop.description ?? ""}
             errorText={errors?.description}
@@ -123,6 +114,7 @@ export function EditProfileForm({
           <Input
             name="address"
             label="ที่อยู่ร้าน"
+            placeholder="ระบุที่อยู่หรือชื่ออาคาร / ห้าง"
             iconLeft={<Icon name="location_on" />}
             defaultValue={shop.address ?? ""}
             errorText={errors?.address}
@@ -141,6 +133,7 @@ export function EditProfileForm({
           <PhoneInput
             name="contactPhone"
             label="เบอร์โทรร้าน"
+            placeholder="0xxxxxxxxx"
             iconLeft={<Icon name="phone" />}
             defaultValue={shop.contact_phone ?? ""}
             errorText={errors?.contactPhone}
@@ -157,6 +150,7 @@ export function EditProfileForm({
             name="ownerName"
             label="ชื่อ-นามสกุล"
             required
+            placeholder="ชื่อจริงของผู้ดำเนินกิจการ"
             iconLeft={<Icon name="person" />}
             defaultValue={shop.owner_name}
             errorText={errors?.ownerName}
@@ -174,6 +168,7 @@ export function EditProfileForm({
             name="ownerEmail"
             label="อีเมล"
             type="email"
+            placeholder="you@example.com"
             iconLeft={<Icon name="mail" />}
             defaultValue={shop.owner_email ?? ""}
             errorText={errors?.ownerEmail}
@@ -197,7 +192,12 @@ export function EditProfileForm({
             iconLeft={<Icon name="schedule" />}
             defaultValue={String(shop.reschedule_cancel_cutoff_hours ?? 0)}
             errorText={cutoffError}
-            helperText="0 = ลูกค้าเลื่อน/ยกเลิกได้จนถึงก่อนเวลานัด • เช่น 24 = ต้องทำก่อนถึงคิวอย่างน้อย 24 ชั่วโมง"
+            helperText={
+              <span className="flex flex-col gap-0.5">
+                <span>ตั้งเป็น 0 = ไม่มีข้อจำกัด ลูกค้ายกเลิกได้ถึงก่อนถึงเวลานัด</span>
+                <span className="text-outline">เช่น ใส่ 24 = ลูกค้าต้องยกเลิกก่อนถึงคิวอย่างน้อย 1 วัน</span>
+              </span>
+            }
             disabled={pending}
           />
         </Section>
