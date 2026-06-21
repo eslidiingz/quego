@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import type { FilterOption } from "@/lib/services/insights";
-import type { InsightsRange } from "@/lib/insights/aggregate";
 import { FilterSheet } from "./FilterSheet";
 
 /**
@@ -20,7 +19,8 @@ export function ReportFilterBar({
   activeStaffIds,
   activeServiceIds,
 }: {
-  range: InsightsRange;
+  /** The active `?range=` token (preset or calendar), preserved in filter URLs. */
+  range: string;
   staffOptions: FilterOption[];
   serviceOptions: FilterOption[];
   activeStaffIds: string[];

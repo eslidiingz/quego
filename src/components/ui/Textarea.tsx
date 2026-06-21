@@ -30,8 +30,10 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           aria-invalid={invalid || undefined}
           aria-required={required || undefined}
           className={cn(
-            "w-full p-4 rounded-lg bg-surface-container-low text-on-surface placeholder:text-outline text-body-md transition-all duration-200 ease-out",
-            "border-2 border-transparent focus:bg-surface-container-lowest focus:border-primary focus:outline-none",
+            // Raised fill (no resting border) — matches Input. The lighter fill
+            // lifts the field off the card so it reads as an input without a line.
+            "w-full p-4 rounded-lg bg-surface-container-high text-on-surface placeholder:text-outline text-body-md transition-all duration-200 ease-out",
+            "border-2 border-transparent hover:bg-surface-container-highest focus:bg-surface-container-highest focus:border-primary focus:outline-none",
             invalid && "border-error focus:border-error",
             className,
           )}

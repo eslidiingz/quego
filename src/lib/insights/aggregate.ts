@@ -19,20 +19,83 @@ import {
 } from "@/lib/booking/slot-math";
 
 /**
- * Selectable lookback windows. The rolling-day windows (7/30/90) keep their
- * numeric meaning; the calendar windows ("month" = this month, "lastmonth" =
- * previous full month) are resolved to concrete dates by the service layer, so
- * the pure aggregate never reads a clock.
+ * Selectable quick-pick lookback windows (the chip row). The rolling-day windows
+ * (7/30/90) keep their numeric meaning; the calendar windows ("month" = this
+ * month, "year" = this year-to-date) are resolved to concrete dates by the
+ * service layer, so the pure aggregate never reads a clock.
  */
-export const INSIGHTS_RANGES = ["7", "30", "90", "month", "lastmonth"] as const;
+export const INSIGHTS_RANGES = ["7", "30", "90", "month", "year"] as const;
 export type InsightsRange = (typeof INSIGHTS_RANGES)[number];
 export const DEFAULT_INSIGHTS_RANGE: InsightsRange = "30";
 
-/** Coerce a `?range=` query value to a valid window key, default = 30 days. */
+/** Coerce a `?range=` query value to a valid preset key, default = 30 days. */
 export function parseRange(raw: string | undefined): InsightsRange {
   return (INSIGHTS_RANGES as readonly string[]).includes(raw ?? "")
     ? (raw as InsightsRange)
     : DEFAULT_INSIGHTS_RANGE;
+}
+
+/**
+ * The report's full range selection. It is either one of the quick-pick presets
+ * (chip row) or a SPECIFIC calendar period chosen from the month/year picker —
+ * a single month (`YYYY-MM`) or a whole year (`YYYY`). The `?range=` query param
+ * carries all three shapes; the service layer resolves each to concrete dates.
+ */
+export type ReportRange =
+  | { kind: "preset"; preset: InsightsRange }
+  | { kind: "month"; year: number; month: number } // month: 1–12
+  | { kind: "year"; year: number };
+
+/** Bounds for an accepted calendar year in the picker (sanity clamp on input). */
+const MIN_REPORT_YEAR = 2000;
+const MAX_REPORT_YEAR = 2100;
+
+/**
+ * Coerce a `?range=` value to a `ReportRange`. Recognises (in order): a preset
+ * token; a `YYYY-MM` month token; a `YYYY` year token. Anything else (including
+ * out-of-range years/months) falls back to the default preset.
+ */
+export function parseReportRange(raw: string | undefined): ReportRange {
+  const v = (raw ?? "").trim();
+
+  if ((INSIGHTS_RANGES as readonly string[]).includes(v)) {
+    return { kind: "preset", preset: v as InsightsRange };
+  }
+
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(v);
+  if (monthMatch) {
+    const year = Number(monthMatch[1]);
+    const month = Number(monthMatch[2]);
+    if (
+      year >= MIN_REPORT_YEAR &&
+      year <= MAX_REPORT_YEAR &&
+      month >= 1 &&
+      month <= 12
+    ) {
+      return { kind: "month", year, month };
+    }
+  }
+
+  const yearMatch = /^(\d{4})$/.exec(v);
+  if (yearMatch) {
+    const year = Number(yearMatch[1]);
+    if (year >= MIN_REPORT_YEAR && year <= MAX_REPORT_YEAR) {
+      return { kind: "year", year };
+    }
+  }
+
+  return { kind: "preset", preset: DEFAULT_INSIGHTS_RANGE };
+}
+
+/** Serialise a `ReportRange` back to its `?range=` token (round-trips parseReportRange). */
+export function serializeReportRange(range: ReportRange): string {
+  if (range.kind === "month") {
+    return `${range.year}-${String(range.month).padStart(2, "0")}`;
+  }
+  if (range.kind === "year") {
+    return String(range.year);
+  }
+  return range.preset;
 }
 
 /** A booking projected to just the fields analytics needs. */

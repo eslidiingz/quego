@@ -11,17 +11,46 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { cn } from "@/lib/cn";
 import { signOutShop } from "@/app/shop/actions";
 
-const navItems = [
-  { href: "/shop", label: "ภาพรวม", icon: "dashboard" },
-  { href: "/shop/bookings", label: "รายการจอง", icon: "event_note" },
-  { href: "/shop/display", label: "หน้าจอแสดงคิว", icon: "cast" },
-  { href: "/shop/insights", label: "รายงานร้าน", icon: "insights" },
-  { href: "/shop/staff", label: "พนักงาน", icon: "group" },
-  { href: "/shop/services", label: "บริการ", icon: "stacks" },
-  { href: "/shop/promotions", label: "โปรโมชั่น", icon: "card_giftcard" },
-  { href: "/shop/expenses", label: "ค่าใช้จ่าย", icon: "receipt_long" },
-  { href: "/shop/profile", label: "ข้อมูลร้าน", icon: "storefront" },
-  { href: "/shop/share", label: "แชร์ร้าน", icon: "share" },
+// Nav is grouped by how a shop owner actually works through a day, not by raw
+// alphabetical/feature order: daily-driver screens first, then the periodic
+// review surfaces (reports + expenses, which pair up as the net-profit story),
+// then the growth tools we want kept discoverable (share/promotions would sink
+// to the bottom on a pure-frequency sort and get forgotten), then set-once
+// configuration last.
+const navGroups: {
+  label: string;
+  items: { href: string; label: string; icon: string }[];
+}[] = [
+  {
+    label: "งานประจำวัน",
+    items: [
+      { href: "/shop", label: "ภาพรวม", icon: "dashboard" },
+      { href: "/shop/bookings", label: "รายการจอง", icon: "event_note" },
+      { href: "/shop/display", label: "หน้าจอแสดงคิว", icon: "cast" },
+    ],
+  },
+  {
+    label: "สรุป & การเงิน",
+    items: [
+      { href: "/shop/insights", label: "รายงานร้าน", icon: "insights" },
+      { href: "/shop/expenses", label: "ค่าใช้จ่าย", icon: "receipt_long" },
+    ],
+  },
+  {
+    label: "เครื่องมือการตลาด",
+    items: [
+      { href: "/shop/share", label: "แชร์ร้าน", icon: "share" },
+      { href: "/shop/promotions", label: "โปรโมชั่น", icon: "card_giftcard" },
+    ],
+  },
+  {
+    label: "จัดการร้าน",
+    items: [
+      { href: "/shop/services", label: "บริการ", icon: "stacks" },
+      { href: "/shop/staff", label: "พนักงาน", icon: "group" },
+      { href: "/shop/profile", label: "ข้อมูลร้าน", icon: "storefront" },
+    ],
+  },
 ];
 
 /**
@@ -87,29 +116,39 @@ export function ShopShell({
             </span>
           </div>
         </div>
-        <nav className="flex flex-col gap-1 px-2 flex-1">
-          {navItems.map((item) => {
-            const active =
-              item.href === "/shop"
-                ? pathname === "/shop"
-                : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMenuOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 px-6 py-3 rounded-full transition-all text-left mx-2",
-                  active
-                    ? "bg-primary text-on-primary font-bold shadow-sm"
-                    : "text-on-surface-variant hover:bg-surface-container-high",
-                )}
-              >
-                <Icon name={item.icon} />
-                <span className="text-label-md">{item.label}</span>
-              </Link>
-            );
-          })}
+        <nav className="flex flex-col gap-1 px-2 flex-1 min-h-0 overflow-y-auto">
+          {navGroups.map((group, groupIndex) => (
+            <div
+              key={group.label}
+              className={cn("flex flex-col gap-1", groupIndex > 0 && "mt-4")}
+            >
+              <p className="px-6 mx-2 mb-1 text-label-sm uppercase tracking-widest text-on-surface-variant/70">
+                {group.label}
+              </p>
+              {group.items.map((item) => {
+                const active =
+                  item.href === "/shop"
+                    ? pathname === "/shop"
+                    : pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMenuOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 px-6 py-3 rounded-full transition-all text-left mx-2",
+                      active
+                        ? "bg-primary text-on-primary font-bold shadow-sm"
+                        : "text-on-surface-variant hover:bg-surface-container-high",
+                    )}
+                  >
+                    <Icon name={item.icon} />
+                    <span className="text-label-md">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
         <div className="p-4">
           <ConfirmDialog

@@ -22,6 +22,13 @@ export type PinInputProps = {
   autoComplete?: string;
   /** Fires once the value reaches `maxDigits` (e.g. to auto-submit a form). */
   onComplete?: (value: string) => void;
+  /**
+   * When this field fills to `maxDigits`, move focus to the first box of the
+   * PinInput whose `id` equals this value — so the user keeps typing the next
+   * row without reaching for the mouse. Only advances on the incomplete →
+   * complete transition, so editing an already-full field won't yank focus.
+   */
+  nextFieldId?: string;
   /** Focus the first box on mount. */
   autoFocus?: boolean;
   id?: string;
@@ -56,6 +63,7 @@ export function PinInput({
   visible,
   autoComplete,
   onComplete,
+  nextFieldId,
   autoFocus,
   id,
 }: PinInputProps) {
@@ -72,15 +80,30 @@ export function PinInput({
 
   const commit = (next: string) => {
     const v = sanitize(next, maxDigits);
+    const wasComplete = current.length === maxDigits;
     if (!isControlled) setInternal(v);
     onChange?.(v);
-    if (v.length === maxDigits) onComplete?.(v);
+    if (v.length === maxDigits) {
+      onComplete?.(v);
+      // Jump to the next row only on the incomplete → complete transition, so
+      // re-editing an already-full field doesn't steal focus away from it.
+      if (!wasComplete) focusNextField();
+    }
   };
 
   const focusBox = (i: number) => {
     const el = inputsRef.current[Math.max(0, Math.min(maxDigits - 1, i))];
     el?.focus();
     el?.select();
+  };
+
+  const focusNextField = () => {
+    if (!nextFieldId) return;
+    const el = document.getElementById(`${nextFieldId}-0`);
+    if (el instanceof HTMLInputElement) {
+      el.focus();
+      el.select();
+    }
   };
 
   const handleChange = (i: number, raw: string) => {
@@ -94,7 +117,9 @@ export function PinInput({
       pos += 1;
     }
     commit(arr.join("").trimEnd());
-    focusBox(pos);
+    // When the row just filled and we have a next row to jump to, `commit`
+    // already moved focus there — don't clamp back onto the last box here.
+    if (pos < maxDigits || !nextFieldId) focusBox(pos);
   };
 
   const handleKeyDown = (
@@ -126,7 +151,7 @@ export function PinInput({
     const pasted = sanitize(e.clipboardData.getData("text"), maxDigits);
     if (!pasted) return;
     commit(pasted);
-    focusBox(pasted.length);
+    if (pasted.length < maxDigits || !nextFieldId) focusBox(pasted.length);
   };
 
   return (

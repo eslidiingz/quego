@@ -543,8 +543,8 @@ function TimeBlock({
         // server validates minute % 10 === 0 as a fallback.
         step={600}
         className={cn(
-          "h-11 px-3 rounded-lg bg-surface-container-low text-on-surface text-body-md transition-all",
-          "border-2 border-transparent focus:bg-surface-container-lowest focus:border-secondary focus:outline-none",
+          "h-11 px-3 rounded-lg bg-surface-container-high text-on-surface text-body-md transition-all duration-200 ease-out",
+          "border-2 border-transparent hover:bg-surface-container-highest focus:bg-surface-container-highest focus:border-secondary focus:outline-none",
           hasError && "border-error focus:border-error",
         )}
       />

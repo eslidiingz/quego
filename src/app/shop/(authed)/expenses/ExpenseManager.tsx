@@ -64,7 +64,32 @@ export function ExpenseManager({
     window.setTimeout(() => setToast(null), 4000);
   }
 
-  const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+  // Period filter (รายเดือน / รายปี). Default to the current Bangkok month;
+  // "ทั้งปี" widens the view to the whole selected year. Filtering is client-side
+  // because the page already loads every row and totals them here.
+  const today = getBangkokToday(); // "YYYY-MM-DD"
+  const [filterYear, setFilterYear] = useState(today.slice(0, 4));
+  const [filterMonth, setFilterMonth] = useState<string>(today.slice(5, 7)); // "all" | "01".."12"
+
+  // Years present in the data plus the current year, newest first.
+  const years = useMemo(() => {
+    const set = new Set<string>(expenses.map((e) => e.expenseDate.slice(0, 4)));
+    set.add(today.slice(0, 4));
+    return [...set].sort((a, b) => Number(b) - Number(a));
+  }, [expenses, today]);
+
+  const filtered = useMemo(
+    () =>
+      expenses.filter((e) => {
+        if (e.expenseDate.slice(0, 4) !== filterYear) return false;
+        if (filterMonth !== "all" && e.expenseDate.slice(5, 7) !== filterMonth)
+          return false;
+        return true;
+      }),
+    [expenses, filterYear, filterMonth],
+  );
+
+  const total = filtered.reduce((sum, e) => sum + e.amount, 0);
 
   return (
     <div className="space-y-stack-md">
@@ -99,23 +124,39 @@ export function ExpenseManager({
           <EmptyState onAdd={openAdd} />
         ) : (
           <>
+            <PeriodFilter
+              years={years}
+              year={filterYear}
+              month={filterMonth}
+              onYearChange={setFilterYear}
+              onMonthChange={setFilterMonth}
+            />
             <div className="flex items-center justify-between gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-3">
               <span className="text-label-md text-on-surface-variant">
-                รวมทั้งหมด {expenses.length} รายการ
+                {filterMonth === "all" ? "รวมทั้งปี" : "รวมเดือนนี้"}{" "}
+                {filtered.length} รายการ
               </span>
               <span className="font-display text-headline-sm tabular-nums text-error">
                 {formatBaht(total)}
               </span>
             </div>
-            <ul className="space-y-3">
-              {expenses.map((expense) => (
-                <ExpenseRow
-                  key={expense.id}
-                  expense={expense}
-                  onEdit={() => openEdit(expense)}
-                />
-              ))}
-            </ul>
+            {filtered.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-outline-variant bg-surface-container-lowest p-8 text-center">
+                <p className="text-body-md text-on-surface-variant">
+                  ไม่มีค่าใช้จ่ายในช่วงที่เลือก
+                </p>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {filtered.map((expense) => (
+                  <ExpenseRow
+                    key={expense.id}
+                    expense={expense}
+                    onEdit={() => openEdit(expense)}
+                  />
+                ))}
+              </ul>
+            )}
           </>
         )}
       </section>
@@ -391,6 +432,69 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       <Button onClick={onAdd} iconLeft={<Icon name="add" size={18} />}>
         เพิ่มค่าใช้จ่ายแรก
       </Button>
+    </div>
+  );
+}
+
+const THAI_MONTHS = [
+  "มกราคม",
+  "กุมภาพันธ์",
+  "มีนาคม",
+  "เมษายน",
+  "พฤษภาคม",
+  "มิถุนายน",
+  "กรกฎาคม",
+  "สิงหาคม",
+  "กันยายน",
+  "ตุลาคม",
+  "พฤศจิกายน",
+  "ธันวาคม",
+];
+
+/**
+ * Period filter for the expense list. A year picker plus a month picker whose
+ * "ทั้งปี" option switches from a monthly (รายเดือน) to a yearly (รายปี) view.
+ * Years are shown in the Buddhist era (พ.ศ.) to match the rest of the UI; the
+ * value stays the Gregorian year used for filtering.
+ */
+function PeriodFilter({
+  years,
+  year,
+  month,
+  onYearChange,
+  onMonthChange,
+}: {
+  years: string[];
+  year: string;
+  month: string;
+  onYearChange: (value: string) => void;
+  onMonthChange: (value: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+      <Select
+        label="ปี"
+        value={year}
+        onChange={(e) => onYearChange(e.target.value)}
+      >
+        {years.map((y) => (
+          <option key={y} value={y}>
+            {Number(y) + 543}
+          </option>
+        ))}
+      </Select>
+      <Select
+        label="เดือน"
+        value={month}
+        onChange={(e) => onMonthChange(e.target.value)}
+      >
+        <option value="all">ทั้งปี</option>
+        {THAI_MONTHS.map((name, i) => (
+          <option key={name} value={String(i + 1).padStart(2, "0")}>
+            {name}
+          </option>
+        ))}
+      </Select>
     </div>
   );
 }

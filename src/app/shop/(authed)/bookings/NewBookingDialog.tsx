@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClassName } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Icon } from "@/components/ui/Icon";
@@ -213,9 +213,12 @@ export function NewBookingDialog({
     return (
       <Link
         href="/shop/services"
-        className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-full bg-secondary-container text-on-secondary-container text-label-md font-medium hover:opacity-90 transition-opacity"
+        className={buttonClassName({
+          size: triggerSize,
+          className: triggerClassName,
+        })}
       >
-        <Icon name="add" size={18} />
+        <Icon name="add" />
         เพิ่มบริการเพื่อรับจอง
       </Link>
     );

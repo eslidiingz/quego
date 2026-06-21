@@ -8,10 +8,12 @@ import {
   type BookingStatus,
 } from "@/lib/services/bookings";
 import { countWaitingForShopToday } from "@/lib/services/waitlist";
+import { getShopSetupStep } from "@/lib/services/shop-setup";
 import { countOpenSlotsToday } from "@/lib/booking/slot-math";
 import { cn } from "@/lib/cn";
 import { getBangkokNow } from "@/lib/time/bangkok";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ShopSetupNudge } from "@/components/shop/ShopSetupNudge";
 import { TodayBookingRow } from "./TodayBookingRow";
 import { NewBookingDialog } from "./bookings/NewBookingDialog";
 
@@ -71,12 +73,15 @@ export default async function ShopHomePage({
     Number.isFinite(Number(rawShow)) ? Number(rawShow) : PREVIEW_LIMIT,
   );
 
-  // Today's bookings, the new-booking dialog's context, and the waitlist count
-  // are independent reads, so they fan out concurrently.
-  const [bookings, context, waitingCount] = await Promise.all([
+  // Today's bookings, the new-booking dialog's context, the waitlist count, and
+  // the outstanding setup step (services → hours) are independent reads, so they
+  // fan out concurrently. `getShopSetupStep` is request-cached and also feeds the
+  // global modal in the layout, so this call doesn't re-hit the DB.
+  const [bookings, context, waitingCount, setupStep] = await Promise.all([
     listBookingsByShop(session.shopId, "today"),
     getBookingContext(session.shopId),
     countWaitingForShopToday(session.shopId),
+    getShopSetupStep(session.shopId),
   ]);
 
   const counts = {
@@ -134,6 +139,18 @@ export default async function ShopHomePage({
         title={session.shopName}
         description="ภาพรวมคิวและการจองของร้านวันนี้"
       />
+
+      {setupStep ? (
+        // Persistent inline reminder on the dashboard; the focus modal lives in
+        // the layout so it follows the owner across every page.
+        <ShopSetupNudge
+          icon={setupStep.icon}
+          title={setupStep.title}
+          description={setupStep.description}
+          ctaLabel={setupStep.ctaLabel}
+          ctaHref={setupStep.ctaHref}
+        />
+      ) : null}
 
       {waitingCount > 0 ? <WaitlistCard count={waitingCount} /> : null}
 

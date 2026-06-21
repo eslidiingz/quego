@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   parseRange,
+  parseReportRange,
+  serializeReportRange,
   computeShopInsights,
   DEFAULT_INSIGHTS_RANGE,
   type InsightsBooking,
@@ -148,7 +150,7 @@ describe("parseRange", () => {
     expect(parseRange("30")).toBe("30");
     expect(parseRange("90")).toBe("90");
     expect(parseRange("month")).toBe("month");
-    expect(parseRange("lastmonth")).toBe("lastmonth");
+    expect(parseRange("year")).toBe("year");
   });
 
   it("falls back to the default (30) for undefined", () => {
@@ -160,6 +162,10 @@ describe("parseRange", () => {
     expect(parseRange("abc")).toBe(DEFAULT_INSIGHTS_RANGE);
   });
 
+  it("falls back to the default for the retired 'lastmonth' key", () => {
+    expect(parseRange("lastmonth")).toBe(DEFAULT_INSIGHTS_RANGE);
+  });
+
   it("falls back to the default for an empty string", () => {
     expect(parseRange("")).toBe(DEFAULT_INSIGHTS_RANGE);
   });
@@ -167,6 +173,72 @@ describe("parseRange", () => {
   it("falls back to the default for numeric-but-invalid windows", () => {
     expect(parseRange("0")).toBe(DEFAULT_INSIGHTS_RANGE);
     expect(parseRange("15")).toBe(DEFAULT_INSIGHTS_RANGE);
+  });
+});
+
+// --- parseReportRange / serializeReportRange ---------------------------------
+
+describe("parseReportRange", () => {
+  it("parses preset tokens to a preset selection", () => {
+    expect(parseReportRange("7")).toEqual({ kind: "preset", preset: "7" });
+    expect(parseReportRange("month")).toEqual({ kind: "preset", preset: "month" });
+    expect(parseReportRange("year")).toEqual({ kind: "preset", preset: "year" });
+  });
+
+  it("parses a YYYY-MM token to a month selection", () => {
+    expect(parseReportRange("2026-06")).toEqual({
+      kind: "month",
+      year: 2026,
+      month: 6,
+    });
+    expect(parseReportRange("2025-01")).toEqual({
+      kind: "month",
+      year: 2025,
+      month: 1,
+    });
+  });
+
+  it("parses a YYYY token to a year selection", () => {
+    expect(parseReportRange("2026")).toEqual({ kind: "year", year: 2026 });
+  });
+
+  it("rejects an out-of-range month and falls back to the default preset", () => {
+    expect(parseReportRange("2026-00")).toEqual({
+      kind: "preset",
+      preset: DEFAULT_INSIGHTS_RANGE,
+    });
+    expect(parseReportRange("2026-13")).toEqual({
+      kind: "preset",
+      preset: DEFAULT_INSIGHTS_RANGE,
+    });
+  });
+
+  it("rejects an out-of-range year and falls back to the default preset", () => {
+    expect(parseReportRange("1999")).toEqual({
+      kind: "preset",
+      preset: DEFAULT_INSIGHTS_RANGE,
+    });
+    expect(parseReportRange("3001")).toEqual({
+      kind: "preset",
+      preset: DEFAULT_INSIGHTS_RANGE,
+    });
+  });
+
+  it("falls back to the default preset for garbage and undefined", () => {
+    expect(parseReportRange("abc")).toEqual({
+      kind: "preset",
+      preset: DEFAULT_INSIGHTS_RANGE,
+    });
+    expect(parseReportRange(undefined)).toEqual({
+      kind: "preset",
+      preset: DEFAULT_INSIGHTS_RANGE,
+    });
+  });
+
+  it("round-trips through serializeReportRange", () => {
+    for (const token of ["7", "30", "90", "month", "year", "2026-06", "2024"]) {
+      expect(serializeReportRange(parseReportRange(token))).toBe(token);
+    }
   });
 });
 

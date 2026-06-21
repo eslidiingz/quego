@@ -56,8 +56,13 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             aria-invalid={invalid || undefined}
             aria-required={required || undefined}
             className={cn(
-              "w-full h-12 rounded-lg bg-surface-container-low text-on-surface placeholder:text-outline text-body-md transition-all duration-200 ease-out",
-              "border-2 border-transparent focus:bg-surface-container-lowest focus:border-primary focus:outline-none",
+              // No resting border (per design): the field reads as an input via
+              // a *raised* fill instead. surface-container-high sits lighter than
+              // the card's bg-surface (esp. in dark mode), so the field lifts off
+              // the card; hover/focus lift it one more step. The border line only
+              // appears on focus (primary) / error.
+              "w-full h-12 rounded-lg bg-surface-container-high text-on-surface placeholder:text-outline text-body-md transition-all duration-200 ease-out",
+              "border-2 border-transparent hover:bg-surface-container-highest focus:bg-surface-container-highest focus:border-primary focus:outline-none",
               iconLeft ? "pl-12 pr-4" : "px-4",
               iconRight ? "pr-12" : undefined,
               invalid && "border-error focus:border-error",

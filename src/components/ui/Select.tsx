@@ -278,8 +278,10 @@ export function Select({
         onClick={() => (open ? closeMenu(false) : openMenu())}
         onKeyDown={onButtonKeyDown}
         className={cn(
-          "relative w-full h-12 pl-4 pr-12 rounded-lg bg-surface-container-low text-body-md text-left flex items-center transition-all duration-200 ease-out",
-          "border-2 border-transparent focus:bg-surface-container-lowest focus:border-primary focus:outline-none disabled:opacity-50 disabled:pointer-events-none",
+          // Raised fill (no resting border) — matches Input. The lighter fill
+          // lifts the control off the card so it reads as a field without a line.
+          "relative w-full h-12 pl-4 pr-12 rounded-lg bg-surface-container-high text-body-md text-left flex items-center transition-all duration-200 ease-out",
+          "border-2 border-transparent hover:bg-surface-container-highest focus:bg-surface-container-highest focus:border-primary focus:outline-none disabled:opacity-50 disabled:pointer-events-none",
           isPlaceholder ? "text-outline" : "text-on-surface",
           invalid && "border-error focus:border-error",
           className,

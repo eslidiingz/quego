@@ -161,8 +161,11 @@ export function LocationFieldCombobox({
             }}
             onKeyDown={handleKeyDown}
             className={cn(
-              "w-full h-12 rounded-lg bg-surface-container-low text-on-surface placeholder:text-outline text-body-md transition-all",
-              "border-2 border-transparent focus:bg-surface-container-lowest focus:border-primary focus:outline-none",
+              // Raised fill — matches Input/Select/Textarea so every field on a
+              // form reads the same. surface-container-high lifts off the card;
+              // hover/focus lift one more step to highest.
+              "w-full h-12 rounded-lg bg-surface-container-high text-on-surface placeholder:text-outline text-body-md transition-all duration-200 ease-out",
+              "border-2 border-transparent hover:bg-surface-container-highest focus:bg-surface-container-highest focus:border-primary focus:outline-none",
               "pl-12",
               display ? "pr-10" : "pr-4",
               invalid && "border-error focus:border-error",
@@ -176,7 +179,7 @@ export function LocationFieldCombobox({
                 reset();
               }}
               aria-label={`ล้าง${label}`}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200 ease-out"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-on-surface-variant hover:bg-on-surface/10 transition-colors duration-200 ease-out"
             >
               <Icon name="close" size={18} />
             </button>

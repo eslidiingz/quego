@@ -119,9 +119,11 @@ export function ChangePinForm({
             errorText={errors?.currentPin}
             disabled={pending}
             autoFocus={focusField === "currentPin"}
+            nextFieldId="change-new-pin"
           />
           <PinInput
             key={`newPin-${resetKeys.newPin}`}
+            id="change-new-pin"
             name="newPin"
             label="รหัส PIN ใหม่"
             required
@@ -130,9 +132,11 @@ export function ChangePinForm({
             errorText={errors?.newPin}
             disabled={pending}
             autoFocus={focusField === "newPin"}
+            nextFieldId="change-confirm-pin"
           />
           <PinInput
             key={`confirmPin-${resetKeys.confirmPin}`}
+            id="change-confirm-pin"
             name="confirmPin"
             label="ยืนยันรหัส PIN ใหม่"
             required

@@ -31,7 +31,12 @@ export function CustomerBottomNav() {
       aria-label="เมนูหลัก"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-outline-variant bg-surface/95 backdrop-blur pb-[env(safe-area-inset-bottom)] sm:hidden"
     >
-      <ul className="mx-auto grid max-w-5xl grid-cols-5">
+      <ul
+        className="mx-auto grid max-w-5xl"
+        style={{
+          gridTemplateColumns: `repeat(${ME_NAV_ITEMS.length}, minmax(0, 1fr))`,
+        }}
+      >
         {ME_NAV_ITEMS.map((item) => {
           const active =
             item.href === "/"

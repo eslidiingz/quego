@@ -144,7 +144,11 @@ export function BookingForm({
     const allow = new Set(serviceStaffIds);
     return context.staff.filter((s) => allow.has(s.id));
   }, [context.staff, serviceStaffIds]);
-  const showStaffStep = serviceStaffIds !== null && capableStaff.length > 0;
+  // Only worth a "pick your provider" step when there's an actual choice — more
+  // than one capable staff. A single-staff shop has nothing to choose, so we
+  // hide the step and let the slot logic treat that lone staff as the queue
+  // (the server still auto-assigns them since preferredStaffId stays empty).
+  const showStaffStep = serviceStaffIds !== null && capableStaff.length > 1;
 
   // Slot-availability inputs depend on the staff choice:
   //   • single-queue (no staff)   → context.capacity, no staff filter
@@ -329,7 +333,7 @@ export function BookingForm({
     setSelectedSlot(null);
     // Scroll to the staff step when this service has assignable staff,
     // otherwise straight to the date step.
-    const willShowStaff = svc.staffIds !== null && svc.staffIds.length > 0;
+    const willShowStaff = svc.staffIds !== null && svc.staffIds.length > 1;
     scrollToSection(willShowStaff ? staffSectionRef : dateSectionRef);
   };
 
@@ -902,34 +906,47 @@ function buildDays(
   capacity: number,
   staffFilter: ReadonlySet<string> | null,
 ): BookableDay[] {
-  return windowDays.map(({ dateYmd, dayOfWeek }) => {
-    const [, m, d] = dateYmd.split("-").map(Number);
-    const hours = context.hours[dayOfWeek];
-    const isOpen = Boolean(hours?.isOpen && hours.openTime && hours.closeTime);
+  return windowDays
+    .map(({ dateYmd, dayOfWeek }): BookableDay | null => {
+      const [, m, d] = dateYmd.split("-").map(Number);
+      const hours = context.hours[dayOfWeek];
+      const isOpen = Boolean(hours?.isOpen && hours.openTime && hours.closeTime);
 
-    let status: DayStatus;
-    if (!isOpen) {
-      status = "closed";
-    } else {
-      const avail = evaluateSlots({
-        openTime: hours!.openTime!,
-        closeTime: hours!.closeTime!,
-        durationMinutes,
-        date: dateYmd,
-        intervals: context.bookedIntervals,
-        capacity,
-        isToday: dateYmd === now.date,
-        nowHHMM: now.timeHHMM,
-        staffIdFilter: staffFilter,
-      });
-      const hasAvailable = avail.some(
-        (s) => s.isAvailable && !locallyTaken.has(takenKey(dateYmd, s.time)),
-      );
-      status = hasAvailable ? "available" : "full";
-    }
+      let status: DayStatus;
+      if (!isOpen) {
+        status = "closed";
+      } else {
+        const avail = evaluateSlots({
+          openTime: hours!.openTime!,
+          closeTime: hours!.closeTime!,
+          durationMinutes,
+          date: dateYmd,
+          intervals: context.bookedIntervals,
+          capacity,
+          isToday: dateYmd === now.date,
+          nowHHMM: now.timeHHMM,
+          staffIdFilter: staffFilter,
+        });
+        // Today is over once the shop has passed its closing time (or its last
+        // bookable slot): every round has elapsed and nothing can be booked.
+        // Drop the day from the picker entirely rather than showing it as
+        // "เต็ม" — a day that's done has no waitlist value, it's just noise.
+        if (
+          dateYmd === now.date &&
+          avail.length > 0 &&
+          avail.every((s) => s.isPast)
+        ) {
+          return null;
+        }
+        const hasAvailable = avail.some(
+          (s) => s.isAvailable && !locallyTaken.has(takenKey(dateYmd, s.time)),
+        );
+        status = hasAvailable ? "available" : "full";
+      }
 
-    return { dateYmd, dayOfWeek, dayOfMonth: d, month0: m - 1, status };
-  });
+      return { dateYmd, dayOfWeek, dayOfMonth: d, month0: m - 1, status };
+    })
+    .filter((day): day is BookableDay => day !== null);
 }
 
 /** Sortable key for a soonest-slot — "YYYY-MM-DD HH:MM" sorts chronologically. */
