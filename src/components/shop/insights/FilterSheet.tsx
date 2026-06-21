@@ -7,7 +7,6 @@ import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import type { FilterOption } from "@/lib/services/insights";
-import type { InsightsRange } from "@/lib/insights/aggregate";
 
 /**
  * Bottom-sheet filter for the shop report. Portals to <body> (the ShopShell
@@ -31,7 +30,8 @@ export function FilterSheet({
 }: {
   open: boolean;
   onClose: () => void;
-  range: InsightsRange;
+  /** The active `?range=` token (preset or calendar), preserved on apply. */
+  range: string;
   staffOptions: FilterOption[];
   serviceOptions: FilterOption[];
   activeStaffIds: string[];

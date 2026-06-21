@@ -153,7 +153,7 @@ export function LocationCombobox({
             "w-full text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none",
             bare
               ? "bg-transparent border-none py-2.5 sm:py-3 pl-8 pr-8"
-              : "h-12 rounded-lg bg-surface-container-low border-2 border-transparent focus:bg-surface-container-lowest focus:border-primary transition-all pl-12 pr-10",
+              : "h-12 rounded-lg bg-surface-container-high border-2 border-transparent hover:bg-surface-container-highest focus:bg-surface-container-highest focus:border-primary transition-all duration-200 ease-out pl-12 pr-10",
           )}
         />
         {query ? (
@@ -162,7 +162,7 @@ export function LocationCombobox({
             onClick={clear}
             aria-label="ล้างพื้นที่"
             className={cn(
-              "absolute top-1/2 -translate-y-1/2 p-1 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200 ease-out",
+              "absolute top-1/2 -translate-y-1/2 p-1 rounded-full text-on-surface-variant hover:bg-on-surface/10 transition-colors duration-200 ease-out",
               bare ? "right-0" : "right-3",
             )}
           >

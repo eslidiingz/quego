@@ -16,7 +16,7 @@ const RANGE_LABELS: Record<InsightsRange, string> = {
   "30": "30 วัน",
   "90": "90 วัน",
   month: "เดือนนี้",
-  lastmonth: "เดือนก่อน",
+  year: "ปีนี้",
 };
 
 export function RangeSelector({
@@ -24,7 +24,9 @@ export function RangeSelector({
   staff = [],
   service = [],
 }: {
-  current: InsightsRange;
+  /** The active `?range=` token. A calendar selection (YYYY-MM / YYYY) matches
+   *  no preset chip, so no pill is highlighted while the picker drives the view. */
+  current: string;
   staff?: string[];
   service?: string[];
 }) {

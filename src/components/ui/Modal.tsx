@@ -92,7 +92,7 @@ export function Modal({
         </div>
         <div className="p-6 overflow-y-auto flex-1">{children}</div>
         {footer ? (
-          <div className="flex gap-3 p-6 border-t border-outline-variant bg-surface-container-low/50 [&>*]:flex-1">
+          <div className="flex gap-3 p-6 border-t border-outline-variant bg-surface-container-low/50 rounded-b-2xl [&>*]:flex-1">
             {footer}
           </div>
         ) : null}

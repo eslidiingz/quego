@@ -384,19 +384,26 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
   // instead of N detail fetches.
   const now = getBangkokNow();
   const openByShop = new Map<string, ShopOpenState>();
+  const hasBusinessHours = new Set<string>();
   let servicesByShop = new Map<string, BookableService[]>();
   let ratingByShop = new Map<string, ShopRatingSummary>();
   const shopIds = shopRows.map((s) => s.id);
   if (shopIds.length > 0) {
-    // Today's hours + every shop's active services + rating aggregates in
-    // three parallel batched queries — the card needs all three, and N+1
-    // per shop would be wasteful.
-    const [hoursResult, services, ratings] = await Promise.all([
+    // Today's hours (for the open/closed badge) + every open day across the
+    // week (the visibility gate) + active services + rating aggregates in
+    // parallel batched queries — the card needs all of these, and N+1 per
+    // shop would be wasteful.
+    const [hoursResult, openDaysResult, services, ratings] = await Promise.all([
       supabase
         .from("shop_business_hours")
         .select("shop_id, is_open, open_time, close_time")
         .in("shop_id", shopIds)
         .eq("day_of_week", now.dayOfWeek),
+      supabase
+        .from("shop_business_hours")
+        .select("shop_id")
+        .in("shop_id", shopIds)
+        .eq("is_open", true),
       listActiveServicesForShops(shopIds),
       getRatingSummariesForShops(shopIds),
     ]);
@@ -411,15 +418,20 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
         ),
       );
     }
+    for (const row of openDaysResult.data ?? []) {
+      hasBusinessHours.add(row.shop_id);
+    }
   }
 
   const shopsByCategory = new Map<string, PublicShop[]>();
   for (const s of shopRows) {
-    // A shop with no active services has nothing bookable to show — hide its
-    // card from discovery rather than render a dead-end. Categories left with
-    // zero visible shops are then dropped by the empty-group filter below.
+    // A shop with no active services, or no business hours set, has nothing
+    // bookable to show — hide its card from discovery rather than render a
+    // dead-end. Categories left with zero visible shops are then dropped by
+    // the empty-group filter below.
     const services = servicesByShop.get(s.id) ?? [];
     if (services.length === 0) continue;
+    if (!hasBusinessHours.has(s.id)) continue;
 
     const list = shopsByCategory.get(s.category_id) ?? [];
     list.push({

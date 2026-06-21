@@ -146,9 +146,11 @@ export function CategoryPicker({
           aria-required="true"
           aria-invalid={invalid || undefined}
           className={cn(
-            "w-full h-12 pl-4 pr-12 rounded-lg bg-surface-container-low text-body-md text-left flex items-center transition-all duration-200 ease-out",
-            "border-2 border-transparent focus:bg-surface-container-lowest focus:border-primary focus:outline-none",
-            open && "bg-surface-container-lowest border-primary",
+            // Raised fill — matches Input/Select so every field on the form reads
+            // the same. high lifts off the card; hover/focus/open lift to highest.
+            "w-full h-12 pl-4 pr-12 rounded-lg bg-surface-container-high text-body-md text-left flex items-center transition-all duration-200 ease-out",
+            "border-2 border-transparent hover:bg-surface-container-highest focus:bg-surface-container-highest focus:border-primary focus:outline-none",
+            open && "bg-surface-container-highest border-primary",
             invalid && "border-error focus:border-error",
             disabled && "opacity-60 cursor-not-allowed",
           )}

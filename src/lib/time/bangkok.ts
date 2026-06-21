@@ -186,3 +186,63 @@ export function getBangkokLastMonth(
   const lastMs = Date.UTC(y, m - 1, 0);
   return datesBetween(firstMs, lastMs);
 }
+
+/**
+ * A specific calendar month (`year`, `month` 1–12) as Bangkok dates, oldest→
+ * newest. The window is CAPPED at today, so the current month returns
+ * month-to-date (parity with `getBangkokMonthToDate`) and a wholly-future month
+ * returns `[]`. Past months return the full 28–31 days.
+ *
+ * Used by the shop report (รายงานร้าน) month picker (กรองรายเดือน).
+ */
+export function getBangkokMonthWindow(
+  year: number,
+  month: number,
+  at: Date = new Date(),
+): { dateYmd: string; dayOfWeek: BangkokNow["dayOfWeek"] }[] {
+  const today = getBangkokToday(at);
+  const [ty, tm, td] = today.split("-").map(Number);
+  const todayMs = Date.UTC(ty, tm - 1, td);
+  const firstMs = Date.UTC(year, month - 1, 1);
+  // Day 0 of the next month = the last day of this month.
+  const lastMs = Date.UTC(year, month, 0);
+  const endMs = Math.min(lastMs, todayMs);
+  if (firstMs > endMs) return []; // entirely in the future
+  return datesBetween(firstMs, endMs);
+}
+
+/**
+ * A specific calendar year as Bangkok dates, oldest→newest. CAPPED at today, so
+ * the current year returns year-to-date and a wholly-future year returns `[]`.
+ * Past years return Jan 1 → Dec 31.
+ *
+ * Used by the shop report (รายงานร้าน) year picker (กรองรายปี).
+ */
+export function getBangkokYearWindow(
+  year: number,
+  at: Date = new Date(),
+): { dateYmd: string; dayOfWeek: BangkokNow["dayOfWeek"] }[] {
+  const today = getBangkokToday(at);
+  const [ty, tm, td] = today.split("-").map(Number);
+  const todayMs = Date.UTC(ty, tm - 1, td);
+  const firstMs = Date.UTC(year, 0, 1);
+  const lastMs = Date.UTC(year, 11, 31);
+  const endMs = Math.min(lastMs, todayMs);
+  if (firstMs > endMs) return []; // entirely in the future
+  return datesBetween(firstMs, endMs);
+}
+
+/**
+ * The current Bangkok calendar year from Jan 1 up to and including TODAY
+ * (year-to-date). Today is a partial day but INCLUDED so the "ปีนี้" report
+ * reconciles with the live "ยอดวันนี้" figure on the shop overview.
+ *
+ * Used by the shop report (รายงานร้าน) "ปีนี้" preset.
+ */
+export function getBangkokYearToDate(
+  at: Date = new Date(),
+): { dateYmd: string; dayOfWeek: BangkokNow["dayOfWeek"] }[] {
+  const today = getBangkokToday(at);
+  const [y] = today.split("-").map(Number);
+  return getBangkokYearWindow(y, at);
+}

@@ -24,8 +24,10 @@ export function SetupPinForm() {
         autoComplete="new-password"
         errorText={state?.fieldErrors?.pin}
         disabled={pending}
+        nextFieldId="customer-pin-confirm"
       />
       <PinInput
+        id="customer-pin-confirm"
         name="pinConfirm"
         label="ยืนยันรหัส PIN"
         required

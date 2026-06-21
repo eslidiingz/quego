@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { requireShopSession } from "@/lib/auth/shop-session-server";
 import { getShopReport } from "@/lib/services/insights";
-import { parseRange } from "@/lib/insights/aggregate";
+import { parseReportRange, serializeReportRange } from "@/lib/insights/aggregate";
 import { formatBaht } from "@/lib/baht";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Icon } from "@/components/ui/Icon";
 import { buttonClassName } from "@/components/ui/Button";
 import { RangeSelector } from "@/components/shop/insights/RangeSelector";
 import { ReportFilterBar } from "@/components/shop/insights/ReportFilterBar";
+import { ReportPeriodPicker } from "@/components/shop/insights/ReportPeriodPicker";
 import { MetricTile } from "@/components/shop/insights/MetricTile";
 import { RevenueHeroCard } from "@/components/shop/insights/RevenueHeroCard";
 import { DeltaChip } from "@/components/shop/insights/DeltaChip";
@@ -32,18 +33,34 @@ export default async function ShopReportPage({
 }) {
   const session = await requireShopSession();
   const { range: rawRange, staff: rawStaff, service: rawService } = await searchParams;
-  const range = parseRange(rawRange);
+  // The selection drives the window; the token is what we keep in URLs so a chip
+  // or a calendar pick (YYYY-MM / YYYY) round-trips through filter/range links.
+  const selection = parseReportRange(rawRange);
+  const rangeToken = serializeReportRange(selection);
   // Multi-select filters ride the URL as comma-separated id lists.
   const parseIds = (raw: string | undefined) =>
     (raw ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const filterStaffIds = parseIds(rawStaff);
   const filterServiceIds = parseIds(rawService);
 
-  const { insights, deltas, staffOptions, serviceOptions } = await getShopReport(
-    session.shopId,
-    range,
-    { filterStaffIds, filterServiceIds },
-  );
+  const { insights, deltas, staffOptions, serviceOptions, availableYears } =
+    await getShopReport(session.shopId, selection, {
+      filterStaffIds,
+      filterServiceIds,
+    });
+
+  // Reflect the active selection in the month/year picker. A preset chip shows a
+  // neutral default (current year, ทั้งปี); a calendar pick shows itself. Ensure
+  // the shown year is always an option even if it has no data.
+  const currentYear = availableYears[0] ?? Number(insights.windowEnd.slice(0, 4));
+  const pickerYear = selection.kind === "preset" ? currentYear : selection.year;
+  const pickerMonth =
+    selection.kind === "month"
+      ? String(selection.month).padStart(2, "0")
+      : "all";
+  const pickerYears = availableYears.includes(pickerYear)
+    ? availableYears
+    : [...availableYears, pickerYear].sort((a, b) => b - a);
 
   const pct = (v: number) => `${Math.round(v * 100)}%`;
   const hasPricedServices = insights.revenueByService.some((s) => s.revenue > 0);
@@ -62,24 +79,31 @@ export default async function ShopReportPage({
           bleed through on scroll. */}
       <div className="sticky top-16 z-20 -mx-4 space-y-3 border-b border-outline-variant bg-surface px-4 py-3 shadow-sm md:-mx-12 md:px-12">
         <div className="flex flex-wrap items-center gap-3">
-          <RangeSelector current={range} staff={filterStaffIds} service={filterServiceIds} />
+          <RangeSelector current={rangeToken} staff={filterStaffIds} service={filterServiceIds} />
           <ReportFilterBar
-            range={range}
+            range={rangeToken}
             staffOptions={staffOptions}
             serviceOptions={serviceOptions}
             activeStaffIds={filterStaffIds}
             activeServiceIds={filterServiceIds}
           />
         </div>
+        <ReportPeriodPicker
+          years={pickerYears}
+          year={pickerYear}
+          month={pickerMonth}
+          staff={filterStaffIds}
+          service={filterServiceIds}
+        />
         <p className="text-label-md text-on-surface-variant">
           ช่วง {formatThaiDate(insights.windowStart)} – {formatThaiDate(insights.windowEnd)}
         </p>
       </div>
 
       {insights.filteredToZero ? (
-        <FilteredToZeroState range={range} />
+        <FilteredToZeroState range={rangeToken} />
       ) : !insights.hasData && insights.expensesTotal <= 0 ? (
-        <EmptyState canExpand={range !== "90"} />
+        <EmptyState canExpand={rangeToken !== "90"} />
       ) : (
         <>
           <RevenueHeroCard

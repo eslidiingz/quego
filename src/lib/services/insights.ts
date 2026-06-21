@@ -3,7 +3,10 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
   getBangkokRecentDates,
   getBangkokMonthToDate,
-  getBangkokLastMonth,
+  getBangkokYearToDate,
+  getBangkokMonthWindow,
+  getBangkokYearWindow,
+  getBangkokToday,
 } from "@/lib/time/bangkok";
 import {
   DAYS_OF_WEEK,
@@ -16,7 +19,7 @@ import {
   type InsightsStaff,
   type InsightsService,
   type InsightsExpense,
-  type InsightsRange,
+  type ReportRange,
   type ShopInsights,
 } from "@/lib/insights/aggregate";
 
@@ -55,7 +58,11 @@ export type ShopReport = {
   deltas: InsightsDeltas;
   staffOptions: FilterOption[];
   serviceOptions: FilterOption[];
+  /** Calendar years (Gregorian) the month/year picker should offer, newest first. */
+  availableYears: number[];
 };
+
+export type { ReportRange } from "@/lib/insights/aggregate";
 
 type WindowDate = { dateYmd: string; dayOfWeek: DayOfWeek };
 
@@ -74,21 +81,31 @@ function priceFromDb(value: number | string | null): number | null {
 }
 
 /**
- * Resolve a range key to its current window dates (oldest→newest, INCLUDING
- * today) so the report reconciles with the overview's live "ยอดวันนี้" figure.
- * Calendar windows ("month"/"lastmonth") read the Bangkok clock here; the pure
- * aggregate stays clock-free. "lastmonth" is always a complete past month.
+ * Resolve a range selection to its current window dates (oldest→newest,
+ * INCLUDING today) so the report reconciles with the overview's live "ยอดวันนี้"
+ * figure. All clock reads happen here; the pure aggregate stays clock-free.
+ *
+ * - presets 7/30/90 → rolling windows ending today.
+ * - preset "month"/"year" → this month / this year, both to-date.
+ * - a specific month/year (from the picker) → that calendar period, capped at
+ *   today (so a past period is the full month/year, the current one is to-date).
  */
-function resolveWindow(range: InsightsRange): WindowDate[] {
-  switch (range) {
+function resolveWindow(range: ReportRange): WindowDate[] {
+  if (range.kind === "month") {
+    return getBangkokMonthWindow(range.year, range.month);
+  }
+  if (range.kind === "year") {
+    return getBangkokYearWindow(range.year);
+  }
+  switch (range.preset) {
     case "7":
       return getBangkokRecentDates(7);
     case "90":
       return getBangkokRecentDates(90);
     case "month":
       return getBangkokMonthToDate();
-    case "lastmonth":
-      return getBangkokLastMonth();
+    case "year":
+      return getBangkokYearToDate();
     case "30":
     default:
       return getBangkokRecentDates(30);
@@ -132,7 +149,7 @@ function delta(current: number, prior: number): number | null {
  */
 export async function getShopReport(
   shopId: string,
-  range: InsightsRange,
+  range: ReportRange,
   opts: { filterStaffIds?: string[]; filterServiceIds?: string[] } = {},
 ): Promise<ShopReport> {
   const { filterStaffIds = [], filterServiceIds = [] } = opts;
@@ -153,6 +170,8 @@ export async function getShopReport(
     { data: staffData, error: staffError },
     { data: servicesData, error: servicesError },
     { data: expensesData, error: expensesError },
+    { data: firstBookingData, error: firstBookingError },
+    { data: firstExpenseData, error: firstExpenseError },
   ] = await Promise.all([
     // ALL statuses — cancelled rows are needed for the cancellation rate.
     supabase
@@ -192,6 +211,21 @@ export async function getShopReport(
       .eq("shop_id", shopId)
       .gte("expense_date", queryStart)
       .lte("expense_date", queryEnd),
+    // Earliest booking / expense dates → the lower bound of the picker's year
+    // list, so an owner can scroll back to any year they have data in. Single
+    // indexed row each; cheap.
+    supabase
+      .from("bookings")
+      .select("booking_date")
+      .eq("shop_id", shopId)
+      .order("booking_date", { ascending: true })
+      .limit(1),
+    supabase
+      .from("shop_expenses")
+      .select("expense_date")
+      .eq("shop_id", shopId)
+      .order("expense_date", { ascending: true })
+      .limit(1),
   ]);
 
   // Surface query failures loudly. Without this, the `?? []` fallbacks below
@@ -211,6 +245,16 @@ export async function getShopReport(
   }
   if (expensesError) {
     throw new Error(`insights: expenses query failed: ${expensesError.message}`);
+  }
+  if (firstBookingError) {
+    throw new Error(
+      `insights: earliest-booking query failed: ${firstBookingError.message}`,
+    );
+  }
+  if (firstExpenseError) {
+    throw new Error(
+      `insights: earliest-expense query failed: ${firstExpenseError.message}`,
+    );
   }
 
   const allBookings: InsightsBooking[] = (bookingsData ?? []).flatMap((b) => {
@@ -316,10 +360,26 @@ export async function getShopReport(
     netProfit: delta(insights.netProfit, prior.netProfit),
   };
 
+  // Picker year list: from the earliest year the shop has ANY data in, up to
+  // the current Bangkok year (always at least the current year). Newest first.
+  const currentYear = Number(getBangkokToday().slice(0, 4));
+  const earliestYears = [
+    (firstBookingData?.[0]?.booking_date as string | undefined)?.slice(0, 4),
+    (firstExpenseData?.[0]?.expense_date as string | undefined)?.slice(0, 4),
+  ]
+    .map((y) => (y ? Number(y) : null))
+    .filter((y): y is number => y != null && Number.isFinite(y));
+  const minYear = earliestYears.length > 0 ? Math.min(...earliestYears) : currentYear;
+  const availableYears: number[] = [];
+  for (let y = currentYear; y >= Math.min(minYear, currentYear); y -= 1) {
+    availableYears.push(y);
+  }
+
   return {
     insights,
     deltas,
     staffOptions: staff.map((s) => ({ id: s.id, name: s.name })),
     serviceOptions: services.map((s) => ({ id: s.id, name: s.name })),
+    availableYears,
   };
 }

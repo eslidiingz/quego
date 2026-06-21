@@ -142,7 +142,7 @@ export function BookingRow({
       <div className="flex flex-col gap-3 border-t border-outline-variant/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3 sm:flex-1">
           <PhoneRow phone={booking.customerPhone} />
-          <span className="hidden text-label-sm text-on-surface-variant/70 sm:inline">
+          <span className="ml-auto shrink-0 text-label-sm text-on-surface-variant/70">
             #<span className="font-mono">{code}</span>
           </span>
         </div>

@@ -7,6 +7,9 @@ import {
   getBangkokRecentDates,
   getBangkokMonthToDate,
   getBangkokLastMonth,
+  getBangkokMonthWindow,
+  getBangkokYearWindow,
+  getBangkokYearToDate,
 } from "./bangkok";
 
 // Bangkok runs on ICT = UTC+7, no DST. Every assertion below feeds an explicit
@@ -301,5 +304,68 @@ describe("getBangkokLastMonth", () => {
     for (const entry of window) {
       expect(entry.dayOfWeek).toBe(dayOfWeekFor(entry.dateYmd));
     }
+  });
+});
+
+describe("getBangkokMonthWindow", () => {
+  it("returns the full span of a PAST month (capped only by month length)", () => {
+    // 'today' is June; February 2026 is wholly past → full 28 days.
+    const window = getBangkokMonthWindow(2026, 2, new Date("2026-06-15T05:00:00Z"));
+    expect(window).toHaveLength(28);
+    expect(window[0].dateYmd).toBe("2026-02-01");
+    expect(window[window.length - 1].dateYmd).toBe("2026-02-28");
+  });
+
+  it("caps the CURRENT month at today (month-to-date)", () => {
+    const window = getBangkokMonthWindow(2026, 6, new Date("2026-06-15T05:00:00Z"));
+    expect(window).toHaveLength(15);
+    expect(window[0].dateYmd).toBe("2026-06-01");
+    expect(window[window.length - 1].dateYmd).toBe("2026-06-15");
+  });
+
+  it("returns an empty window for a wholly-future month", () => {
+    const window = getBangkokMonthWindow(2026, 9, new Date("2026-06-15T05:00:00Z"));
+    expect(window).toHaveLength(0);
+  });
+
+  it("returns 29 days for February in a leap year", () => {
+    const window = getBangkokMonthWindow(2024, 2, new Date("2026-06-15T05:00:00Z"));
+    expect(window).toHaveLength(29);
+    expect(window[window.length - 1].dateYmd).toBe("2024-02-29");
+  });
+});
+
+describe("getBangkokYearWindow", () => {
+  it("returns Jan 1 → Dec 31 for a PAST year", () => {
+    const window = getBangkokYearWindow(2025, new Date("2026-06-15T05:00:00Z"));
+    expect(window).toHaveLength(365);
+    expect(window[0].dateYmd).toBe("2025-01-01");
+    expect(window[window.length - 1].dateYmd).toBe("2025-12-31");
+  });
+
+  it("caps the CURRENT year at today (year-to-date)", () => {
+    const window = getBangkokYearWindow(2026, new Date("2026-06-15T05:00:00Z"));
+    expect(window[0].dateYmd).toBe("2026-01-01");
+    expect(window[window.length - 1].dateYmd).toBe("2026-06-15");
+  });
+
+  it("returns an empty window for a wholly-future year", () => {
+    const window = getBangkokYearWindow(2027, new Date("2026-06-15T05:00:00Z"));
+    expect(window).toHaveLength(0);
+  });
+});
+
+describe("getBangkokYearToDate", () => {
+  it("spans Jan 1 of the current Bangkok year through today", () => {
+    const window = getBangkokYearToDate(new Date("2026-06-15T05:00:00Z"));
+    expect(window[0].dateYmd).toBe("2026-01-01");
+    expect(window[window.length - 1].dateYmd).toBe("2026-06-15");
+  });
+
+  it("uses the ICT-projected year at the day rollover", () => {
+    // 2025-12-31T18:00Z = 2026-01-01T01:00 ICT → year-to-date is just Jan 1.
+    const window = getBangkokYearToDate(new Date("2025-12-31T18:00:00Z"));
+    expect(window).toHaveLength(1);
+    expect(window[0].dateYmd).toBe("2026-01-01");
   });
 });
