@@ -4,12 +4,11 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
 
-export type ProfileTab = "info" | "hours" | "notifications" | "security";
+export type ProfileTab = "info" | "hours" | "security";
 
 const TABS: { key: ProfileTab; label: string; icon: string }[] = [
   { key: "info", label: "ข้อมูลร้าน", icon: "storefront" },
   { key: "hours", label: "เวลาทำการ", icon: "schedule" },
-  { key: "notifications", label: "การแจ้งเตือน", icon: "notifications" },
   { key: "security", label: "ความปลอดภัย", icon: "shield" },
 ];
 

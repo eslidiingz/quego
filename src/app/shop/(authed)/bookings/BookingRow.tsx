@@ -91,47 +91,79 @@ export function BookingRow({
             </Chip>
           </div>
 
-          {booking.serviceName ? (
-            <p className="flex items-center gap-1.5 text-label-md text-on-surface-variant">
-              <Icon name="design_services" size={16} className="shrink-0" />
-              <span className="break-words">
-                {booking.serviceName} · {booking.serviceDurationMinutes} นาที
-                {booking.servicePrice != null
-                  ? ` · ${formatBaht(booking.servicePrice)}`
-                  : ""}
-              </span>
-            </p>
-          ) : null}
+          {/* Service line — service/duration/price on the left, reference code
+              pinned to the right rail on ≥sm so it lines up under the status
+              chip without adding a tall third row. Price stays inline with the
+              service (it's an attribute of the service, not a standalone
+              figure). On mobile the code lives in the bottom row instead, so the
+              right-rail code is `hidden sm:block`. When there's no service the
+              row only renders on ≥sm (to carry the code) — never as an empty
+              gap on mobile. */}
+          <div
+            className={cn(
+              "flex items-start justify-between gap-2",
+              !booking.serviceName && "hidden sm:flex",
+            )}
+          >
+            {booking.serviceName ? (
+              <p className="flex min-w-0 items-center gap-1.5 text-label-md text-on-surface-variant">
+                <Icon name="design_services" size={16} className="shrink-0" />
+                <span className="break-words">
+                  {booking.serviceName} · {booking.serviceDurationMinutes} นาที
+                  {booking.servicePrice != null
+                    ? ` · ${formatBaht(booking.servicePrice)}`
+                    : ""}
+                </span>
+              </p>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+            <span
+              aria-hidden="true"
+              className="hidden shrink-0 text-label-sm text-on-surface-variant/60 sm:block"
+            >
+              #<span className="font-mono">{code}</span>
+            </span>
+          </div>
 
-          {booking.staffName ? (
-            <p className="flex items-center gap-1.5 text-label-md text-on-surface-variant">
-              <Icon name="person" size={16} className="shrink-0" />
-              <span className="break-words">
-                {booking.staffName}
-                {booking.staffRole ? ` · ${booking.staffRole}` : ""}
-              </span>
-            </p>
-          ) : null}
-
-          {showNext || overdueMin > 0 || isComing ? (
-            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-              {showNext ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-label-sm font-semibold text-on-primary">
-                  <Icon name="arrow_forward" size={13} className="shrink-0" />
-                  ถัดไป
-                </span>
-              ) : null}
-              {overdueMin > 0 ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-error/10 px-2 py-0.5 text-label-sm font-semibold text-error">
-                  <Icon name="schedule" size={13} className="shrink-0" />
-                  เลยเวลา {overdueMin} นาที
-                </span>
-              ) : null}
-              {isComing ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-label-sm font-semibold text-success">
-                  <Icon name="check_circle" size={13} className="shrink-0" />
-                  กำลังมา
-                </span>
+          {/* Staff line shares its row with the live-signal pills: staff text on
+              the left (truncates), pills pinned to the right rail (wrap when more
+              than one fires). The row still renders when there's no staff but a
+              signal is active, so the pills never lose their home. */}
+          {booking.staffName || showNext || overdueMin > 0 || isComing ? (
+            <div className="flex items-start justify-between gap-2">
+              {booking.staffName ? (
+                <p className="flex min-w-0 items-center gap-1.5 text-label-md text-on-surface-variant">
+                  <Icon name="person" size={16} className="shrink-0" />
+                  <span className="truncate">
+                    {booking.staffName}
+                    {booking.staffRole ? ` · ${booking.staffRole}` : ""}
+                  </span>
+                </p>
+              ) : (
+                <span aria-hidden="true" />
+              )}
+              {showNext || overdueMin > 0 || isComing ? (
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                  {showNext ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-label-sm font-semibold text-on-primary">
+                      <Icon name="arrow_forward" size={13} className="shrink-0" />
+                      ถัดไป
+                    </span>
+                  ) : null}
+                  {overdueMin > 0 ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-error/10 px-2 py-0.5 text-label-sm font-semibold text-error">
+                      <Icon name="schedule" size={13} className="shrink-0" />
+                      เลยเวลา {overdueMin} นาที
+                    </span>
+                  ) : null}
+                  {isComing ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-label-sm font-semibold text-success">
+                      <Icon name="check_circle" size={13} className="shrink-0" />
+                      กำลังมา
+                    </span>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           ) : null}
@@ -140,9 +172,14 @@ export function BookingRow({
 
       {/* ── Bottom zone: phone + (confirmed) actions ───────────────────── */}
       <div className="flex flex-col gap-3 border-t border-outline-variant/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+        <div className="flex min-w-0 items-center gap-2.5 sm:flex-1">
           <PhoneRow phone={booking.customerPhone} />
-          <span className="ml-auto shrink-0 text-label-sm text-on-surface-variant/70">
+          {/* Mobile-only: code sits at the far right of this row. On ≥sm it
+              moves up beside the status chip, so it's hidden here. */}
+          <span
+            aria-hidden="true"
+            className="ml-auto shrink-0 text-label-sm text-on-surface-variant/70 sm:hidden"
+          >
             #<span className="font-mono">{code}</span>
           </span>
         </div>
@@ -179,12 +216,11 @@ function TimeBlock({ time }: { time: string }) {
   return (
     <div
       aria-hidden="true"
-      className="flex shrink-0 min-w-[3.5rem] flex-col items-center justify-center rounded-lg bg-primary/10 px-2.5 py-2 leading-none"
+      className="flex size-[77px] shrink-0 items-center justify-center rounded-lg bg-primary/10 px-2.5 leading-none"
     >
       <span className="font-display text-headline-md font-bold text-primary">
         {time}
       </span>
-      <span className="mt-1 text-label-sm text-primary/60">น.</span>
     </div>
   );
 }

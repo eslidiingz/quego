@@ -34,10 +34,22 @@ export function NewBookingDialog({
   context,
   triggerClassName,
   triggerSize = "md",
+  triggerLabel = "เพิ่มการจอง",
+  triggerIcon = "person_add",
+  initialName = "",
+  initialPhone = "",
 }: {
   context: BookingContext;
   triggerClassName?: string;
   triggerSize?: "sm" | "md" | "lg" | "xl";
+  /** Trigger button copy — e.g. "จองให้ลูกค้า" when opened from a customer page. */
+  triggerLabel?: string;
+  /** Trigger button leading icon (Material Symbol name). */
+  triggerIcon?: string;
+  /** Prefill the customer name field (and what it resets to after a save). */
+  initialName?: string;
+  /** Prefill the phone field — digits only (and what it resets to after a save). */
+  initialPhone?: string;
 }) {
   const services = context.services;
   const showServiceStep =
@@ -53,8 +65,8 @@ export function NewBookingDialog({
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [name, setName] = useState(initialName);
+  const [phone, setPhone] = useState(initialPhone);
 
   const [state, formAction, pending] = useActionState<
     CreateManualBookingState,
@@ -74,10 +86,10 @@ export function NewBookingDialog({
     setSelectedStaffId(null);
     setSelectedDate(null);
     setSelectedSlot(null);
-    setName("");
-    setPhone("");
+    setName(initialName);
+    setPhone(initialPhone);
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [state, autoKey]);
+  }, [state, autoKey, initialName, initialPhone]);
 
   const selectedService = useMemo(
     () => services.find((s) => serviceKey(s) === selectedServiceKey) ?? null,
@@ -231,10 +243,10 @@ export function NewBookingDialog({
         size={triggerSize}
         rounded="full"
         onClick={() => setOpen(true)}
-        iconLeft={<Icon name="person_add" />}
+        iconLeft={<Icon name={triggerIcon} />}
         className={triggerClassName}
       >
-        เพิ่มการจอง
+        {triggerLabel}
       </Button>
 
       <Modal
@@ -639,7 +651,7 @@ function SlotButton({
 
 function EmptyHint({ icon, message }: { icon: string; message: string }) {
   return (
-    <div className="flex flex-col items-center gap-2 py-6 text-on-surface-variant">
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-low/40 py-8 text-on-surface-variant">
       <Icon name={icon} size={28} className="opacity-60" />
       <p className="text-label-md">{message}</p>
     </div>

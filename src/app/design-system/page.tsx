@@ -100,7 +100,7 @@ const PRINCIPLES: { icon: string; title: string; body: string }[] = [
   {
     icon: "smartphone",
     title: "Mobile-first",
-    body: "ออกแบบที่ 375×812 ก่อนเสมอ แล้วค่อย enhance ขึ้นด้วย min-width — จุดสลับหลักคือ sm: (640px)",
+    body: "ออกแบบที่ 414×896 (iPhone XR/11) เป็น reference ก่อนเสมอ แล้วค่อย enhance ขึ้นด้วย min-width — จุดสลับหลักคือ sm: (640px)",
   },
   {
     icon: "touch_app",

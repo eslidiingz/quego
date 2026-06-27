@@ -56,7 +56,9 @@ export function AdminShell({
         )}
       >
         <div className="px-6 py-8 flex items-center">
-          <QuegoWordmark />
+          <Link href="/">
+            <QuegoWordmark />
+          </Link>
         </div>
         <div className="px-4 mx-2 mb-6 py-3 bg-surface-container-high rounded-xl flex items-center gap-3">
           <Avatar initials={initials(adminName)} ring="primary" size="lg" />

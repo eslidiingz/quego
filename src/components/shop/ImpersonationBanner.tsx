@@ -33,7 +33,7 @@ export function ImpersonationBanner({ shopName }: { shopName: string }) {
         <div className="flex items-center gap-2 min-w-0">
           <Icon name="admin_panel_settings" size={20} />
           <p className="text-label-md font-bold truncate">
-            กำลังสวมรอยเป็นร้าน &ldquo;{shopName}&rdquo;
+            กำลังเข้าในนามร้าน &ldquo;{shopName}&rdquo;
           </p>
         </div>
         <button
@@ -47,7 +47,7 @@ export function ImpersonationBanner({ shopName }: { shopName: string }) {
           ) : (
             <Icon name="logout" size={16} />
           )}
-          {pending ? "กำลังออก..." : "ออกจากการสวมรอย"}
+          {pending ? "กำลังออก..." : "ออกจากร้าน"}
         </button>
       </div>
     </div>

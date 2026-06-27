@@ -153,27 +153,6 @@ export function ShareTools({
         <CopyField value={bookingUrl} id="share-booking-url" />
       </section>
 
-      {/* How to wire the link into a LINE OA rich menu (manual, no API) */}
-      <section className={CARD}>
-        <h2 className="text-label-lg font-bold text-on-surface mb-1 flex items-center gap-2">
-          <Icon name="forum" size={20} className="text-primary" />
-          วิธีเพิ่มลงเมนูใน LINE OA
-        </h2>
-        <p className="text-label-md text-on-surface-variant mb-4">
-          นำลิงก์ด้านบนไปวางในริชเมนูของ LINE Official Account
-          เพื่อให้ลูกค้าจองคิวได้จากแชต
-        </p>
-        <ol className="space-y-2.5">
-          {LINE_STEPS.map((step, i) => (
-            <li key={step} className="flex items-start gap-3">
-              <span className="shrink-0 flex items-center justify-center size-6 rounded-full bg-primary text-on-primary text-label-sm font-bold">
-                {i + 1}
-              </span>
-              <span className="text-body-md text-on-surface pt-0.5">{step}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
     </div>
   );
 }

@@ -77,7 +77,7 @@ export default async function ShopReportPage({
       {/* Sticky filter bar: sticks BELOW the 64px ShopShell header (which is
           itself sticky top-0 z-30), with a solid bg so report content can't
           bleed through on scroll. */}
-      <div className="sticky top-16 z-20 -mx-4 space-y-3 border-b border-outline-variant bg-surface px-4 py-3 shadow-sm md:-mx-12 md:px-12">
+      <div className="sticky top-16 z-20 space-y-3 rounded-2xl border border-outline-variant bg-surface p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
           <RangeSelector current={rangeToken} staff={filterStaffIds} service={filterServiceIds} />
           <ReportFilterBar
