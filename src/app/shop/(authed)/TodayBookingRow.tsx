@@ -90,11 +90,10 @@ export function TodayBookingRow({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         {/* ── Content zone ─────────────────────────────────────────── */}
         <div className="flex min-w-0 flex-1 items-start gap-3">
-          <div className="flex shrink-0 min-w-[3.5rem] flex-col items-center justify-center rounded-lg bg-primary/10 px-2.5 py-2 leading-none">
+          <div className="flex size-[77px] shrink-0 items-center justify-center rounded-lg bg-primary/10 px-2.5 leading-none">
             <span className="font-display text-headline-md font-bold text-primary">
               {booking.slotTime}
             </span>
-            <span className="mt-1 text-label-sm text-primary/60">น.</span>
           </div>
 
           <div className="min-w-0 flex-1">

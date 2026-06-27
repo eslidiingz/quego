@@ -178,7 +178,7 @@ Both fonts load via `next/font/google` and bind to CSS variables consumed by the
 
 ## Layout & Spacing
 
-The system employs a **12-column fluid grid** for desktop and a **single-column vertical stack** for mobile, designed **mobile-first** (base styles target ~375px wide, then enhance up via `min-width`).
+The system employs a **12-column fluid grid** for desktop and a **single-column vertical stack** for mobile, designed **mobile-first** (base styles enhance up via `min-width`). The canonical **mobile reference viewport is 414 × 896** (iPhone XR/11 class) — design and review mobile screens at this size, not the narrower 375px default some preview tools assume.
 
 A "Generous Whitespace" philosophy is applied by using a 24px gutter (`stack-md`/`gutter`) as the minimum standard for component separation. Sections should be separated by `stack-lg` (40px) to allow the design to "breathe." On desktop, content is centered within a 1280px container (`container-max`) to prevent excessive line lengths and maintain a focused, boutique feel. Screen margins go from 16px (`margin-mobile`) to 48px (`margin-desktop`).
 

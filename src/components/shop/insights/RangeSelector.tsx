@@ -41,7 +41,7 @@ export function RangeSelector({
     <div
       role="group"
       aria-label="เลือกช่วงเวลา"
-      className="-mx-0.5 flex w-full gap-1.5 overflow-x-auto px-0.5 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex w-full gap-1.5 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {INSIGHTS_RANGES.map((r) => {
         const active = r === current;

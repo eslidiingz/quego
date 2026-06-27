@@ -2,18 +2,21 @@ import { notFound } from "next/navigation";
 import { requireShopSession } from "@/lib/auth/shop-session-server";
 import {
   getCustomerHistoryForShop,
-  type ShopCustomerBooking,
+  getShopCustomerContact,
 } from "@/lib/services/customer-crm";
 import {
   getCustomerNote,
   isValidCustomerPhone,
 } from "@/lib/services/customer-notes";
+import { getBookingContext } from "@/lib/services/bookings";
+import { getLoyaltyBalance } from "@/lib/services/loyalty";
+import { getBangkokToday } from "@/lib/time/bangkok";
 import { formatBaht } from "@/lib/baht";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
-import type { BookingStatus, CancelledBy } from "@/lib/services/bookings";
+import { NewBookingDialog } from "../../bookings/NewBookingDialog";
 import { CustomerNoteForm } from "./CustomerNoteForm";
+import { CustomerBookingHistory } from "./CustomerBookingHistory";
 
 export const dynamic = "force-dynamic";
 
@@ -35,9 +38,12 @@ export default async function ShopCustomerPage({
   // A malformed phone can't have a booking — fail closed before touching the DB.
   if (!isValidCustomerPhone(phone)) notFound();
 
-  const [history, savedNote] = await Promise.all([
+  const [history, savedNote, context, loyalty, contact] = await Promise.all([
     getCustomerHistoryForShop(session.shopId, phone),
     getCustomerNote(session.shopId, phone),
+    getBookingContext(session.shopId),
+    getLoyaltyBalance(phone),
+    getShopCustomerContact(phone),
   ]);
 
   // Zero bookings ⇒ this phone is not a customer of THIS shop. 404 so a shop
@@ -45,17 +51,45 @@ export default async function ShopCustomerPage({
   if (history.bookings.length === 0) notFound();
 
   const title = history.displayName ?? formatPhone(phone);
+  const today = getBangkokToday();
+
+  // Split the timeline: confirmed = still-ahead queue; everything else is past.
+  const upcoming = history.bookings.filter((b) => b.status === "confirmed");
+  const past = history.bookings.filter((b) => b.status !== "confirmed");
 
   return (
     <div className="p-4 md:p-12 max-w-[960px] mx-auto w-full space-y-stack-md">
       <PageHeader
         eyebrow="ลูกค้า"
         title={title}
+        action={
+          context ? (
+            <NewBookingDialog
+              context={context}
+              triggerSize="sm"
+              triggerLabel="จองให้ลูกค้า"
+              triggerIcon="event_available"
+              initialName={history.displayName ?? ""}
+              initialPhone={phone}
+            />
+          ) : undefined
+        }
         description={
-          <span className="flex flex-col gap-1">
-            <span className="flex items-center gap-1.5">
-              <Icon name="phone" size={14} className="shrink-0" />
-              {formatPhone(phone)}
+          <span className="flex flex-col gap-1.5">
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <a
+                href={`tel:${phone}`}
+                className="inline-flex items-center gap-1.5 rounded font-medium text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
+                <Icon name="call" size={14} className="shrink-0" />
+                {formatPhone(phone)}
+              </a>
+              {contact.lineLinked ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-secondary-container/50 px-2 py-0.5 text-label-sm font-semibold text-on-secondary-container">
+                  <Icon name="forum" size={13} className="shrink-0" />
+                  เชื่อม LINE แล้ว
+                </span>
+              ) : null}
             </span>
             <span>ประวัติการใช้บริการที่ร้านของคุณ</span>
           </span>
@@ -63,12 +97,38 @@ export default async function ShopCustomerPage({
       />
 
       {/* ── Summary tiles ─────────────────────────────────────────── */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <StatTile
           icon="task_alt"
           label="ใช้บริการแล้ว"
           value={`${history.totalVisits}`}
           sub="ครั้งที่เสร็จสิ้น"
+        />
+        <StatTile
+          icon="payments"
+          label="ยอดใช้จ่ายสะสม"
+          value={formatBaht(history.lifetimeSpend)}
+          sub="จากบริการที่เสร็จสิ้น"
+        />
+        <StatTile
+          icon="stars"
+          label="แต้มสะสม"
+          value={`${loyalty.balance}`}
+          sub="แต้ม Quego ทั้งหมด"
+        />
+        <StatTile
+          icon="update"
+          label="เห็นล่าสุด"
+          value={
+            history.lastCompletedVisit
+              ? formatRelativeRecency(history.lastCompletedVisit, today)
+              : "—"
+          }
+          sub={
+            history.firstVisit
+              ? `ลูกค้าตั้งแต่ ${formatShortDate(history.firstVisit)}`
+              : "ยังไม่เคยมารับบริการ"
+          }
         />
         <StatTile
           icon="event_upcoming"
@@ -81,16 +141,6 @@ export default async function ShopCustomerPage({
           label="ยกเลิก"
           value={`${history.cancelledCount}`}
           sub="ครั้งที่ยกเลิก"
-        />
-        <StatTile
-          icon="history"
-          label="ลูกค้าตั้งแต่"
-          value={history.firstVisit ? formatShortDate(history.firstVisit) : "—"}
-          sub={
-            history.lastVisit
-              ? `ล่าสุด ${formatShortDate(history.lastVisit)}`
-              : undefined
-          }
         />
       </section>
 
@@ -115,17 +165,8 @@ export default async function ShopCustomerPage({
         <CustomerNoteForm phone={phone} initialNote={savedNote.note} />
       </section>
 
-      {/* ── Visit-history timeline ────────────────────────────────── */}
-      <section className="space-y-4">
-        <h2 className="font-display text-headline-md text-on-surface">
-          ประวัติการจอง ({history.bookings.length})
-        </h2>
-        <ol className="space-y-3">
-          {history.bookings.map((b) => (
-            <HistoryRow key={b.id} booking={b} />
-          ))}
-        </ol>
-      </section>
+      {/* ── Visit-history timeline (upcoming split out, past capped) ── */}
+      <CustomerBookingHistory upcoming={upcoming} past={past} />
     </div>
   );
 }
@@ -157,76 +198,6 @@ function StatTile({
   );
 }
 
-// ----- History row --------------------------------------------------------
-
-const STATUS_CHIP: Record<
-  BookingStatus,
-  { label: string; variant: "confirmed" | "success" | "danger" }
-> = {
-  confirmed: { label: "รอรับบริการ", variant: "confirmed" },
-  completed: { label: "เสร็จสิ้น", variant: "success" },
-  cancelled: { label: "ยกเลิก", variant: "danger" },
-};
-
-function cancelChipLabel(by: CancelledBy | null): string {
-  if (by === "customer") return "ลูกค้ายกเลิก";
-  if (by === "shop") return "ร้านยกเลิก";
-  return "ยกเลิก";
-}
-
-function HistoryRow({ booking }: { booking: ShopCustomerBooking }) {
-  const chip = STATUS_CHIP[booking.status];
-  const chipLabel =
-    booking.status === "cancelled"
-      ? cancelChipLabel(booking.cancelledBy)
-      : chip.label;
-  const muted = booking.status === "cancelled";
-
-  return (
-    <li
-      className={`rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 ${muted ? "opacity-70" : ""}`}
-    >
-      <div className="flex items-start gap-3">
-        <div className="flex shrink-0 w-16 flex-col items-center justify-center rounded-xl bg-surface-container-low py-2 text-center">
-          <span className="font-display text-headline-sm leading-none text-on-surface">
-            {formatDay(booking.bookingDate)}
-          </span>
-          <span className="mt-1 text-label-sm text-on-surface-variant">
-            {formatMonthYear(booking.bookingDate)}
-          </span>
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <p className="flex items-center gap-1.5 text-body-md font-bold text-on-surface">
-              <Icon name="schedule" size={16} className="shrink-0 text-primary" />
-              {booking.slotTime} น.
-            </p>
-            <Chip variant={chip.variant} size="sm" className="shrink-0">
-              {chipLabel}
-            </Chip>
-          </div>
-
-          <p className="mt-1 text-label-md text-on-surface-variant break-words">
-            {booking.serviceName ?? "บริการ"} · {booking.serviceDurationMinutes}{" "}
-            นาที
-            {booking.servicePrice != null
-              ? ` · ${formatBaht(booking.servicePrice)}`
-              : ""}
-          </p>
-
-          {booking.staffName ? (
-            <p className="mt-1 flex items-center gap-1.5 text-label-sm text-on-surface-variant">
-              <Icon name="person" size={14} className="shrink-0" />
-              <span className="break-words">{booking.staffName}</span>
-            </p>
-          ) : null}
-        </div>
-      </div>
-    </li>
-  );
-}
-
 // ----- Formatting (UTC-parsed so the calendar date stays intact) ----------
 
 const THAI_MONTH_SHORT = [
@@ -244,18 +215,29 @@ const THAI_MONTH_SHORT = [
   "ธ.ค.",
 ];
 
-function formatDay(ymd: string): string {
-  return String(Number(ymd.split("-")[2]));
-}
-
-function formatMonthYear(ymd: string): string {
-  const [y, m] = ymd.split("-").map(Number);
-  return `${THAI_MONTH_SHORT[m - 1]} ${(y + 543) % 100}`;
-}
-
 function formatShortDate(ymd: string): string {
   const [y, m, d] = ymd.split("-").map(Number);
   return `${d} ${THAI_MONTH_SHORT[m - 1]} ${y + 543}`;
+}
+
+/**
+ * "How long since the customer last actually came" as a coarse Thai phrase,
+ * computed from two YYYY-MM-DD strings (both already Bangkok-local). More
+ * actionable on a CRM than an absolute first-visit date — a quick read of who's
+ * gone quiet. Parsed at UTC midnight so the day delta is timezone-stable.
+ */
+function formatRelativeRecency(ymd: string, todayYmd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const [ty, tm, td] = todayYmd.split("-").map(Number);
+  const diffDays = Math.round(
+    (Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, d)) / 86_400_000,
+  );
+  if (diffDays <= 0) return "วันนี้";
+  if (diffDays === 1) return "เมื่อวาน";
+  if (diffDays < 7) return `${diffDays} วันก่อน`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} สัปดาห์ก่อน`;
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)} เดือนก่อน`;
+  return `${Math.floor(diffDays / 365)} ปีก่อน`;
 }
 
 function formatDateTime(iso: string): string {

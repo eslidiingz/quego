@@ -92,7 +92,7 @@ export function FilterSheet({
 
   return createPortal(
     <div
-      className="quego-overlay-in fixed inset-0 z-50 flex items-end justify-center bg-on-surface/40 backdrop-blur-sm"
+      className="quego-overlay-in fixed inset-0 z-50 flex items-center justify-center bg-on-surface/40 p-6 backdrop-blur-sm"
       onClick={onClose}
       role="presentation"
     >
@@ -100,13 +100,10 @@ export function FilterSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby="filter-sheet-title"
-        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-t-2xl border border-outline-variant bg-surface-container-lowest shadow-luxury"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-luxury"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex flex-col items-center pt-3">
-          <span aria-hidden="true" className="h-1.5 w-10 rounded-full bg-outline-variant" />
-        </div>
-        <div className="flex items-center justify-between px-6 pb-4 pt-3">
+        <div className="flex items-center justify-between px-6 pb-4 pt-6">
           <h2 id="filter-sheet-title" className="font-display text-headline-md text-on-surface">
             ตัวกรอง
           </h2>
@@ -120,7 +117,7 @@ export function FilterSheet({
           </button>
         </div>
 
-        <div className="flex-1 space-y-6 overflow-y-auto px-6 pb-2">
+        <div className="flex-1 space-y-6 overflow-y-auto px-6 pb-6">
           {staffOptions.length > 0 ? (
             <FilterGroup label="พนักงาน">
               <ChipOption
