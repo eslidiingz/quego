@@ -42,8 +42,8 @@ const STEPS: Step[] = [
  */
 export function HowItWorks() {
   return (
-    <section id="how" className="bg-surface-container-low">
-      <div className="max-w-[1180px] mx-auto w-full px-4 md:px-12 py-14 md:py-18">
+    <section id="how" className="bg-surface-container-low px-4 md:px-12 py-14 md:py-18">
+      <div className="max-w-[1180px] mx-auto w-full">
         <div className="mb-8">
           <h2 className="font-headline font-semibold text-headline-lg sm:text-display-lg tracking-tight text-on-background">
             ใช้งานง่ายใน 3 ขั้นตอน
