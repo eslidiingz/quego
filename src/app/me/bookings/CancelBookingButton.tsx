@@ -10,7 +10,7 @@ export function CancelBookingButton({ bookingId }: { bookingId: string }) {
       trigger={
         <button
           type="button"
-          className="border-2 border-outline-variant rounded-full px-4 py-2 text-on-surface-variant hover:bg-surface-container-low transition-colors text-label-md font-semibold flex items-center justify-center gap-2"
+          className="inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-full text-label-md font-semibold text-on-surface-variant hover:bg-error-container/40 hover:text-on-error-container transition-colors"
         >
           <Icon name="cancel" size={18} />
           ยกเลิกการจอง

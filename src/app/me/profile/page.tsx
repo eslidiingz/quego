@@ -5,9 +5,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Tabs } from "@/components/ui/Tabs";
 import { requireCustomerSession } from "@/lib/auth/customer-session-server";
 import { getCustomerProfile } from "@/lib/services/customers";
-import { getLineLinkStatus } from "@/lib/services/line-linking";
+// import { getLineLinkStatus } from "@/lib/services/line-linking"; // ซ่อนแท็บการแจ้งเตือนชั่วคราว
 import { ProfileNameForm } from "./ProfileNameForm";
-import { LinkLineCard } from "./LinkLineCard";
+// import { LinkLineCard } from "./LinkLineCard"; // ซ่อนแท็บการแจ้งเตือนชั่วคราว
 import { changeCustomerPinAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export default async function CustomerProfilePage({
     redirect("/login?notice=session-expired");
   }
   const { tab, notice } = await searchParams;
-  const lineLink = await getLineLinkStatus(session.customerId);
+  // const lineLink = await getLineLinkStatus(session.customerId); // ซ่อนแท็บการแจ้งเตือนชั่วคราว
 
   return (
     <div className="max-w-2xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
@@ -56,11 +56,12 @@ export default async function CustomerProfilePage({
               <ProfileNameForm name={profile.name} phone={profile.phone} />
             ),
           },
-          {
-            id: "notifications",
-            label: "การแจ้งเตือน",
-            content: <LinkLineCard linked={lineLink.linked} />,
-          },
+          // ซ่อนแท็บ "การแจ้งเตือน" ไว้ชั่วคราว (เก็บโค้ดไว้สำหรับเปิดใช้ภายหลัง)
+          // {
+          //   id: "notifications",
+          //   label: "การแจ้งเตือน",
+          //   content: <LinkLineCard linked={lineLink.linked} />,
+          // },
           {
             id: "security",
             label: "ความปลอดภัย",
