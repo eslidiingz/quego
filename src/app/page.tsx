@@ -104,9 +104,9 @@ export default async function HomePage({
          come to find a shop, not to read marketing). */}
       <section
         id="shops"
-        className="scroll-mt-20 max-w-[1180px] mx-auto w-full px-4 md:px-12 pt-8 md:pt-10"
+        className="scroll-mt-20 px-4 md:px-12 pt-8 md:pt-10"
       >
-        <div className="mb-6">
+        <div className="max-w-[1180px] mx-auto w-full mb-6">
           <p className="text-label-sm font-medium uppercase tracking-wide text-primary">
             ค้นหาร้าน
           </p>
@@ -121,8 +121,10 @@ export default async function HomePage({
 
       <div className="flex-1">
         {groups.length === 0 ? (
-          <div className="max-w-[1180px] mx-auto w-full px-4 md:px-12 py-12">
-            <EmptyState />
+          <div className="px-4 md:px-12 py-12">
+            <div className="max-w-[1180px] mx-auto w-full">
+              <EmptyState />
+            </div>
           </div>
         ) : (
           <ShopDiscovery

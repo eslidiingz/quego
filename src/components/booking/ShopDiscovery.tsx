@@ -124,7 +124,7 @@ export function ShopDiscovery({
   }, [filteredGroups, effectiveCategoryId]);
 
   return (
-    <div className="flex flex-col gap-stack-md">
+    <div className="flex flex-col gap-stack-md px-4 md:px-12">
       {hasSearch ? (
         <ActiveFilters
           query={initialQuery}
@@ -135,7 +135,7 @@ export function ShopDiscovery({
 
       {/* Category filter chips */}
       <div className="max-w-[1180px] mx-auto w-full">
-        <div className="flex gap-2 overflow-x-auto px-4 md:px-12 pb-1 no-scrollbar">
+        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
           <FilterChip
             label="ทั้งหมด"
             icon="apps"
@@ -157,7 +157,7 @@ export function ShopDiscovery({
       </div>
 
       {/* Results grid */}
-      <div className="max-w-[1180px] mx-auto w-full px-4 md:px-12 pb-stack-md">
+      <div className="max-w-[1180px] mx-auto w-full pb-stack-md">
         {items.length === 0 ? (
           <NoResults query={initialQuery} location={location} />
         ) : (
@@ -276,7 +276,7 @@ function ActiveFilters({
   const q = query.trim();
   const where = location ? locationLabel(location) : null;
   return (
-    <div className="max-w-[1180px] mx-auto w-full px-4 md:px-12 flex flex-wrap items-center gap-2">
+    <div className="max-w-[1180px] mx-auto w-full flex flex-wrap items-center gap-2">
       <span className="text-label-md font-semibold text-on-surface">
         พบ {resultCount} ร้าน
       </span>
