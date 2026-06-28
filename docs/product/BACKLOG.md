@@ -72,7 +72,10 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
 
 | ID | ฟีเจอร์ | Persona | Impact | Effort | หมวด |
 |----|---------|---------|--------|--------|------|
+| OPP-22 | แยกหน้าแรกลูกค้า / หน้าร้าน `/business` (landing split) | platform | high | M | acquisition |
+| OPP-23 | หน้า "ชวนเพื่อน" ใน `/me` (surface referral OPP-15) | customer | high | S | monetization |
 | OPP-21 | แถบสรุปสถานการณ์หน้า dashboard ร้าน (glance bar) | shop | high | M | ops-efficiency |
+| OPP-24 | Checklist เปิดร้านหลังสมัคร (สมัคร→เพิ่มบริการ→รับ QR) | shop | high | S | activation |
 | OPP-10 | Rich-menu / ลิงก์จองต่อร้าน + QR | shop | med | S | discovery |
 | OPP-18a | ค้นหา/กรอง/เรียงรายการร้าน (admin) | admin | med | M | ops-efficiency |
 | OPP-11a | ตัวเลือก "พนักงานคนไหนก็ได้ = เร็วกว่า" | customer | med | M | discovery |
@@ -399,6 +402,47 @@ Sorted for sequencing. **Impact** = high/med/low · **Effort** = S/M/L.
 - **คู่แข่งอ้างอิง:** QueQ/Fresha/GoWabi shop dashboard มาตรฐาน = คิวถัดไป+call-next,
   ตัวนับรอ/เสร็จ, ยอดวันนี้, fill/ที่ว่าง at a glance.
 - **PRD:** `docs/product/prd/opp21-dashboard-glance-bar.md`
+
+### [OPP-22] แยกหน้าแรกลูกค้า / หน้าร้านค้า `/business` (landing split)
+- **Persona:** platform · **Impact/Effort:** high · M · **หมวด:** acquisition
+- **ปัญหา:** `src/app/page.tsx` เป็น "hybrid" หน้าเดียวที่รับใช้ 3 persona พร้อมกัน —
+  `<ForShopOwners />` (CTA สมัครร้าน) ฝังลึก ~4.7 จอใต้ flow ลูกค้า (`page.tsx:141`),
+  `OpenShopCtaCard` แทรกใน grid ผลค้นหา (`ShopDiscovery.tsx:188`), **ไม่มี route
+  `/business`**, และ metadata/keywords เป็น demand ล้วน (`page.tsx:25-33`) → SEO +
+  recruit-link ฝั่งร้านเป็น 0. Supply เป็นคอขวด marketplace แต่ acquisition ฝั่งร้าน
+  ถูกฝังลึกสุด.
+- **ข้อเสนอ:** แยก `/business` (supply landing เต็มรูป: hero ร้าน + PERKS +
+  how-it-works ร้าน + dual CTA สมัคร/เข้าระบบร้าน + metadata แยก), ลด `/` ให้เป็น
+  customer-first (เอา `ForShopOwners` ออก → banner cross-link บาง), เพิ่ม nav entry
+  "เปิดร้าน", repoint `OpenShopCtaCard` → `/business`, แก้ hero stat ไม่ให้ดูร้างตอน
+  cold start. Reuse component/token เดิม 100%, ไม่มี migration, `/business` ไม่ถูก guard
+  ใน `proxy.ts`. **อย่าทำ** interstitial "ลูกค้า/ร้าน" เป็นหน้าแรก.
+- **คู่แข่งอ้างอิง:** Fresha `/for-business`, GoWabi `/business`, OpenTable
+  `/restaurant` — ทุก marketplace ที่ supply เป็นคอขวดแยกหน้าร้านเสมอ.
+- **PRD:** `docs/product/prd/opp22-landing-business-split.md`
+
+### [OPP-23] หน้า "ชวนเพื่อน" ใน `/me` — surface referral (OPP-15)
+- **Persona:** customer · **Impact/Effort:** high · S · **หมวด:** monetization
+- **ปัญหา:** referral backend ของ OPP-15 ship แล้ว (`src/lib/loyalty/`, `loyalty.ts`,
+  `customers.referral_code`, ตาราง `referrals`) แต่ **ไม่มีหน้า UI ใน `/me`** ให้ลูกค้า
+  เห็น/แชร์โค้ด (verified: `/me` มีแค่ bookings/profile/rewards/waitlist) → K-factor
+  ติดที่ 0 เพราะไม่มีประตูให้แชร์.
+- **ข้อเสนอ:** หน้า/section "ชวนเพื่อน" ใน `/me`: แสดง referral code + ลิงก์/ปุ่มแชร์
+  (LINE/copy) + สถานะเครดิตที่ได้/รอ hold 3 วัน. งานเล็ก (เปิด UI ทับ service ที่มีแล้ว)
+  ROI สูงสุดต่อ effort. ยืนยัน path `/me/rewards` ปัจจุบันก่อน (เอกสารเก่าอ้าง
+  `/me/credit` ที่ retire แล้ว).
+- **คู่แข่งอ้างอิง:** GoWabi ฿100-after-completed referral; phone-keyed loop เข้ากับ
+  identity เราพอดี.
+
+### [OPP-24] Checklist เปิดร้านหลังสมัคร (post-register activation)
+- **Persona:** shop · **Impact/Effort:** high · S · **หมวด:** activation
+- **ปัญหา:** `createShop` ลง `status=approved` ทันที แต่ร้านที่สมัครเสร็จมักยัง
+  **bookable ไม่ได้เพราะไม่มี active service** → สมัครแล้วเงียบ (vanity signup,
+  activation leak).
+- **ข้อเสนอ:** Checklist หลังสมัคร/บนหน้า `/shop`: "เพิ่มบริการแรก → ตั้งเวลาทำการ →
+  รับ QR/ลิงก์จอง" พร้อม state ว่า gate ไหนทำให้ยังรับจองไม่ได้. แปลง registration ให้
+  เป็น activation จริง. ใช้ข้อมูล setup ที่มีอยู่ (service/business-hours).
+- **คู่แข่งอ้างอิง:** onboarding checklist มาตรฐานของ SaaS tool-first (Fresha/Square).
 
 ---
 

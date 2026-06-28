@@ -53,15 +53,21 @@ export function LandingHero({
       : null,
   );
 
-  // Build the stat row, dropping the shop count entirely when there are no
-  // shops yet (showing "—" reads like a bug). The third item is a real product
-  // promise (LINE alerts) rather than a made-up "minutes saved" figure.
-  const stats: HeroStat[] = [
-    ...(shopCount > 0
-      ? [{ num: `${shopCount}`, label: "ร้านพร้อมให้จอง" }]
-      : []),
-    { num: `${categoryCount}`, label: "หมวดบริการความงาม" },
-  ];
+  // Stat row doubles as social proof. Lead with the real shop/category counts
+  // only once supply is genuinely proof-worthy; below that threshold a bare "2
+  // ร้าน" reads thin and cold-starts as "ร้าง", so we fall back to qualitative
+  // value stats that hold true from day one (live queue + book anytime).
+  const PROOFWORTHY_SHOP_COUNT = 5;
+  const stats: HeroStat[] =
+    shopCount >= PROOFWORTHY_SHOP_COUNT
+      ? [
+          { num: `${shopCount}`, label: "ร้านพร้อมให้จอง" },
+          { num: `${categoryCount}`, label: "หมวดบริการ" },
+        ]
+      : [
+          { num: "สด", label: "ดูคิวก่อนไป ไม่เสี่ยงรอเก้อ" },
+          { num: "24 ชม.", label: "จองล่วงหน้าได้ทุกเวลา" },
+        ];
 
   // Glide to the results instead of letting the hash hard-jump: suppress Next's
   // instant scroll-on-navigation (`scroll: false`) and smooth-scroll the
@@ -124,7 +130,7 @@ export function LandingHero({
             </span>
 
             <h1 className="quego-reveal font-display text-display-xl-mobile sm:text-display-xl leading-[1.1] mb-5">
-              ตัดผม ทำเล็บ นวด สปา
+              ตัดผม ร้านนวด คลินิก คาร์แคร์ ร้านอาหาร
               <br />
               จองคิวไว้{" "}
               <em className="not-italic text-tertiary-fixed-dim">
@@ -133,7 +139,7 @@ export function LandingHero({
             </h1>
 
             <p className="quego-reveal text-body-lg text-on-primary/85 max-w-[540px] mb-8">
-              ดูคิวของร้านแบบเรียลไทม์ กดจองล่วงหน้า แล้วรอรับแจ้งเตือนผ่าน LINE
+              ดูคิวของร้านแบบเรียลไทม์ กดจองล่วงหน้า แล้วรอรับแจ้งเตือน
               ตอนใกล้ถึงคิวของคุณ
             </p>
 
@@ -210,7 +216,7 @@ export function LandingHero({
                   size={16}
                   className="text-primary-fixed-dim"
                 />
-                แจ้งเตือนผ่าน LINE
+                แจ้งเตือนอัตโนมัติ
               </span>
             </p>
 
@@ -319,10 +325,10 @@ function LiveQueueMock() {
           </div>
         </div>
 
-        {/* LINE notify footer */}
+        {/* Notify footer */}
         <p className="mt-4 flex items-center gap-2 text-label-md text-on-surface-variant">
           <Icon name="notifications_active" size={16} className="text-primary" />
-          จะแจ้งเตือนผ่าน LINE เมื่อใกล้ถึงคิว
+          จะแจ้งเตือนเมื่อใกล้ถึงคิว
         </p>
       </div>
     </div>

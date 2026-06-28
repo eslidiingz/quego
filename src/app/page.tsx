@@ -4,7 +4,6 @@ import { ShopDiscovery } from "@/components/booking/ShopDiscovery";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingHero } from "@/components/landing/LandingHero";
 import { ValueProps } from "@/components/landing/ValueProps";
-import { ForShopOwners } from "@/components/landing/ForShopOwners";
 import { HomeFAQ } from "@/components/landing/HomeFAQ";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { LandingFooter } from "@/components/landing/LandingFooter";
@@ -21,14 +20,14 @@ export const metadata = {
   metadataBase: new URL(SITE_URL),
   title: "Quego — ไม่ต้องรอเก้อ แค่กดจอง",
   description:
-    "จองคิวร้านบริการความงามและสุขภาพทั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า ไม่ต้องไปนั่งรอ",
+    "จองคิวร้านและธุรกิจบริการทุกประเภททั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า ไม่ต้องไปนั่งรอ",
   keywords: [
     "จองคิว",
     "จองคิวร้านเสริมสวย",
     "จองคิวออนไลน์",
     "ดูคิวเรียลไทม์",
-    "ร้านความงาม",
-    "ร้านนวด สปา",
+    "จองคิวคลินิก",
+    "จองคิวร้านอาหาร",
     "quego",
   ],
   openGraph: {
@@ -37,14 +36,14 @@ export const metadata = {
     siteName: "Quego",
     title: "Quego — ไม่ต้องรอเก้อ แค่กดจอง",
     description:
-      "จองคิวร้านบริการความงามและสุขภาพทั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า ไม่ต้องไปนั่งรอ",
+      "จองคิวร้านและธุรกิจบริการทุกประเภททั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า ไม่ต้องไปนั่งรอ",
     url: SITE_URL,
   },
   twitter: {
     card: "summary_large_image",
     title: "Quego — ไม่ต้องรอเก้อ แค่กดจอง",
     description:
-      "จองคิวร้านบริการความงามและสุขภาพทั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า",
+      "จองคิวร้านและธุรกิจบริการทุกประเภททั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า",
   },
 };
 
@@ -100,10 +99,12 @@ export default async function HomePage({
         initialSubdistrict={initialSubdistrict}
       />
 
-      {/* Real, bookable shops — the hero search + category pills jump here */}
+      {/* Real, bookable shops — the hero search + category pills jump here.
+         Kept close to the hero so the first shop is near the fold (customers
+         come to find a shop, not to read marketing). */}
       <section
         id="shops"
-        className="scroll-mt-20 max-w-[1180px] mx-auto w-full px-4 md:px-12 pt-14 md:pt-18"
+        className="scroll-mt-20 max-w-[1180px] mx-auto w-full px-4 md:px-12 pt-8 md:pt-10"
       >
         <div className="mb-6">
           <p className="text-label-sm font-medium uppercase tracking-wide text-primary">
@@ -138,12 +139,52 @@ export default async function HomePage({
 
       <ValueProps />
       <HowItWorks />
-      <ForShopOwners />
       <HomeFAQ />
+      <OwnerCrossLink />
       <LandingFooter />
 
       {showCustomerNav ? <CustomerBottomNav /> : null}
     </main>
+  );
+}
+
+/**
+ * Thin supply-side cross-link — the customer home's only owner-facing nudge.
+ * One line instead of a full ForShopOwners section, so it never breaks the
+ * customer's discovery → book flow; the real pitch lives on /business.
+ */
+function OwnerCrossLink() {
+  return (
+    <section className="px-4 md:px-12 py-6">
+      <div className="max-w-[1180px] mx-auto w-full">
+        <Link
+          href="/business"
+          className="group flex items-center justify-between gap-4 rounded-xl border border-outline-variant bg-surface-container-low px-5 py-4 hover:border-primary transition-colors"
+        >
+          <span className="flex items-center gap-3 min-w-0">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Icon name="storefront" size={20} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-label-lg font-semibold text-on-surface">
+                เป็นเจ้าของร้าน?
+              </span>
+              <span className="block text-label-md text-on-surface-variant">
+                เปิดคิวออนไลน์ฟรี สมัครเสร็จใช้ได้ทันที
+              </span>
+            </span>
+          </span>
+          <span className="inline-flex items-center gap-1 shrink-0 text-label-md font-semibold text-primary">
+            เปิดร้าน
+            <Icon
+              name="arrow_forward"
+              size={18}
+              className="transition-transform group-hover:translate-x-0.5"
+            />
+          </span>
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -158,7 +199,7 @@ function EmptyState() {
         เป็นคนแรกที่สมัครและเปิดร้านบน Quego
       </p>
       <Link
-        href="/shops/register"
+        href="/business"
         className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-full bg-secondary text-on-secondary text-label-lg font-semibold hover:bg-secondary-fixed-variant transition-colors"
       >
         <Icon name="add_business" size={18} />
