@@ -15,7 +15,7 @@ const COLS: FootCol[] = [
   {
     title: "สำหรับร้าน",
     links: [
-      { label: "เปิดร้านกับ Quego", href: "/#for-owners" },
+      { label: "เปิดร้านกับ Quego", href: "/business" },
       { label: "เข้าสู่ระบบร้าน", href: "/shop/login" },
     ],
   },
@@ -33,7 +33,7 @@ export function LandingFooter() {
           <div className="max-w-[300px]">
             <QuegoWordmark className="!text-inverse-on-surface dark:!text-on-surface" />
             <p className="text-body-sm text-inverse-on-surface/60 dark:text-on-surface-variant mt-2.5">
-              ระบบจองคิวสำหรับร้านบริการความงามและสุขภาพทั่วประเทศไทย
+              ระบบจองคิวออนไลน์สำหรับร้านและธุรกิจบริการทั่วประเทศไทย
             </p>
           </div>
 

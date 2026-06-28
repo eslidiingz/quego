@@ -214,7 +214,7 @@ function OpenShopCtaCard() {
         </p>
       </div>
       <Link
-        href="/shops/register"
+        href="/business"
         className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full bg-secondary text-on-secondary text-label-lg font-semibold hover:bg-secondary-fixed-variant transition-colors self-start"
       >
         <Icon name="storefront" size={18} />

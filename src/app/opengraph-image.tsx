@@ -33,7 +33,7 @@ async function loadFont(
 export default async function OpengraphImage() {
   const wordmark = "quego";
   const headline = "ไม่ต้องรอเก้อ แค่กดจอง";
-  const sub = "จองคิวร้านความงาม–สุขภาพ · ดูคิวเรียลไทม์ · แจ้งเตือนผ่าน LINE";
+  const sub = "จองคิวร้านและธุรกิจบริการ · ดูคิวเรียลไทม์ · แจ้งเตือนผ่าน LINE";
 
   const [anuphan, sora] = await Promise.all([
     loadFont("Anuphan", 700, headline + sub),

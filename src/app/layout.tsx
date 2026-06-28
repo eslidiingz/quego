@@ -29,7 +29,7 @@ const anuphan = Anuphan({
 export const metadata: Metadata = {
   title: "Quego — ไม่ต้องรอเก้อ แค่กดจอง",
   description:
-    "จองคิวร้านบริการความงามและสุขภาพทั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า ไม่ต้องไปนั่งรอ",
+    "จองคิวร้านและธุรกิจบริการทุกประเภททั่วไทย ดูคิวเรียลไทม์ กดจองล่วงหน้า ไม่ต้องไปนั่งรอ",
 };
 
 export default function RootLayout({

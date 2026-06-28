@@ -1,12 +1,13 @@
 import Link from "next/link";
+import { Icon } from "@/components/ui/Icon";
 import { SiteAuthLink } from "@/components/layout/SiteAuthLink";
 import { QuegoWordmark } from "@/components/ui/QuegoWordmark";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 /** Section anchors — desktop-only, low-emphasis text links. */
 const ANCHOR_LINKS: { label: string; href: string }[] = [
-  { label: "ค้นหาร้าน", href: "#shops" },
-  { label: "วิธีใช้งาน", href: "#how" },
+  { label: "ค้นหาร้าน", href: "/#shops" },
+  { label: "วิธีใช้งาน", href: "/#how" },
 ];
 
 /**
@@ -14,7 +15,9 @@ const ANCHOR_LINKS: { label: string; href: string }[] = [
  * the shared auth entry point.
  *
  * SRP: chrome + navigation only. Auth state lives entirely in SiteAuthLink
- * (DIP — this component never reads a session).
+ * (DIP — this component never reads a session). The "เปิดร้าน" link is the one
+ * supply-side affordance: a low-emphasis route to the /business landing, shown
+ * on every breakpoint so a shop owner always has a way in.
  */
 export function LandingNav() {
   return (
@@ -32,6 +35,13 @@ export function LandingNav() {
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2">
+        <Link
+          href="/business"
+          className="inline-flex items-center gap-1 rounded-full px-2.5 sm:px-3 py-1.5 text-label-md font-semibold text-primary hover:bg-surface-container-low transition-colors"
+        >
+          <Icon name="storefront" size={16} className="hidden sm:inline-block" />
+          เปิดร้าน
+        </Link>
         <ThemeToggle />
         <SiteAuthLink />
       </div>
