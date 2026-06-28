@@ -174,6 +174,17 @@ export type CustomerBookingItem = {
   status: BookingStatus;
   /** Who cancelled — only meaningful when status === "cancelled"; else null. */
   cancelledBy: CancelledBy | null;
+  /** Shop phone for a one-tap call straight from the card; null if unset. */
+  shopContactPhone: string | null;
+  /** Service + staff ids — power the "จองอีกครั้ง" rebook deep-link. */
+  serviceId: string | null;
+  staffId: string | null;
+  /**
+   * Shop's reschedule/cancel cutoff window (hours). Lets the card gate the
+   * "เลื่อนนัด" action with the same `isPastChangeCutoff` math the detail page
+   * uses — no extra round-trip.
+   */
+  cutoffHours: number;
   /** The customer's own review of this booking, if any (completed only). */
   review: BookingReview | null;
 };
@@ -1786,7 +1797,14 @@ type CustomerBookingRow = {
   service_price: number | string | null;
   status: BookingStatus;
   cancelled_by: CancelledBy | null;
-  shops: { name: string; address: string | null } | null;
+  service_id: string | null;
+  staff_id: string | null;
+  shops: {
+    name: string;
+    address: string | null;
+    contact_phone: string | null;
+    reschedule_cancel_cutoff_hours: number;
+  } | null;
   shop_staff: { name: string; role: string | null } | null;
   // reviews embeds the booking's review. Because `reviews.booking_id` is UNIQUE,
   // PostgREST infers a ONE-TO-ONE relationship and returns a single object (or
@@ -1823,8 +1841,8 @@ export async function listBookingsByCustomerPhone(
     .from("bookings")
     .select(
       `id, shop_id, booking_date, slot_time, service_duration_minutes,
-       service_name, service_price, status, cancelled_by,
-       shops ( name, address ),
+       service_name, service_price, status, cancelled_by, service_id, staff_id,
+       shops ( name, address, contact_phone, reschedule_cancel_cutoff_hours ),
        shop_staff ( name, role ),
        reviews ( id, rating, comment )`,
     )
@@ -1855,6 +1873,10 @@ export async function listBookingsByCustomerPhone(
         staffRole: r.shop_staff?.role ?? null,
         status: r.status,
         cancelledBy: r.cancelled_by,
+        shopContactPhone: r.shops?.contact_phone ?? null,
+        serviceId: r.service_id,
+        staffId: r.staff_id,
+        cutoffHours: r.shops?.reschedule_cancel_cutoff_hours ?? 0,
         review: reviewRow
           ? {
               id: reviewRow.id,

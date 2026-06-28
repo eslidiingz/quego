@@ -1,15 +1,19 @@
 import Link from "next/link";
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
+import { buttonClassName } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { getBangkokNow, getBangkokToday } from "@/lib/time/bangkok";
+import { isPastChangeCutoff } from "@/lib/booking/cutoff";
 import { formatBaht } from "@/lib/baht";
 import type {
+  BookingQueueStatus,
   BookingStatus,
   CancelledBy,
   CustomerBookingItem,
 } from "@/lib/services/bookings";
 import { CancelBookingButton } from "./CancelBookingButton";
+import { BookingQueueBadge } from "./BookingQueueBadge";
 import { WriteReviewButton } from "@/components/reviews/WriteReviewButton";
 
 const STATUS_MAP: Record<
@@ -32,7 +36,21 @@ function cancelChipLabel(by: CancelledBy | null): string {
   return "ยกเลิก";
 }
 
-export function BookingCard({ booking }: { booking: CustomerBookingItem }) {
+export function BookingCard({
+  booking,
+  initialQueue = null,
+  featured = false,
+}: {
+  booking: CustomerBookingItem;
+  /**
+   * Server-computed live-queue seed for this booking; only passed for a
+   * confirmed, same-day booking (else null). Seeds {@link BookingQueueBadge}.
+   */
+  initialQueue?: BookingQueueStatus | null;
+  /** The customer's nearest upcoming booking — gets a primary-tinted highlight
+   * and a "คิวถัดไปของคุณ" eyebrow so the next visit leads the list. */
+  featured?: boolean;
+}) {
   const status = STATUS_MAP[booking.status];
   const muted = booking.status === "cancelled";
 
@@ -46,20 +64,96 @@ export function BookingCard({ booking }: { booking: CustomerBookingItem }) {
     booking.bookingDate < today ||
     (booking.bookingDate === today && booking.slotTime < nowHHMM);
   const canCancel = booking.status === "confirmed" && !isPast;
+  // Reschedule shares the shop's cutoff window with cancel; gate it with the
+  // same pure math the detail page uses (defaults to "until the slot starts"
+  // when the shop configures no cutoff).
+  const canReschedule =
+    booking.status === "confirmed" &&
+    !isPastChangeCutoff(booking.bookingDate, booking.slotTime, booking.cutoffHours, {
+      date: today,
+      timeHHMM: nowHHMM,
+    });
+  // The live queue badge only makes sense for a confirmed booking happening
+  // today that the server found to be active in its lane.
+  const showQueue =
+    booking.status === "confirmed" &&
+    booking.bookingDate === today &&
+    !!initialQueue?.active;
+  // Call/directions help before an upcoming visit; hide them once it's past or
+  // for completed/cancelled rows.
+  const isUpcoming = booking.status === "confirmed" && !isPast;
+  const mapsHref = booking.shopAddress
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        booking.shopAddress,
+      )}`
+    : null;
+
+  // "จองอีกครั้ง" closes the retention loop on a finished/cancelled visit by
+  // deep-linking back to the booking form with the same service + staff
+  // prefilled (the form validates and degrades gracefully on stale ids). Falls
+  // back to the shop page when the original service is unknown.
+  const showRebook =
+    booking.status === "completed" || booking.status === "cancelled";
+  const rebookHref = booking.serviceId
+    ? `/shops/${booking.shopId}/book?serviceId=${booking.serviceId}${
+        booking.staffId ? `&staffId=${booking.staffId}` : ""
+      }`
+    : `/shops/${booking.shopId}`;
+
+  // A relative "how soon" hint for an upcoming visit on a future day — today's
+  // urgency is already carried by the live queue badge, so we skip it then.
+  const daysUntil = daysFromToday(today, booking.bookingDate);
+  const relativeLabel =
+    isUpcoming && daysUntil >= 1
+      ? daysUntil === 1
+        ? "พรุ่งนี้"
+        : `อีก ${daysUntil} วัน`
+      : null;
 
   return (
     <article
       className={cn(
-        "bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 hover:shadow-tinted transition-shadow space-y-4",
-        muted && "opacity-70",
+        "relative bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6 hover:shadow-tinted transition-shadow",
+        // Cancelled rows read as inactive via a recessed surface + the danger
+        // chip — NOT a blanket opacity dim, which would drop body text below
+        // the 4.5:1 contrast floor.
+        muted && "bg-surface-container-low",
+        // The nearest upcoming visit leads the list with a primary-tinted frame.
+        featured && "border-primary/40 shadow-tinted",
       )}
     >
+      {featured ? (
+        <p className="flex items-center gap-1.5 text-label-sm font-semibold uppercase tracking-wide text-primary">
+          <Icon name="bolt" size={14} className="shrink-0" />
+          คิวถัดไปของคุณ
+        </p>
+      ) : null}
+
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1 space-y-2">
-          <TimeBadge time={booking.slotTime} />
+          <div className="flex flex-wrap items-center gap-2">
+            <TimeBadge time={booking.slotTime} />
+            {relativeLabel ? (
+              <span className="inline-flex items-center rounded-full bg-secondary-fixed/40 px-2.5 py-0.5 text-label-sm font-semibold text-on-secondary-fixed">
+                {relativeLabel}
+              </span>
+            ) : null}
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-display text-headline-md text-on-surface">
-              {booking.shopName}
+              {muted ? (
+                booking.shopName
+              ) : (
+                // Stretched link: the ::before pseudo fills the relative
+                // <article>, making the whole card tap to detail while the
+                // action buttons (relative z-10) stay independently clickable.
+                <Link
+                  href={`/bookings/${booking.id}`}
+                  className="transition-colors hover:text-primary focus:outline-none focus-visible:underline before:absolute before:inset-0 before:content-['']"
+                >
+                  {booking.shopName}
+                </Link>
+              )}
             </h3>
             {booking.review ? (
               // A reviewed booking is necessarily completed; surface the more
@@ -100,8 +194,33 @@ export function BookingCard({ booking }: { booking: CustomerBookingItem }) {
             </p>
           ) : null}
         </div>
-        <DateBadge dateYmd={booking.bookingDate} />
+        {/* Right column: date badge + (sm+) rebook/review actions below it */}
+        <div className="flex flex-col items-end gap-3 shrink-0">
+          <DateBadge dateYmd={booking.bookingDate} />
+          {showRebook ? (
+            <div className="relative z-10 hidden sm:flex sm:flex-row sm:items-center gap-2">
+              {booking.status === "completed" ? (
+                <WriteReviewButton
+                  bookingId={booking.id}
+                  shopName={booking.shopName}
+                  existing={booking.review}
+                />
+              ) : null}
+              <Link
+                href={rebookHref}
+                className={buttonClassName({ variant: "primary", size: "md" })}
+              >
+                <Icon name="event_repeat" size={18} />
+                จองอีกครั้ง
+              </Link>
+            </div>
+          ) : null}
+        </div>
       </div>
+
+      {showQueue && initialQueue ? (
+        <BookingQueueBadge status={initialQueue} />
+      ) : null}
 
       {booking.shopAddress ? (
         <p className="flex items-start gap-2 text-body-md text-on-surface-variant">
@@ -118,25 +237,87 @@ export function BookingCard({ booking }: { booking: CustomerBookingItem }) {
         {formatThaiDate(booking.bookingDate)} เวลา {booking.slotTime} น.
       </p>
 
-      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-        {canCancel ? <CancelBookingButton bookingId={booking.id} /> : null}
-        {booking.status === "completed" ? (
-          <WriteReviewButton
-            bookingId={booking.id}
-            shopName={booking.shopName}
-            existing={booking.review}
-          />
-        ) : null}
-        {booking.status !== "cancelled" ? (
-          <Link
-            href={`/bookings/${booking.id}`}
-            className="border-2 border-outline-variant rounded-full px-4 h-11 text-on-surface-variant hover:bg-surface-container-low transition-colors text-label-md font-semibold flex items-center justify-center gap-2"
-          >
-            ดูรายละเอียดการจอง
-            <Icon name="chevron_right" size={18} />
-          </Link>
-        ) : null}
-      </div>
+      {/* Bottom utility bar: contact links on the left, action buttons on the right.
+          On mobile the two groups stack (actions first, contact below); on sm+ they
+          share a single row. z-10 lifts both over the stretched card link so every
+          button/anchor stays independently clickable. */}
+      {(isUpcoming && (booking.shopContactPhone || mapsHref)) ||
+      canReschedule ||
+      canCancel ||
+      showRebook ||
+      booking.status === "completed" ? (
+        <div className={cn(
+          "relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
+          // When the only content is rebook/review (already shown in the right column on sm+),
+          // hide this bar entirely on sm+ to avoid the empty-space gap.
+          showRebook && !canCancel && !canReschedule && !isUpcoming && "sm:hidden",
+        )}>
+          {/* Contact — left side on sm+ */}
+          {isUpcoming && (booking.shopContactPhone || mapsHref) ? (
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+              {booking.shopContactPhone ? (
+                <a
+                  href={`tel:${booking.shopContactPhone}`}
+                  className="inline-flex items-center gap-1.5 min-h-[44px] text-label-md font-semibold text-primary hover:underline"
+                >
+                  <Icon name="call" size={18} />
+                  โทรหาร้าน
+                </a>
+              ) : null}
+              {mapsHref ? (
+                <a
+                  href={mapsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 min-h-[44px] text-label-md font-semibold text-primary hover:underline"
+                >
+                  <Icon name="directions" size={18} />
+                  เส้นทาง
+                </a>
+              ) : null}
+            </div>
+          ) : (
+            <div />
+          )}
+
+          {/* Actions — right side on sm+ */}
+          {canReschedule || canCancel || showRebook || booking.status === "completed" ? (
+            <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap sm:justify-end gap-3">
+              {canCancel ? <CancelBookingButton bookingId={booking.id} /> : null}
+              {canReschedule ? (
+                <Link
+                  href={`/bookings/${booking.id}/reschedule`}
+                  className={buttonClassName({ variant: "outline", size: "md" })}
+                >
+                  <Icon name="edit_calendar" size={18} />
+                  เลื่อนนัด
+                </Link>
+              ) : null}
+              {showRebook ? (
+                <Link
+                  href={rebookHref}
+                  className={cn(
+                    buttonClassName({ variant: "primary", size: "md" }),
+                    "sm:hidden",
+                  )}
+                >
+                  <Icon name="event_repeat" size={18} />
+                  จองอีกครั้ง
+                </Link>
+              ) : null}
+              {booking.status === "completed" ? (
+                <span className={showRebook ? "sm:hidden" : ""}>
+                  <WriteReviewButton
+                    bookingId={booking.id}
+                    shopName={booking.shopName}
+                    existing={booking.review}
+                  />
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -172,6 +353,18 @@ function TimeBadge({ time }: { time: string }) {
       <span className="font-display text-headline-sm leading-none">{time}</span>
       <span className="text-label-md">น.</span>
     </span>
+  );
+}
+
+/**
+ * Whole-day delta between two "YYYY-MM-DD" Bangkok dates via UTC-midnight
+ * arithmetic (host-timezone-independent). Positive = `date` is in the future.
+ */
+function daysFromToday(today: string, date: string): number {
+  const [ay, am, ad] = today.split("-").map(Number);
+  const [by, bm, bd] = date.split("-").map(Number);
+  return Math.round(
+    (Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000,
   );
 }
 

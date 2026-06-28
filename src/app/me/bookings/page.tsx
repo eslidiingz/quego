@@ -2,7 +2,11 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { requireCustomerSession } from "@/lib/auth/customer-session-server";
-import { listBookingsByCustomerPhone } from "@/lib/services/bookings";
+import {
+  getBookingQueueStatus,
+  listBookingsByCustomerPhone,
+  type BookingQueueStatus,
+} from "@/lib/services/bookings";
 import {
   BOOKING_PERIODS,
   BOOKING_PERIOD_LABELS,
@@ -10,7 +14,7 @@ import {
   parseBookingPeriod,
   type BookingPeriod,
 } from "@/lib/booking/period";
-import { getBangkokToday } from "@/lib/time/bangkok";
+import { getBangkokNow, getBangkokToday } from "@/lib/time/bangkok";
 import { BookingCard } from "./BookingCard";
 import { BookingPeriodFilter } from "./BookingPeriodFilter";
 
@@ -49,6 +53,33 @@ export default async function MyBookingsPage({
     isBookingInPeriod(b.bookingDate, period, today),
   );
 
+  // Live queue position only matters for a confirmed booking happening today.
+  // Fetch those few statuses in parallel so each card can seed its live badge
+  // without a client round-trip on first paint.
+  const queueByBooking = new Map<string, BookingQueueStatus>();
+  await Promise.all(
+    visible
+      .filter((b) => b.status === "confirmed" && b.bookingDate === today)
+      .map(async (b) => {
+        queueByBooking.set(b.id, await getBookingQueueStatus(b.id));
+      }),
+  );
+
+  // Customers think in "กำลังจะถึง" vs "ผ่านไปแล้ว", not date ranges — so within
+  // the chosen period, split the list on that axis. Upcoming = a confirmed slot
+  // not yet elapsed; everything else (completed, cancelled, or a passed slot) is
+  // history. The service already orders upcoming-first/nearest, so each slice
+  // stays sensibly ordered, and the nearest upcoming visit (index 0) is featured.
+  const nowHHMM = getBangkokNow().timeHHMM;
+  const isUpcoming = (b: (typeof visible)[number]) =>
+    b.status === "confirmed" &&
+    (b.bookingDate > today ||
+      (b.bookingDate === today && b.slotTime >= nowHHMM));
+  const upcoming = visible.filter(isUpcoming);
+  const past = visible.filter((b) => !isUpcoming(b));
+  // Only label the groups when both are present — a lone header is just noise.
+  const showSectionHeaders = upcoming.length > 0 && past.length > 0;
+
   return (
     <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-6 space-y-stack-md">
       <PageHeader
@@ -65,16 +96,72 @@ export default async function MyBookingsPage({
           {visible.length === 0 ? (
             <NoMatchState period={period} />
           ) : (
-            <ul className="space-y-4">
-              {visible.map((b) => (
-                <li key={b.id}>
-                  <BookingCard booking={b} />
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-stack-md">
+              {upcoming.length > 0 ? (
+                <section className="space-y-4">
+                  {showSectionHeaders ? (
+                    <SectionHeader
+                      icon="event_upcoming"
+                      label="กำลังจะถึง"
+                      count={upcoming.length}
+                    />
+                  ) : null}
+                  <ul className="space-y-4">
+                    {upcoming.map((b, i) => (
+                      <li key={b.id}>
+                        <BookingCard
+                          booking={b}
+                          initialQueue={queueByBooking.get(b.id) ?? null}
+                          featured={i === 0}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+              {past.length > 0 ? (
+                <section className="space-y-4">
+                  {showSectionHeaders ? (
+                    <SectionHeader
+                      icon="history"
+                      label="ผ่านไปแล้ว"
+                      count={past.length}
+                    />
+                  ) : null}
+                  <ul className="space-y-4">
+                    {past.map((b) => (
+                      <li key={b.id}>
+                        <BookingCard
+                          booking={b}
+                          initialQueue={queueByBooking.get(b.id) ?? null}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+            </div>
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function SectionHeader({
+  icon,
+  label,
+  count,
+}: {
+  icon: string;
+  label: string;
+  count: number;
+}) {
+  return (
+    <div className="flex items-center gap-2 px-1">
+      <Icon name={icon} size={18} className="text-on-surface-variant" />
+      <h2 className="text-label-lg font-semibold text-on-surface">{label}</h2>
+      <span className="text-label-md text-on-surface-variant">· {count}</span>
     </div>
   );
 }
@@ -83,7 +170,7 @@ function NoMatchState({ period }: { period: BookingPeriod }) {
   return (
     <div className="border-2 border-dashed border-outline-variant rounded-2xl px-6 py-10 flex flex-col items-center text-center gap-3 bg-surface-container-lowest">
       <span className="flex items-center justify-center w-14 h-14 rounded-full bg-surface-container-low text-on-surface-variant">
-        <Icon name="event_busy" size={28} />
+        <Icon name="filter_alt_off" size={28} />
       </span>
       <p className="text-body-md text-on-surface-variant max-w-sm">
         ไม่มีการจองในช่วง “{BOOKING_PERIOD_LABELS[period]}”

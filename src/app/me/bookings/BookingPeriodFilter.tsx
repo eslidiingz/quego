@@ -22,18 +22,19 @@ export function BookingPeriodFilter({
 }) {
   return (
     <nav
-      className="flex gap-1 p-1 bg-surface-container-low rounded-full border border-outline-variant overflow-x-auto no-scrollbar"
+      className="grid grid-cols-4 gap-1 p-1 bg-surface-container-low rounded-full border border-outline-variant"
       aria-label="กรองตามช่วงเวลา"
     >
       {BOOKING_PERIODS.map((p) => {
         const isActive = p === current;
+        const count = counts[p];
         return (
           <Link
             key={p}
             href={p === "today" ? "/me/bookings" : `/me/bookings?period=${p}`}
             scroll={false}
             className={cn(
-              "px-4 py-2 rounded-full text-label-md whitespace-nowrap transition-colors flex items-center gap-2",
+              "px-2 py-2 rounded-full text-label-sm sm:text-label-md whitespace-nowrap transition-colors flex items-center justify-center gap-1.5",
               isActive
                 ? "bg-primary text-on-primary font-bold shadow-sm"
                 : "text-on-surface-variant hover:bg-surface-container-high",
@@ -41,16 +42,20 @@ export function BookingPeriodFilter({
             aria-current={isActive ? "page" : undefined}
           >
             <span>{BOOKING_PERIOD_LABELS[p]}</span>
-            <span
-              className={cn(
-                "min-w-6 px-1.5 h-5 inline-flex items-center justify-center rounded-full text-label-sm font-bold",
-                isActive
-                  ? "bg-on-primary/20 text-on-primary"
-                  : "bg-surface-container-high text-on-surface-variant",
-              )}
-            >
-              {counts[p]}
-            </span>
+            {/* Hide the count badge when zero — an empty period adds noise and
+                steals width from the Thai labels in the 4-up grid. */}
+            {count > 0 ? (
+              <span
+                className={cn(
+                  "min-w-5 px-1 h-5 inline-flex items-center justify-center rounded-full text-label-sm font-bold",
+                  isActive
+                    ? "bg-on-primary/20 text-on-primary"
+                    : "bg-surface-container-high text-on-surface-variant",
+                )}
+              >
+                {count}
+              </span>
+            ) : null}
           </Link>
         );
       })}

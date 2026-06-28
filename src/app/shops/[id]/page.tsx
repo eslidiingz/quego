@@ -139,16 +139,22 @@ export default async function ShopDetailPage({
   // last content and footer clear the fixed bar instead of hiding behind it.
   const isBookable = shop.services.length > 0;
 
-  // Bottom inset reserved for whatever floats over the page bottom on mobile:
-  // the booking bar (~5rem) and/or the customer tab bar (~4rem, sm:hidden). When
-  // both are present on mobile the bar stacks above the tab bar, so reserve 9rem;
-  // on sm:+ the tab bar is gone, so only the booking bar's 5rem remains.
+  // Single source of truth for the booking link — shared by the floating bar
+  // (mobile/tablet) and the inline CTA inside the decision card (desktop), so the
+  // two booking entry points can never drift apart.
+  const bookHref = `/shops/${shop.handle ?? shop.id}/book`;
+
+  // Bottom inset reserved for whatever floats over the page bottom: the booking
+  // bar (~5rem) and/or the customer tab bar (~4rem). The tab bar is `lg:hidden`,
+  // so for a signed-in customer it stays visible through the whole tablet range
+  // and the bar stacks above it — reserve bar+nav (9rem) until lg. At lg:+ both
+  // the bar and the tab bar are gone (the CTA moves in-card), so no inset.
   const mainBottomInset = isBookable
     ? showCustomerNav
-      ? "pb-[calc(env(safe-area-inset-bottom)+9rem)] sm:pb-[calc(env(safe-area-inset-bottom)+5rem)]"
-      : "pb-[calc(env(safe-area-inset-bottom)+5rem)]"
+      ? "pb-[calc(env(safe-area-inset-bottom)+9rem)] lg:pb-0"
+      : "pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0"
     : showCustomerNav
-      ? "pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0"
+      ? "pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0"
       : undefined;
 
   return (
@@ -276,10 +282,18 @@ export default async function ShopDetailPage({
           </div>
         </section>
 
-        {/* Decision zone — live queue status. The primary "book now" CTA lives in
-            the floating bar (below) as the page's single booking entry point, so
-            this card only carries the not-yet-bookable notice when applicable. */}
-        <QueueStatusPanel status={queueStatus} shopId={shop.id} isOpen={isOpenNow}>
+        {/* Decision zone — live queue status + the primary "จองคิวร้านนี้" CTA.
+            On mobile/tablet the CTA lives in the floating bar (below); on desktop
+            (lg:+) it surfaces inline in this card — above the fold, in the same
+            glance as the queue status — and the floating bar is hidden. Either
+            way there is exactly one booking entry point per viewport. This card
+            also carries the not-yet-bookable notice when applicable. */}
+        <QueueStatusPanel
+          status={queueStatus}
+          shopId={shop.id}
+          isOpen={isOpenNow}
+          bookHref={isBookable ? bookHref : undefined}
+        >
           {!isBookable ? (
             <>
               <Button
@@ -378,28 +392,32 @@ export default async function ShopDetailPage({
         </section>
       </div>
 
-      {/* Floating booking bar — the page's single, always-reachable booking
-          entry point on every viewport. Coral (brand accent CTA) so it stands
-          out against the teal hero/surface. Hidden when not bookable. */}
+      {/* Floating booking bar — the always-reachable booking CTA on mobile and
+          tablet. Coral (brand accent CTA) so it stands out against the teal
+          hero/surface. Hidden when not bookable, and replaced on lg:+ by the
+          in-card CTA so desktop isn't left with a mobile-style bottom bar
+          floating over the footer. The pill spans the full content container
+          width (max-w-3xl) at every visible width. */}
       {isBookable ? (
         <div
           className={cn(
-            "fixed inset-x-0 z-40 border-t border-outline-variant bg-surface/95 backdrop-blur",
-            // On mobile, sit directly above the customer tab bar when shown;
-            // on sm:+ the tab bar is hidden so drop back to the viewport edge.
+            "fixed inset-x-0 z-40 lg:hidden border-t border-outline-variant bg-surface/95 backdrop-blur",
+            // The customer tab bar is `lg:hidden`, so it's present across mobile
+            // AND tablet — sit the bar above it whenever it's shown. At lg:+ this
+            // bar is hidden anyway (the CTA moves in-card).
             showCustomerNav
-              ? "bottom-[calc(4rem+env(safe-area-inset-bottom))] sm:bottom-0"
+              ? "bottom-[calc(4rem+env(safe-area-inset-bottom))]"
               : "bottom-0",
           )}
         >
           <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <Link
-              href={`/shops/${shop.handle ?? shop.id}/book`}
+              href={bookHref}
               className={buttonClassName({
                 size: "xl",
                 fullWidth: true,
                 className:
-                  "bg-secondary text-on-secondary hover:bg-secondary/90 shadow-coral-glow hover:shadow-coral-glow sm:mx-auto sm:max-w-md",
+                  "bg-secondary text-on-secondary hover:bg-secondary/90 shadow-coral-glow hover:shadow-coral-glow",
               })}
             >
               <Icon name="event_available" />
@@ -420,11 +438,13 @@ function QueueStatusPanel({
   status,
   shopId,
   isOpen,
+  bookHref,
   children,
 }: {
   status: ShopQueueStatus;
   shopId: string;
   isOpen: boolean;
+  bookHref?: string;
   children?: React.ReactNode;
 }) {
   return (
@@ -443,6 +463,24 @@ function QueueStatusPanel({
         )}
       </div>
       <LiveQueueStatus shopId={shopId} initial={status} />
+      {/* Desktop (lg:+) booking CTA — surfaces inline here, in the same glance as
+          the queue status, while the floating bar is hidden at this width. */}
+      {bookHref ? (
+        <div className="hidden lg:flex flex-col gap-2 px-5 md:px-6 pb-5 md:pb-6 pt-1">
+          <Link
+            href={bookHref}
+            className={buttonClassName({
+              size: "xl",
+              fullWidth: true,
+              className:
+                "bg-secondary text-on-secondary hover:bg-secondary/90 shadow-coral-glow hover:shadow-coral-glow",
+            })}
+          >
+            <Icon name="event_available" />
+            จองคิวร้านนี้
+          </Link>
+        </div>
+      ) : null}
       {children ? (
         <div className="flex flex-col gap-2 px-5 md:px-6 pb-5 md:pb-6 pt-1">
           {children}

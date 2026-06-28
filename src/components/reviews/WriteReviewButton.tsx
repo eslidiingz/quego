@@ -110,6 +110,7 @@ function CreateReviewFlow({
         size="md"
         onClick={openModal}
         iconLeft={<Icon name="rate_review" size={18} />}
+        className="w-full sm:w-fit"
       >
         เขียนรีวิว
       </Button>

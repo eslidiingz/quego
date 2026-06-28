@@ -35,7 +35,7 @@ export default async function MeLayout({
             {/* Inline destinations live in the top bar on tablet/desktop only.
                 On mobile they move to the fixed {@link CustomerBottomNav} so
                 the narrow top bar stays uncluttered (app-style chrome). */}
-            <nav className="hidden items-center gap-1 sm:flex">
+            <nav className="hidden items-center gap-1 lg:flex">
               {ME_NAV_ITEMS.map((item) => (
                 <Link
                   key={item.href}
@@ -55,7 +55,7 @@ export default async function MeLayout({
       </header>
 
       {/* pb clears the fixed bottom nav on mobile; it's hidden on sm:+. */}
-      <main className="flex-1 pb-20 sm:pb-0">{children}</main>
+      <main className="flex-1 pb-20 lg:pb-0">{children}</main>
 
       <CustomerBottomNav />
     </div>

@@ -8,10 +8,11 @@ import { ME_NAV_ITEMS } from "@/app/me/nav-items";
 import { WaitlistNavBadge } from "./WaitlistNavBadge";
 
 /**
- * Native-app-style bottom tab bar for the signed-in customer. Shown only on
- * mobile (`sm:hidden`); on tablet/desktop the same destinations live in the
- * top bar (see {@link MeLayout}). Fixed to the viewport bottom with an iOS
- * safe-area inset so it clears the home indicator.
+ * Native-app-style bottom tab bar for the signed-in customer. Shown on mobile
+ * AND tablet (`lg:hidden`); only on desktop (lg:+) do the same destinations move
+ * to the top bar (see {@link MeLayout}). Fixed to the viewport bottom with an iOS
+ * safe-area inset so it clears the home indicator. Anything that floats at the
+ * page bottom on these widths (e.g. a booking CTA bar) must stack above it.
  *
  * Used in two places, always for an authenticated customer:
  * - The customer area layout ({@link MeLayout}) renders it unconditionally —
@@ -29,21 +30,16 @@ export function CustomerBottomNav() {
   return (
     <nav
       aria-label="เมนูหลัก"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-outline-variant bg-surface/95 backdrop-blur pb-[env(safe-area-inset-bottom)] sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-outline-variant bg-surface/95 backdrop-blur pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
-      <ul
-        className="mx-auto grid max-w-5xl"
-        style={{
-          gridTemplateColumns: `repeat(${ME_NAV_ITEMS.length}, minmax(0, 1fr))`,
-        }}
-      >
+      <ul className="mx-auto flex max-w-3xl items-stretch justify-between px-4">
         {ME_NAV_ITEMS.map((item) => {
           const active =
             item.href === "/"
               ? pathname === "/"
               : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
-            <li key={item.href}>
+            <li key={item.href} className="flex">
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
