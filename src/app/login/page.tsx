@@ -11,7 +11,7 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ tab?: string; notice?: string; ref?: string }>;
+type SearchParams = Promise<{ tab?: string; notice?: string }>;
 
 function resolveTab(raw: string | undefined): LoginTabKey {
   return raw === "shop" ? "shop" : "customer";
@@ -22,7 +22,7 @@ export default async function LoginPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const { tab, notice, ref } = await searchParams;
+  const { tab, notice } = await searchParams;
   const active = resolveTab(tab);
 
   return (
@@ -39,7 +39,7 @@ export default async function LoginPage({
       >
         <LoginTabs active={active} />
         {active === "customer" ? (
-          <CustomerLoginForm referralCode={ref} />
+          <CustomerLoginForm />
         ) : (
           <>
             <ShopLoginPhoneForm />

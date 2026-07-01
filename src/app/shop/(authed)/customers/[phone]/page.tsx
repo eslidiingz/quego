@@ -9,7 +9,6 @@ import {
   isValidCustomerPhone,
 } from "@/lib/services/customer-notes";
 import { getBookingContext } from "@/lib/services/bookings";
-import { getLoyaltyBalance } from "@/lib/services/loyalty";
 import { getBangkokToday } from "@/lib/time/bangkok";
 import { formatBaht } from "@/lib/baht";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -38,11 +37,10 @@ export default async function ShopCustomerPage({
   // A malformed phone can't have a booking — fail closed before touching the DB.
   if (!isValidCustomerPhone(phone)) notFound();
 
-  const [history, savedNote, context, loyalty, contact] = await Promise.all([
+  const [history, savedNote, context, contact] = await Promise.all([
     getCustomerHistoryForShop(session.shopId, phone),
     getCustomerNote(session.shopId, phone),
     getBookingContext(session.shopId),
-    getLoyaltyBalance(phone),
     getShopCustomerContact(phone),
   ]);
 
@@ -109,12 +107,6 @@ export default async function ShopCustomerPage({
           label="ยอดใช้จ่ายสะสม"
           value={formatBaht(history.lifetimeSpend)}
           sub="จากบริการที่เสร็จสิ้น"
-        />
-        <StatTile
-          icon="stars"
-          label="แต้มสะสม"
-          value={`${loyalty.balance}`}
-          sub="แต้ม Quego ทั้งหมด"
         />
         <StatTile
           icon="update"

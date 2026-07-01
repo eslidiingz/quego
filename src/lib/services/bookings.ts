@@ -42,8 +42,6 @@ import {
   pushBookingConfirmationToCustomer,
   pushBookingCancellationToCustomer,
 } from "@/lib/services/line-linking";
-import { accrueBookingCredit } from "@/lib/services/loyalty";
-import { accruePromotionStamps } from "@/lib/services/promotions";
 import { isPastChangeCutoff } from "@/lib/booking/cutoff";
 
 // Re-export so server callers can import {BookingContext} from this module
@@ -1089,12 +1087,8 @@ export async function updateBookingStatus(
     .update({ status: newStatus })
     .eq("id", bookingId)
     .eq("shop_id", shopId)
-    .select("id, customer_phone, service_price")
-    .maybeSingle<{
-      id: string;
-      customer_phone: string | null;
-      service_price: number | string | null;
-    }>();
+    .select("id")
+    .maybeSingle<{ id: string }>();
 
   if (error) {
     console.error("updateBookingStatus error:", error);
@@ -1102,20 +1096,6 @@ export async function updateBookingStatus(
   }
   if (!data) {
     return { ok: false, code: "not_found", message: "ไม่พบรายการจองนี้" };
-  }
-
-  // OPP-15: accrue informational loyalty points when a booking is completed.
-  // Fire-and-forget off the response path (mirrors the cancel/confirm LINE
-  // pushes below); accrueBookingCredit is idempotent (UNIQUE(booking_id, kind))
-  // and never throws. Anonymous bookings (no phone) earn nothing.
-  if (newStatus === "completed" && data.customer_phone) {
-    const phone = data.customer_phone;
-    const price = priceFromDb(data.service_price);
-    after(() => accrueBookingCredit(bookingId, phone, price));
-    // Same fire-and-forget pattern for stamp-card promotions: award a stamp
-    // toward every active stamp card the shop runs. Idempotent per
-    // (promotion, booking); never throws.
-    after(() => accruePromotionStamps(bookingId, shopId, phone));
   }
 
   return { ok: true };
