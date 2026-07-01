@@ -15,10 +15,6 @@ import {
 } from "@/lib/location/thailand";
 import { isValidThaiPhone } from "@/lib/validation/phone";
 import { isValidHandleFormat, isReservedHandle } from "@/lib/slug";
-import {
-  MIN_REQUIRED_STAMPS,
-  MAX_REQUIRED_STAMPS,
-} from "@/lib/promotions/stamp-card";
 
 export type ShopFormFields = {
   name: string;
@@ -363,72 +359,5 @@ export function validateExpenseForm(
 }
 
 export function hasExpenseErrors(errors: ExpenseFormErrors): boolean {
-  return Object.keys(errors).length > 0;
-}
-
-// ----- Promotion (โปรโมชั่น) form -------------------------------------------
-
-export type PromotionFormFields = {
-  /** Promotion name, e.g. "บัตรสะสมแต้มตัดผม". */
-  title: string;
-  /** What the customer earns, e.g. "ตัดผมฟรี 1 ครั้ง". */
-  reward: string;
-  /** Raw string from the form input; validated/parsed to an integer below. */
-  requiredStamps: string;
-  description?: string;
-  isActive: boolean;
-};
-
-export type PromotionFormErrors = Partial<
-  Record<"title" | "reward" | "requiredStamps" | "description", string>
->;
-
-export function parsePromotionFormData(
-  formData: FormData,
-): PromotionFormFields {
-  const get = (key: string) => String(formData.get(key) ?? "").trim();
-  return {
-    title: get("title"),
-    reward: get("reward"),
-    requiredStamps: get("requiredStamps"),
-    description: get("description") || undefined,
-    // The form always renders the active toggle, so an unchecked box (which
-    // submits no value) means "paused". Treat only an explicit on/true/1 as active.
-    isActive: ["on", "true", "1"].includes(get("isActive").toLowerCase()),
-  };
-}
-
-export function validatePromotionForm(
-  input: PromotionFormFields,
-): PromotionFormErrors {
-  const errors: PromotionFormErrors = {};
-
-  if (!input.title) errors.title = "กรุณากรอกชื่อโปรโมชั่น";
-  else if (input.title.length > 120)
-    errors.title = "ชื่อโปรโมชั่นต้องไม่เกิน 120 ตัวอักษร";
-
-  if (!input.reward) errors.reward = "กรุณากรอกสิทธิ์ที่ลูกค้าจะได้รับ";
-  else if (input.reward.length > 120)
-    errors.reward = "สิทธิ์ที่ได้รับต้องไม่เกิน 120 ตัวอักษร";
-
-  // Required stamps must be an integer within the supported band.
-  if (!input.requiredStamps) {
-    errors.requiredStamps = "กรุณากรอกจำนวนครั้งที่ต้องสะสม";
-  } else {
-    const n = Number(input.requiredStamps);
-    if (!Number.isInteger(n)) {
-      errors.requiredStamps = "จำนวนครั้งต้องเป็นจำนวนเต็ม";
-    } else if (n < MIN_REQUIRED_STAMPS || n > MAX_REQUIRED_STAMPS) {
-      errors.requiredStamps = `จำนวนครั้งต้องอยู่ระหว่าง ${MIN_REQUIRED_STAMPS}–${MAX_REQUIRED_STAMPS}`;
-    }
-  }
-
-  if (input.description && input.description.length > 500)
-    errors.description = "รายละเอียดต้องไม่เกิน 500 ตัวอักษร";
-
-  return errors;
-}
-
-export function hasPromotionErrors(errors: PromotionFormErrors): boolean {
   return Object.keys(errors).length > 0;
 }

@@ -14,8 +14,8 @@ import { signOutShop } from "@/app/shop/actions";
 // Nav is grouped by how a shop owner actually works through a day, not by raw
 // alphabetical/feature order: daily-driver screens first, then the periodic
 // review surfaces (reports + expenses, which pair up as the net-profit story),
-// then the growth tools we want kept discoverable (share/promotions would sink
-// to the bottom on a pure-frequency sort and get forgotten), then set-once
+// then the growth tools we want kept discoverable (sharing would sink to the
+// bottom on a pure-frequency sort and get forgotten), then set-once
 // configuration last.
 const navGroups: {
   label: string;
@@ -41,7 +41,6 @@ const navGroups: {
     label: "เครื่องมือการตลาด",
     items: [
       { href: "/shop/share", label: "แชร์ร้าน", icon: "share" },
-      { href: "/shop/promotions", label: "โปรโมชั่น", icon: "card_giftcard" },
     ],
   },
   {

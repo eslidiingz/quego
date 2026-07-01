@@ -17,6 +17,5 @@ export const ME_NAV_ITEMS: readonly MeNavItem[] = [
   { href: "/", label: "หน้าหลัก", icon: "home" },
   { href: "/me/bookings", label: "คิวของฉัน", icon: "confirmation_number" },
   { href: "/me/waitlist", label: "คิวรอ", icon: "manage_history" },
-  { href: "/me/rewards", label: "แต้มสะสม", icon: "stars" },
   { href: "/me/profile", label: "โปรไฟล์", icon: "person" },
 ];
