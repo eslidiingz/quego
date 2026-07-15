@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
@@ -11,6 +11,7 @@ import {
 } from "@/components/booking/PublicShopCard";
 import { shopImageUrl } from "@/lib/r2/url";
 import type { ShopRatingSummary } from "@/lib/services/reviews";
+import { distanceKm, type LatLng } from "@/lib/location/maps";
 
 export type DiscoveryService = { name: string; price: number | null };
 
@@ -24,6 +25,9 @@ export type DiscoveryShop = {
   province: string | null;
   district: string | null;
   subdistrict: string | null;
+  /** Map pin (WGS84) for "ใกล้ฉัน" distance; null when the shop set no pin. */
+  latitude: number | null;
+  longitude: number | null;
   /** Active services — searchable + shown as chips on the card. */
   services: DiscoveryService[];
   openState: ShopOpenState;
@@ -40,7 +44,12 @@ export type DiscoveryGroup = {
   shops: DiscoveryShop[];
 };
 
-type GridItem = { shop: DiscoveryShop; categoryIcon: string | null };
+type GridItem = {
+  shop: DiscoveryShop;
+  categoryIcon: string | null;
+  /** Distance from the customer (km) once "ใกล้ฉัน" is on and the shop has a pin. */
+  distanceKm?: number | null;
+};
 
 /**
  * Customer discovery surface for the home page. The *search* (location +
@@ -74,6 +83,88 @@ export function ShopDiscovery({
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(
     initialCategoryId || null,
   );
+
+  // Customer location powers the per-card distance badge. We ask for it on load
+  // (see the effect below) so every card can show "X กม." without a tap; the
+  // "ใกล้ฉัน" button is now only a *sort* toggle (nearest-first), independent of
+  // whether the badge is shown.
+  const [userLoc, setUserLoc] = useState<LatLng | null>(null);
+  const [geoBusy, setGeoBusy] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [sortByDistance, setSortByDistance] = useState(false);
+
+  // Ask for location once on mount so distances appear without an extra tap.
+  // We skip the prompt only when the browser reports the permission as already
+  // "denied" (don't nag a customer who blocked us); a silent auto-load failure
+  // never shows the error banner — only an explicit button tap does.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) return;
+    let cancelled = false;
+    const fetchLoc = () => {
+      setGeoBusy(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (cancelled) return;
+          setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setGeoBusy(false);
+        },
+        () => {
+          if (cancelled) return;
+          setGeoBusy(false);
+        },
+        { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+      );
+    };
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: "geolocation" as PermissionName })
+        .then((status) => {
+          if (cancelled) return;
+          if (status.state !== "denied") fetchLoc();
+        })
+        .catch(() => {
+          if (!cancelled) fetchLoc();
+        });
+    } else {
+      fetchLoc();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Explicit "ใกล้ฉัน" tap: if we already have the location, just toggle the
+  // nearest-first sort; otherwise (re)request it — a tap is a clear opt-in, so a
+  // failure here *does* surface the error banner — and switch sorting on once it
+  // arrives.
+  function toggleNearMe() {
+    if (sortByDistance) {
+      setSortByDistance(false);
+      return;
+    }
+    if (userLoc) {
+      setSortByDistance(true);
+      return;
+    }
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      setGeoError("อุปกรณ์นี้ไม่รองรับการหาตำแหน่ง");
+      return;
+    }
+    setGeoBusy(true);
+    setGeoError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setSortByDistance(true);
+        setGeoBusy(false);
+      },
+      () => {
+        setGeoError("หาตำแหน่งไม่สำเร็จ หรือไม่ได้รับอนุญาต");
+        setGeoBusy(false);
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+    );
+  }
 
   const location: LocationValue | null = initialProvince
     ? {
@@ -123,6 +214,29 @@ export function ShopDiscovery({
     return flat.sort((a, b) => openRank(a.shop.openState) - openRank(b.shop.openState));
   }, [filteredGroups, effectiveCategoryId]);
 
+  // Once we have the customer's location, annotate every card with its distance
+  // (so the "X กม." badge shows without any tap). Only re-sort nearest-first when
+  // "ใกล้ฉัน" is toggled on; shops without a pin keep no distance and, when
+  // sorting, sink to the bottom.
+  const displayItems = useMemo<GridItem[]>(() => {
+    if (!userLoc) return items;
+    const withDistance = items.map((it) => {
+      const { latitude, longitude } = it.shop;
+      const d =
+        latitude != null && longitude != null
+          ? distanceKm(userLoc, { lat: latitude, lng: longitude })
+          : null;
+      return { ...it, distanceKm: d };
+    });
+    if (!sortByDistance) return withDistance;
+    return withDistance.sort((a, b) => {
+      if (a.distanceKm == null && b.distanceKm == null) return 0;
+      if (a.distanceKm == null) return 1;
+      if (b.distanceKm == null) return -1;
+      return a.distanceKm - b.distanceKm;
+    });
+  }, [items, userLoc, sortByDistance]);
+
   return (
     <div className="flex flex-col gap-stack-md px-4 md:px-12">
       {hasSearch ? (
@@ -156,16 +270,32 @@ export function ShopDiscovery({
         </div>
       </div>
 
+      {/* "ใกล้ฉัน" control — left-aligned above the grid. */}
+      {items.length > 0 ? (
+        <div className="max-w-[1180px] mx-auto w-full flex items-center justify-start gap-2">
+          <NearMeButton
+            active={sortByDistance}
+            busy={geoBusy}
+            onClick={toggleNearMe}
+          />
+          {geoError ? (
+            <span role="alert" className="text-label-sm text-error">
+              {geoError}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Results grid */}
       <div className="max-w-[1180px] mx-auto w-full pb-stack-md">
-        {items.length === 0 ? (
+        {displayItems.length === 0 ? (
           <NoResults query={initialQuery} location={location} />
         ) : (
           <div
             key={effectiveCategoryId ?? "all"}
             className="quego-fade-in grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6"
           >
-            {items.map(({ shop, categoryIcon }) => (
+            {displayItems.map(({ shop, categoryIcon, distanceKm: d }) => (
               <PublicShopCard
                 key={shop.id}
                 id={shop.id}
@@ -179,12 +309,13 @@ export function ShopDiscovery({
                 services={shop.services}
                 openState={shop.openState}
                 rating={shop.rating}
+                distanceKm={d}
               />
             ))}
             {/* Fill a sparse last row so the grid never looks hollow — and turn
                the empty space into an owner-conversion nudge. Shown when the
                result set is small or doesn't fill the 3-up desktop row. */}
-            {items.length < 3 || items.length % 3 !== 0 ? (
+            {displayItems.length < 3 || displayItems.length % 3 !== 0 ? (
               <OpenShopCtaCard />
             ) : null}
           </div>
@@ -337,6 +468,40 @@ function FilterChip({
       >
         {count}
       </span>
+    </button>
+  );
+}
+
+/**
+ * "ใกล้ฉัน" toggle. Off → requests geolocation on tap; on → shows the active
+ * state and clears on tap. Privacy: geolocation is only ever requested by an
+ * explicit tap, never on load.
+ */
+function NearMeButton({
+  active,
+  busy,
+  onClick,
+}: {
+  active: boolean;
+  busy: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      disabled={busy}
+      className={cn(
+        "shrink-0 inline-flex items-center gap-1.5 h-9 px-4 rounded-full border text-label-md font-semibold transition-all duration-200 ease-out active:scale-[0.97] disabled:opacity-60",
+        active
+          ? "bg-primary text-on-primary border-primary"
+          : "bg-surface-container-lowest text-on-surface-variant border-outline-variant hover:border-primary hover:text-primary",
+      )}
+    >
+      <Icon name={busy ? "progress_activity" : "near_me"} size={18} className={busy ? "animate-spin" : undefined} />
+      {busy ? "กำลังหาตำแหน่ง..." : active ? "เรียงตามระยะทาง" : "ใกล้ฉัน"}
+      {active && !busy ? <Icon name="close" size={16} /> : null}
     </button>
   );
 }

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { LocationSearchPicker } from "@/components/ui/LocationSearchPicker";
+import { ShopLocationPicker } from "@/components/shop/ShopLocationPicker";
+import { resolveMapsLink } from "@/lib/location/resolve-maps-link";
 import { CategoryPicker } from "@/app/shops/register/CategoryPicker";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Toast } from "@/components/ui/Toast";
@@ -129,6 +131,13 @@ export function EditProfileForm({
             districtError={errors?.district}
             subdistrictError={errors?.subdistrict}
             disabled={pending}
+          />
+          <ShopLocationPicker
+            defaultLatitude={shop.latitude}
+            defaultLongitude={shop.longitude}
+            error={errors?.latitude ?? errors?.longitude}
+            disabled={pending}
+            resolveLink={resolveMapsLink}
           />
           <PhoneInput
             name="contactPhone"

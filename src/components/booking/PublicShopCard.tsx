@@ -6,6 +6,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Chip } from "@/components/ui/Chip";
 import { ShopRatingBadge } from "@/components/reviews/ShopRatingBadge";
 import type { ShopRatingSummary } from "@/lib/services/reviews";
+import { formatDistanceKm } from "@/lib/location/maps";
 import { ShopServiceChips } from "./ShopServiceChips";
 
 export type ShopOpenState = "open" | "closed" | "unknown";
@@ -35,6 +36,11 @@ export type PublicShopCardProps = {
   openState?: ShopOpenState;
   /** Average rating + count; badge is hidden when count is 0 or omitted. */
   rating?: ShopRatingSummary | null;
+  /**
+   * Straight-line distance (km) from the customer, when they've opted into
+   * "ใกล้ฉัน" and the shop has a pin. Null/undefined → no distance badge.
+   */
+  distanceKm?: number | null;
   className?: string;
 };
 
@@ -59,10 +65,13 @@ export function PublicShopCard({
   services = [],
   openState = "unknown",
   rating,
+  distanceKm,
   className,
 }: PublicShopCardProps) {
   const area = [district, province].filter(Boolean).join(", ");
   const fromPrice = startingPrice(services);
+  const distanceLabel =
+    distanceKm != null ? formatDistanceKm(distanceKm) : "";
 
   return (
     <Link
@@ -124,10 +133,16 @@ export function PublicShopCard({
           <h3 className="font-display text-body-md sm:text-headline-md text-on-surface leading-tight line-clamp-2">
             {name}
           </h3>
-          {area ? (
+          {area || distanceLabel ? (
             <p className="text-label-sm text-on-surface-variant flex items-center gap-1">
               <Icon name="location_on" size={14} className="shrink-0" />
-              <span className="truncate">{area}</span>
+              {area ? <span className="truncate">{area}</span> : null}
+              {distanceLabel ? (
+                <span className="shrink-0 inline-flex items-center gap-0.5 text-primary font-medium">
+                  <Icon name="near_me" size={13} className="shrink-0" />
+                  {distanceLabel}
+                </span>
+              ) : null}
             </p>
           ) : null}
         </div>

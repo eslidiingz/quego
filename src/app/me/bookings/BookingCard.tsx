@@ -5,6 +5,7 @@ import { buttonClassName } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { getBangkokNow, getBangkokToday } from "@/lib/time/bangkok";
 import { isPastChangeCutoff } from "@/lib/booking/cutoff";
+import { buildShopDirectionsUrl } from "@/lib/location/maps";
 import { formatBaht } from "@/lib/baht";
 import type {
   BookingQueueStatus,
@@ -82,11 +83,13 @@ export function BookingCard({
   // Call/directions help before an upcoming visit; hide them once it's past or
   // for completed/cancelled rows.
   const isUpcoming = booking.status === "confirmed" && !isPast;
-  const mapsHref = booking.shopAddress
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        booking.shopAddress,
-      )}`
-    : null;
+  // Precise pin when the shop dropped one, else a text search on the address —
+  // buildShopDirectionsUrl picks the best available and returns null for neither.
+  const mapsHref = buildShopDirectionsUrl({
+    latitude: booking.shopLatitude,
+    longitude: booking.shopLongitude,
+    address: booking.shopAddress,
+  });
 
   // "จองอีกครั้ง" closes the retention loop on a finished/cancelled visit by
   // deep-linking back to the booking form with the same service + staff

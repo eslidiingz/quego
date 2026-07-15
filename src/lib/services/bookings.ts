@@ -43,6 +43,7 @@ import {
   pushBookingCancellationToCustomer,
 } from "@/lib/services/line-linking";
 import { isPastChangeCutoff } from "@/lib/booking/cutoff";
+import { toCoord } from "@/lib/location/maps";
 
 // Re-export so server callers can import {BookingContext} from this module
 // in addition to the pure slot-math file (single source of truth).
@@ -161,6 +162,9 @@ export type CustomerBookingItem = {
   shopId: string;
   shopName: string;
   shopAddress: string | null;
+  /** Shop map pin (WGS84) for the "เส้นทาง" deep link; null when the shop set none. */
+  shopLatitude: number | null;
+  shopLongitude: number | null;
   bookingDate: string;
   slotTime: string; // HH:MM
   serviceDurationMinutes: number;
@@ -1782,6 +1786,8 @@ type CustomerBookingRow = {
   shops: {
     name: string;
     address: string | null;
+    latitude: string | number | null;
+    longitude: string | number | null;
     contact_phone: string | null;
     reschedule_cancel_cutoff_hours: number;
   } | null;
@@ -1822,7 +1828,7 @@ export async function listBookingsByCustomerPhone(
     .select(
       `id, shop_id, booking_date, slot_time, service_duration_minutes,
        service_name, service_price, status, cancelled_by, service_id, staff_id,
-       shops ( name, address, contact_phone, reschedule_cancel_cutoff_hours ),
+       shops ( name, address, latitude, longitude, contact_phone, reschedule_cancel_cutoff_hours ),
        shop_staff ( name, role ),
        reviews ( id, rating, comment )`,
     )
@@ -1844,6 +1850,8 @@ export async function listBookingsByCustomerPhone(
         shopId: r.shop_id,
         shopName: r.shops?.name ?? "—",
         shopAddress: r.shops?.address ?? null,
+        shopLatitude: toCoord(r.shops?.latitude),
+        shopLongitude: toCoord(r.shops?.longitude),
         bookingDate: r.booking_date,
         slotTime: r.slot_time.slice(0, 5),
         serviceDurationMinutes: r.service_duration_minutes,
