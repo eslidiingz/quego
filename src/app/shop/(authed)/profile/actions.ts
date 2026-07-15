@@ -100,6 +100,8 @@ export async function updateOwnShop(
     province: parsed.province,
     district: parsed.district,
     subdistrict: parsed.subdistrict,
+    latitude: parsed.latitude,
+    longitude: parsed.longitude,
     contactPhone: parsed.contactPhone,
     ownerName: parsed.ownerName,
     ownerEmail: parsed.ownerEmail,

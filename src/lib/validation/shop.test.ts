@@ -291,6 +291,40 @@ describe("validateShopForm", () => {
     expect(errors.ownerPhone).toBe("เบอร์โทรไม่ถูกต้อง (10 หลัก ขึ้นต้นด้วย 0)");
     expect(hasErrors(errors)).toBe(true);
   });
+
+  it("accepts a shop with no map pin (both blank)", () => {
+    const errors = validateShopForm(validBase({ latitude: undefined, longitude: undefined }));
+    expect(errors.latitude).toBeUndefined();
+    expect(errors.longitude).toBeUndefined();
+  });
+
+  it("accepts a valid map pin", () => {
+    const errors = validateShopForm(
+      validBase({ latitude: "13.7466", longitude: "100.5347" }),
+    );
+    expect(errors.latitude).toBeUndefined();
+    expect(errors.longitude).toBeUndefined();
+  });
+
+  it("rejects a half-set pin (lat without lng)", () => {
+    const errors = validateShopForm(validBase({ latitude: "13.7", longitude: undefined }));
+    expect(errors.latitude).toContain("ปักหมุดตำแหน่งร้านให้ครบ");
+  });
+
+  it("rejects an out-of-range latitude", () => {
+    const errors = validateShopForm(validBase({ latitude: "99", longitude: "100.5" }));
+    expect(errors.latitude).toContain("ละติจูด");
+  });
+
+  it("rejects an out-of-range longitude", () => {
+    const errors = validateShopForm(validBase({ latitude: "13.7", longitude: "200" }));
+    expect(errors.longitude).toContain("ลองจิจูด");
+  });
+
+  it("rejects a non-numeric coordinate", () => {
+    const errors = validateShopForm(validBase({ latitude: "abc", longitude: "100.5" }));
+    expect(errors.latitude).toBeDefined();
+  });
 });
 
 describe("hasErrors", () => {

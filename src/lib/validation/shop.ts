@@ -38,6 +38,14 @@ export type ShopFormFields = {
   ownerName: string;
   ownerPhone: string;
   ownerEmail?: string;
+  /**
+   * Optional map pin (WGS84). Raw strings from the form's hidden inputs — set as
+   * a pair by the location picker (current-location button or pasted Maps link)
+   * or both blank. Powers the customer "นำทาง" deep link; the address text is the
+   * fallback when unset.
+   */
+  latitude?: string;
+  longitude?: string;
 };
 
 export type ShopFormErrors = Partial<Record<keyof ShopFormFields, string>>;
@@ -61,6 +69,8 @@ export function parseShopFormData(formData: FormData): ShopFormFields {
     ownerName: get("ownerName"),
     ownerPhone: get("ownerPhone"),
     ownerEmail: get("ownerEmail") || undefined,
+    latitude: get("latitude") || undefined,
+    longitude: get("longitude") || undefined,
   };
 }
 
@@ -145,6 +155,23 @@ export function validateShopForm(input: ShopFormFields): ShopFormErrors {
       errors.ownerEmail = "อีเมลต้องไม่เกิน 254 ตัวอักษร";
     } else if (!EMAIL_RE.test(input.ownerEmail)) {
       errors.ownerEmail = "รูปแบบอีเมลไม่ถูกต้อง";
+    }
+  }
+
+  // Map pin is optional, but lat/lng only make sense as a pair — the DB enforces
+  // this too (shops_lat_lng_paired). Bounds live here because a direct POST
+  // bypasses the client picker; the numeric style mirrors validateServiceForm.
+  const hasLat = Boolean(input.latitude);
+  const hasLng = Boolean(input.longitude);
+  if (hasLat !== hasLng) {
+    errors.latitude = "กรุณาปักหมุดตำแหน่งร้านให้ครบ (ละติจูดและลองจิจูด)";
+  } else if (hasLat && hasLng) {
+    const lat = Number(input.latitude);
+    const lng = Number(input.longitude);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      errors.latitude = "ตำแหน่งไม่ถูกต้อง (ละติจูดต้องอยู่ระหว่าง -90 ถึง 90)";
+    } else if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+      errors.longitude = "ตำแหน่งไม่ถูกต้อง (ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180)";
     }
   }
 

@@ -8,6 +8,7 @@ import { CustomerBottomNav } from "@/components/layout/CustomerBottomNav";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { Chip } from "@/components/ui/Chip";
 import { BusinessHoursPanel } from "@/components/booking/BusinessHoursPanel";
+import { DirectionsLink } from "@/components/booking/DirectionsLink";
 import { LiveQueueStatus } from "@/components/booking/LiveQueueStatus";
 import { ServiceList } from "@/components/booking/ServiceList";
 import { ShopReviewsSection } from "@/components/reviews/ShopReviewsSection";
@@ -237,10 +238,16 @@ export default async function ShopDetailPage({
               {shop.name}
             </h1>
             {heroArea ? (
-              <p className="flex items-center gap-1.5 text-label-md text-on-surface-variant">
-                <Icon name="location_on" size={15} />
-                {heroArea}
-              </p>
+              <div className="flex items-center gap-x-3 gap-y-1 flex-wrap">
+                <p className="flex items-center gap-1.5 text-label-md text-on-surface-variant">
+                  <Icon name="location_on" size={15} />
+                  {heroArea}
+                </p>
+                {/* Directions right in the hero — precise pin when set, else a
+                    search on the address; renders nothing when the shop has
+                    neither, so the area line stands alone. */}
+                <DirectionsLink shop={shop} iconSize={16} className="min-h-0" />
+              </div>
             ) : null}
             <div className="flex items-center gap-2 flex-wrap pt-1">
               {isOpenNow ? (
@@ -387,6 +394,12 @@ export default async function ShopDetailPage({
                   }
                 />
               ) : null}
+              {/* Directions — precise pin when set, else a search on the address. */}
+              <DirectionsLink
+                shop={shop}
+                label="นำทางไปที่ร้าน"
+                className="justify-center w-full h-12 rounded-full border-2 border-outline-variant hover:bg-surface-container-low hover:no-underline"
+              />
             </div>
           ) : null}
         </section>

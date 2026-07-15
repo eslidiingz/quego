@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { CategoryPicker } from "./CategoryPicker";
 import { LocationSearchPicker } from "@/components/ui/LocationSearchPicker";
+import { ShopLocationPicker } from "@/components/shop/ShopLocationPicker";
+import { resolveMapsLink } from "@/lib/location/resolve-maps-link";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Modal } from "@/components/ui/Modal";
 import { PhoneOtpStep } from "@/components/auth/PhoneOtpStep";
@@ -143,6 +145,13 @@ export function ShopRegistrationForm({
           districtError={errors?.district}
           subdistrictError={errors?.subdistrict}
           disabled={pending}
+        />
+        <ShopLocationPicker
+          defaultLatitude={values?.latitude}
+          defaultLongitude={values?.longitude}
+          error={errors?.latitude ?? errors?.longitude}
+          disabled={pending}
+          resolveLink={resolveMapsLink}
         />
         <PhoneInput
           name="contactPhone"

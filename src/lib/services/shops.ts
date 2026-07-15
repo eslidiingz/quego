@@ -28,6 +28,7 @@ import {
   HANDLE_MAX_LENGTH,
 } from "@/lib/slug";
 import { isUuid } from "@/lib/validation/uuid";
+import { toCoord } from "@/lib/location/maps";
 import { putObject, deleteObject } from "@/lib/r2/client";
 import {
   validateImageFile,
@@ -72,6 +73,9 @@ export type CreateShopInput = {
   ownerName: string;
   ownerPhone: string;
   ownerEmail?: string;
+  /** Optional map pin (WGS84) as raw form strings; written as a pair or both null. */
+  latitude?: string;
+  longitude?: string;
 };
 
 /** Which unique field clashed, so the form can flag the right input inline. */
@@ -107,6 +111,12 @@ export type ShopListItem = {
   province: string | null;
   district: string | null;
   subdistrict: string | null;
+  /**
+   * Map pin (WGS84). Optional because only `getShopById` (the owner profile page)
+   * selects it — the admin list projections leave it undefined.
+   */
+  latitude?: number | null;
+  longitude?: number | null;
   rejection_reason: string | null;
   service_duration_minutes: number;
   created_at: string;
@@ -166,6 +176,9 @@ export type PublicShopDetail = {
   province: string | null;
   district: string | null;
   subdistrict: string | null;
+  /** Map pin (WGS84) for the "นำทาง" deep link; null when the shop set no pin. */
+  latitude: number | null;
+  longitude: number | null;
   contact_phone: string | null;
   /**
    * Shop-level default duration. Only meaningful as a fallback for shops that
@@ -192,6 +205,9 @@ type ShopDetailRow = {
   province: string | null;
   district: string | null;
   subdistrict: string | null;
+  // Supabase returns `numeric` as a string; toCoord() normalises to number|null.
+  latitude: string | number | null;
+  longitude: string | number | null;
   contact_phone: string | null;
   service_duration_minutes: number;
   logo_key: string | null;
@@ -218,7 +234,7 @@ export async function getPublicShopByHandleOrId(
     .from("shops")
     .select(
       `
-        id, name, handle, description, address, province, district, subdistrict, contact_phone, service_duration_minutes, logo_key, cover_key,
+        id, name, handle, description, address, province, district, subdistrict, latitude, longitude, contact_phone, service_duration_minutes, logo_key, cover_key,
         shop_categories ( id, name, icon )
       `,
     )
@@ -261,6 +277,8 @@ export async function getPublicShopByHandleOrId(
     province: row.province,
     district: row.district,
     subdistrict: row.subdistrict,
+    latitude: toCoord(row.latitude),
+    longitude: toCoord(row.longitude),
     contact_phone: row.contact_phone,
     service_duration_minutes: row.service_duration_minutes,
     services,
@@ -307,6 +325,9 @@ export type PublicShop = {
   province: string | null;
   district: string | null;
   subdistrict: string | null;
+  /** Map pin (WGS84) for the "นำทาง" deep link + "ใกล้ฉัน" distance; null if unset. */
+  latitude: number | null;
+  longitude: number | null;
   service_duration_minutes: number;
   /** Active services (บริการ) — drives the card's service chips, "เริ่มต้น ฿"
    *  price, and free-text service search on the discovery page. */
@@ -369,7 +390,7 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
     supabase
       .from("shops")
       .select(
-        "id, name, handle, description, address, province, district, subdistrict, service_duration_minutes, category_id, logo_key, cover_key",
+        "id, name, handle, description, address, province, district, subdistrict, latitude, longitude, service_duration_minutes, category_id, logo_key, cover_key",
       )
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
@@ -443,6 +464,8 @@ export async function listPublicShopsByCategory(): Promise<CategoryWithShops[]> 
       province: s.province,
       district: s.district,
       subdistrict: s.subdistrict,
+      latitude: toCoord(s.latitude),
+      longitude: toCoord(s.longitude),
       service_duration_minutes: s.service_duration_minutes,
       services,
       openState: openByShop.get(s.id) ?? "unknown",
@@ -649,6 +672,8 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
       province: input.province,
       district: input.district,
       subdistrict: input.subdistrict,
+      latitude: input.latitude ? Number(input.latitude) : null,
+      longitude: input.longitude ? Number(input.longitude) : null,
       contact_phone: input.contactPhone || null,
       owner_name: input.ownerName,
       owner_phone: input.ownerPhone,
@@ -706,6 +731,8 @@ type ShopRow = {
   province: string | null;
   district: string | null;
   subdistrict: string | null;
+  latitude: string | number | null;
+  longitude: string | number | null;
   rejection_reason: string | null;
   service_duration_minutes: number;
   created_at: string;
@@ -730,7 +757,7 @@ export async function listShops(filter?: {
       `
         id, name, handle, status,
         owner_name, owner_phone, owner_email,
-        contact_phone, description, address, province, district, subdistrict,
+        contact_phone, description, address, province, district, subdistrict, latitude, longitude,
         rejection_reason, service_duration_minutes, created_at, reviewed_at,
         reschedule_cancel_cutoff_hours, logo_key, cover_key,
         shop_categories ( name )
@@ -760,6 +787,8 @@ export async function listShops(filter?: {
     province: r.province,
     district: r.district,
     subdistrict: r.subdistrict,
+    latitude: toCoord(r.latitude),
+    longitude: toCoord(r.longitude),
     rejection_reason: r.rejection_reason,
     service_duration_minutes: r.service_duration_minutes,
     created_at: r.created_at,
@@ -862,7 +891,7 @@ export async function getShopById(id: string): Promise<ShopListItem | null> {
       `
         id, name, handle, status,
         owner_name, owner_phone, owner_email,
-        contact_phone, description, address, province, district, subdistrict,
+        contact_phone, description, address, province, district, subdistrict, latitude, longitude,
         rejection_reason, service_duration_minutes, created_at, reviewed_at,
         reschedule_cancel_cutoff_hours, logo_key, cover_key,
         shop_categories ( name )
@@ -888,6 +917,8 @@ export async function getShopById(id: string): Promise<ShopListItem | null> {
     province: r.province,
     district: r.district,
     subdistrict: r.subdistrict,
+    latitude: toCoord(r.latitude),
+    longitude: toCoord(r.longitude),
     rejection_reason: r.rejection_reason,
     service_duration_minutes: r.service_duration_minutes,
     created_at: r.created_at,
@@ -1005,6 +1036,8 @@ export async function updateOwnShopProfile(
       province: input.province,
       district: input.district,
       subdistrict: input.subdistrict,
+      latitude: input.latitude ? Number(input.latitude) : null,
+      longitude: input.longitude ? Number(input.longitude) : null,
       contact_phone: input.contactPhone || null,
       owner_name: input.ownerName,
       owner_email: input.ownerEmail || null,
