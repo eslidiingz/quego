@@ -8,12 +8,14 @@ import {
   type BookingStatus,
 } from "@/lib/services/bookings";
 import { countWaitingForShopToday } from "@/lib/services/waitlist";
-import { getShopSetupStep } from "@/lib/services/shop-setup";
+import { getShopSetupChecklist } from "@/lib/services/shop-setup";
 import { countOpenSlotsToday } from "@/lib/booking/slot-math";
 import { cn } from "@/lib/cn";
 import { getBangkokNow } from "@/lib/time/bangkok";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ShopSetupNudge } from "@/components/shop/ShopSetupNudge";
+import { TourHelpButton } from "@/components/tour/TourHelpButton";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
+import { ShopSetupChecklistCard } from "@/components/shop/ShopSetupChecklistCard";
 import { TodayBookingRow } from "./TodayBookingRow";
 import { NewBookingDialog } from "./bookings/NewBookingDialog";
 
@@ -74,14 +76,14 @@ export default async function ShopHomePage({
   );
 
   // Today's bookings, the new-booking dialog's context, the waitlist count, and
-  // the outstanding setup step (services → hours) are independent reads, so they
-  // fan out concurrently. `getShopSetupStep` is request-cached and also feeds the
-  // global modal in the layout, so this call doesn't re-hit the DB.
-  const [bookings, context, waitingCount, setupStep] = await Promise.all([
+  // the activation checklist are independent reads, so they fan out
+  // concurrently. The checklist is request-cached and shares its reads with the
+  // global setup modal in the layout, so this call doesn't re-hit the DB.
+  const [bookings, context, waitingCount, checklist] = await Promise.all([
     listBookingsByShop(session.shopId, "today"),
     getBookingContext(session.shopId),
     countWaitingForShopToday(session.shopId),
-    getShopSetupStep(session.shopId),
+    getShopSetupChecklist(session.shopId),
   ]);
 
   const counts = {
@@ -137,20 +139,14 @@ export default async function ShopHomePage({
       <PageHeader
         eyebrow="ยินดีต้อนรับสู่ร้าน"
         title={session.shopName}
+        help={<TourHelpButton tourId="shop-home" />}
         description="ภาพรวมคิวและการจองของร้านวันนี้"
       />
 
-      {setupStep ? (
-        // Persistent inline reminder on the dashboard; the focus modal lives in
-        // the layout so it follows the owner across every page.
-        <ShopSetupNudge
-          icon={setupStep.icon}
-          title={setupStep.title}
-          description={setupStep.description}
-          ctaLabel={setupStep.ctaLabel}
-          ctaHref={setupStep.ctaHref}
-        />
-      ) : null}
+      {/* Persistent activation checklist; the focus modal in the layout still
+          handles the two steps that block bookings outright. Renders nothing
+          once every step is done. */}
+      <ShopSetupChecklistCard checklist={checklist} />
 
       {waitingCount > 0 ? <WaitlistCard count={waitingCount} /> : null}
 
@@ -180,7 +176,7 @@ export default async function ShopHomePage({
         {/* Glance stats (Q1): read-only — visually distinct from the filter
             tiles below (no border/click affordance) so the owner never mistakes
             them for a filter. */}
-        <div className="grid grid-cols-2 gap-3">
+        <div data-tour={TOUR_ANCHORS.homeGlance} className="grid grid-cols-2 gap-3">
           <GlanceStat
             icon="payments"
             label="ยอดวันนี้"
@@ -194,6 +190,7 @@ export default async function ShopHomePage({
         </div>
 
         <nav
+          data-tour={TOUR_ANCHORS.homeFilters}
           className="grid grid-cols-3 gap-3"
           aria-label="กรองตามสถานะ"
         >
@@ -225,7 +222,11 @@ export default async function ShopHomePage({
         ) : visible.length === 0 ? (
           <EmptyState kind="filter-empty" />
         ) : (
-          <ul className="space-y-2.5">
+          // The tour anchor sits on the list, NOT on a wrapper that outlives it:
+          // when there are no bookings the anchor should genuinely disappear so
+          // the coachmark falls back to its centered "ยังไม่มีคิว" copy instead of
+          // ringing an empty state while describing rows that aren't there.
+          <ul data-tour={TOUR_ANCHORS.homeQueueList} className="space-y-2.5">
             {preview.map((b) => (
               <TodayBookingRow
                 key={b.id}
