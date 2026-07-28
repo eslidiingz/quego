@@ -139,8 +139,8 @@ export function LandingHero({
             </h1>
 
             <p className="quego-reveal text-body-lg text-on-primary/85 max-w-[540px] mb-8">
-              ดูคิวของร้านแบบเรียลไทม์ กดจองล่วงหน้า แล้วรอรับแจ้งเตือน
-              ตอนใกล้ถึงคิวของคุณ
+              ดูคิวของร้านแบบเรียลไทม์ กดจองล่วงหน้าได้ตลอด 24 ชม.
+              แล้วเช็กคิวก่อนออกจากบ้าน
             </p>
 
             {/* Search — location + service, seeds the real discovery filter below */}
@@ -216,7 +216,7 @@ export function LandingHero({
                   size={16}
                   className="text-primary-fixed-dim"
                 />
-                แจ้งเตือนอัตโนมัติ
+                เลื่อน–ยกเลิกเองได้
               </span>
             </p>
 
@@ -327,8 +327,8 @@ function LiveQueueMock() {
 
         {/* Notify footer */}
         <p className="mt-4 flex items-center gap-2 text-label-md text-on-surface-variant">
-          <Icon name="notifications_active" size={16} className="text-primary" />
-          จะแจ้งเตือนเมื่อใกล้ถึงคิว
+          <Icon name="autorenew" size={16} className="text-primary" />
+          อัปเดตเองทุก 10 วิ ไม่ต้องกดรีเฟรช
         </p>
       </div>
     </div>

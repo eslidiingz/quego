@@ -21,7 +21,7 @@ export default async function MyWaitlistPage() {
       <PageHeader
         eyebrow="คิวรอ"
         title="รอสล็อตว่าง"
-        description="รายการด้านล่างคือคิวที่คุณฝากรอไว้ เราจะแจ้งเตือนทันทีที่มีช่องว่าง — ในแอป และทาง LINE ถ้าเชื่อมต่อไว้"
+        description="รายการด้านล่างคือคิวที่คุณฝากรอไว้ ทันทีที่มีคิวว่าง สถานะจะเปลี่ยนเป็น “มีคิวว่าง” และกดจองได้จากหน้านี้เลย"
       />
 
       {entries.length === 0 ? (
@@ -37,7 +37,7 @@ export default async function MyWaitlistPage() {
             ยังไม่มีคิวรอ
           </h2>
           <p className="text-body-md text-on-surface-variant max-w-md mx-auto">
-            ถ้าร้านไหนคิวเต็มในวันที่ต้องการ กด “แจ้งเตือนเมื่อมีคิวว่าง”
+            ถ้าร้านไหนคิวเต็มในวันที่ต้องการ กด “ฝากรอคิวว่าง”
             ในหน้าจองได้เลย แล้วรายการจะมาแสดงที่นี่
           </p>
           <Link

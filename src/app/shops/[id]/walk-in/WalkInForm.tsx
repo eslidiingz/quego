@@ -125,7 +125,7 @@ export function WalkInForm({
           required
           value={phone}
           onChange={(digits) => setPhone(digits)}
-          helperText="ใช้ยืนยันคิวและแจ้งเตือนผ่าน LINE"
+          helperText="ใช้ยืนยันคิว และให้ร้านติดต่อกลับได้"
         />
       </section>
 

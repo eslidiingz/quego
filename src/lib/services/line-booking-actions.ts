@@ -105,7 +105,7 @@ export async function handleBookingPostback(
           !res.ok
             ? res.message
             : res.firstAck
-              ? "รับทราบค่ะ 🙌 ทางร้านทราบแล้วว่าคุณกำลังมา"
+              ? "รับทราบค่ะ 🙌 ขึ้นสถานะ “กำลังมา” ในคิวของร้านให้แล้ว"
               : "คุณได้แจ้งว่ากำลังมาแล้วก่อนหน้านี้ค่ะ 🙏",
           "postback_coming",
         );
@@ -126,7 +126,7 @@ export async function handleBookingPostback(
         await replyText(
           replyToken,
           res.ok
-            ? "ยกเลิกคิวเรียบร้อยแล้ว 🙏 ทางร้านได้รับแจ้งแล้ว"
+            ? "ยกเลิกคิวเรียบร้อยแล้ว 🙏 คิวนี้ถูกปลดออกจากตารางของร้าน"
             : res.message,
           "postback_cancel",
         );

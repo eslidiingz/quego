@@ -44,7 +44,7 @@ export function LinkLineCard({ linked }: { linked: boolean }) {
                 เชื่อมต่อ LINE แล้ว
               </p>
               <p className="text-label-md text-on-surface-variant">
-                คุณจะได้รับแจ้งเตือนสถานะคิวผ่าน LINE
+                เราจะส่งข้อความเมื่อจองสำเร็จ ร้านยกเลิกคิว และมีคิวว่างจากรายการรอ
               </p>
             </div>
           </div>
@@ -83,9 +83,9 @@ export function LinkLineCard({ linked }: { linked: boolean }) {
   return (
     <FormSection icon="notifications" title="การแจ้งเตือนผ่าน LINE">
       <p className="text-body-md text-on-surface-variant">
-        เชื่อมต่อบัญชี LINE ของคุณ เพื่อรับแจ้งเตือนเมื่อจองสำเร็จ ใกล้ถึงคิว
-        และเมื่อถึงคิวของคุณ ระบบจะพาคุณไปยืนยันสิทธิ์ (authorize) กับ LINE ก่อน
-        แล้วจึงเชื่อมต่อให้อัตโนมัติ
+        เชื่อมต่อบัญชี LINE ของคุณ เพื่อรับใบยืนยันเมื่อจองสำเร็จ แจ้งเมื่อร้านยกเลิกคิว
+        และเมื่อมีคิวว่างจากรายการที่ฝากรอไว้ ระบบจะพาคุณไปยืนยันสิทธิ์ (authorize)
+        กับ LINE ก่อน แล้วจึงเชื่อมต่อให้อัตโนมัติ
       </p>
 
       <ol className="list-decimal space-y-2 pl-5 text-label-md text-on-surface-variant">
