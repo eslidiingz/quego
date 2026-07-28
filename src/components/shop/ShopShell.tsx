@@ -9,6 +9,7 @@ import { QuegoWordmark } from "@/components/ui/QuegoWordmark";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { cn } from "@/lib/cn";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import { signOutShop } from "@/app/shop/actions";
 
 // Nav is grouped by how a shop owner actually works through a day, not by raw
@@ -118,7 +119,10 @@ export function ShopShell({
             </span>
           </div>
         </div>
-        <nav className="flex flex-col gap-1 px-2 flex-1 min-h-0 overflow-y-auto">
+        <nav
+          data-tour={TOUR_ANCHORS.shellNav}
+          className="flex flex-col gap-1 px-2 flex-1 min-h-0 overflow-y-auto"
+        >
           {navGroups.map((group, groupIndex) => (
             <div
               key={group.label}
@@ -185,7 +189,10 @@ export function ShopShell({
           <h1 className="font-display text-headline-md text-on-surface lg:hidden">
             {shopName}
           </h1>
-          <div className="ml-auto flex items-center gap-2">
+          <div
+            data-tour={TOUR_ANCHORS.shellHeaderTools}
+            className="ml-auto flex items-center gap-2"
+          >
             <ThemeToggle />
             {/* Notifier (the bell) is the right-most item so its `right-0`
                 dropdown anchors to the viewport edge and stays on-screen on

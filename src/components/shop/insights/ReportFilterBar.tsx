@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import type { FilterOption } from "@/lib/services/insights";
 import { FilterSheet } from "./FilterSheet";
 
@@ -49,6 +50,8 @@ export function ReportFilterBar({
       <button
         type="button"
         onClick={() => setOpen(true)}
+        // The component returns a fragment, so the trigger carries the anchor.
+        data-tour={TOUR_ANCHORS.insightsFilter}
         className="relative inline-flex shrink-0 items-center gap-2 rounded-full border border-outline-variant bg-surface-container-lowest px-4 py-2 text-label-md font-medium text-on-surface transition-colors hover:bg-surface-container-high"
       >
         <Icon name="tune" size={18} />

@@ -73,15 +73,15 @@ export function WaitlistPanel({
     return (
       <div className="rounded-2xl border-2 border-primary/30 bg-primary/8 p-5 space-y-2 text-center">
         <span className="inline-flex items-center justify-center size-12 rounded-full bg-primary/15 text-primary">
-          <Icon name="notifications_active" size={26} />
+          <Icon name="check_circle" size={26} />
         </span>
         <h3 className="font-display text-headline-sm text-on-surface">
           {state.alreadyWaiting ? "คุณอยู่ในรายการรอแล้ว" : "เพิ่มในรายการรอเรียบร้อย"}
         </h3>
         <p className="text-body-md text-on-surface-variant">
-          เราจะแจ้งเตือนผ่าน LINE ทันทีที่มีคิวว่างสำหรับ{" "}
+          ทันทีที่มีคิวว่างสำหรับ{" "}
           <span className="font-semibold text-on-surface">{serviceName}</span>{" "}
-          {dateLabel}
+          {dateLabel} รายการของคุณจะขึ้นสถานะ “มีคิวว่าง” ให้กดจองได้เลย
         </p>
         <Link
           href="/me/waitlist"
@@ -122,16 +122,16 @@ export function WaitlistPanel({
     <div className="rounded-2xl border-2 border-outline-variant bg-surface-container-low/50 p-5 space-y-4">
       <div className="flex items-start gap-3">
         <span className="inline-flex items-center justify-center size-10 rounded-full bg-secondary-container text-on-secondary-container shrink-0">
-          <Icon name="notifications_active" />
+          <Icon name="hourglass_top" />
         </span>
         <div className="min-w-0">
           <h3 className="font-display text-headline-sm text-on-surface">
-            คิวเต็มแล้ว — รับการแจ้งเตือนเมื่อมีคิวว่าง
+            คิวเต็มแล้ว — ฝากรอคิวว่างไว้ได้
           </h3>
           <p className="text-label-md text-on-surface-variant mt-0.5">
             {serviceName}
-            {staffLabel ? ` · ${staffLabel}` : ""} · {dateLabel} — เราจะแจ้งผ่าน
-            LINE ทันทีที่มีคนยกเลิก
+            {staffLabel ? ` · ${staffLabel}` : ""} · {dateLabel} — ถ้ามีคนยกเลิก
+            เราจะเสนอคิวให้ตามลำดับที่ฝากไว้
           </p>
         </div>
       </div>
@@ -150,24 +150,24 @@ export function WaitlistPanel({
           placeholder="0812345678"
           value={phone}
           onChange={(digits) => setPhone(digits)}
-          helperText="เบอร์ที่เชื่อมกับ LINE เพื่อรับแจ้งเตือน"
+          helperText="เบอร์เดียวกับที่ใช้จองคิว เพื่อดูสถานะรายการรอ"
         />
       </div>
 
       {lineConnected === false ? (
         <Link
-          href="/me/profile"
+          href="/me/waitlist"
           className="flex items-start gap-2 rounded-xl bg-secondary-container/40 p-3 text-label-md text-on-secondary-container hover:bg-secondary-container/60 transition-colors"
         >
-          <Icon name="link" size={18} className="mt-0.5 shrink-0" />
+          <Icon name="list_alt" size={18} className="mt-0.5 shrink-0" />
           <span>
-            เชื่อมบัญชี LINE ที่หน้าโปรไฟล์ก่อน เพื่อให้เราแจ้งเตือนคุณได้
+            ดูสถานะได้ที่หน้า “รายการรอของฉัน” — อัปเดตทันทีที่มีคิวว่าง
           </span>
         </Link>
       ) : (
         <p className="flex items-start gap-2 text-label-md text-on-surface-variant">
           <Icon name="info" size={18} className="mt-0.5 shrink-0" />
-          <span>ต้องเชื่อมบัญชี LINE ไว้กับเบอร์นี้ จึงจะได้รับการแจ้งเตือน</span>
+          <span>ใช้เบอร์นี้เช็กสถานะได้ที่หน้า “รายการรอของฉัน”</span>
         </p>
       )}
 
@@ -189,11 +189,11 @@ export function WaitlistPanel({
           pending ? (
             <Icon name="progress_activity" className="animate-spin" />
           ) : (
-            <Icon name="notifications_active" />
+            <Icon name="playlist_add" />
           )
         }
       >
-        {pending ? "กำลังเพิ่ม..." : "แจ้งเตือนเมื่อมีคิวว่าง"}
+        {pending ? "กำลังเพิ่ม..." : "ฝากรอคิวว่าง"}
       </Button>
     </div>
   );

@@ -1,4 +1,5 @@
 import { formatBaht } from "@/lib/baht";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import { DeltaChip } from "./DeltaChip";
 
 /**
@@ -18,7 +19,10 @@ export function RevenueHeroCard({
   delta: number | null;
 }) {
   return (
-    <section className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 md:p-6">
+    <section
+      data-tour={TOUR_ANCHORS.insightsRevenue}
+      className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 md:p-6"
+    >
       <div className="flex items-center justify-between gap-3">
         <p className="text-label-md text-on-surface-variant">รายได้โดยประมาณ</p>
         <DeltaChip delta={delta} size="md" />

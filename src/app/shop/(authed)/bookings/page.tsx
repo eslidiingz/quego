@@ -10,6 +10,7 @@ import {
 } from "@/lib/services/bookings";
 import { getBangkokNow } from "@/lib/time/bangkok";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { TourHelpButton } from "@/components/tour/TourHelpButton";
 import { BookingRow } from "./BookingRow";
 import { BookingsTabs } from "./BookingsTabs";
 import { NewBookingDialog } from "./NewBookingDialog";
@@ -73,6 +74,7 @@ export default async function ShopBookingsPage({
         eyebrow="การจองของลูกค้า"
         title="รายการจอง"
         description="ติดตามคิวที่ลูกค้าจองเข้ามาที่ร้านของคุณ ทั้งคิววันนี้ คิวล่วงหน้า และประวัติย้อนหลัง"
+        help={<TourHelpButton tourId="shop-bookings" />}
         action={
           context ? (
             <NewBookingDialog context={context} triggerSize="sm" />

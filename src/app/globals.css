@@ -303,6 +303,33 @@
     -webkit-backdrop-filter: blur(12px);
   }
 
+  /* Guided-tour spotlight. Two shadows on one box, both of which follow the
+     element's own border-radius: a primary ring around the highlighted element,
+     then a 200vmax spread that swallows the rest of the viewport as the scrim.
+     Cheaper and sharper than an SVG mask, and it animates between steps. */
+  .tour-spotlight {
+    position: fixed;
+    pointer-events: none;
+    box-shadow:
+      0 0 0 3px var(--color-primary),
+      0 0 0 200vmax color-mix(in oklab, var(--color-on-surface) 62%, transparent);
+  }
+  /* Centered mode (no anchor to cut out) paints the scrim directly instead. */
+  .tour-scrim {
+    background: color-mix(in oklab, var(--color-on-surface) 62%, transparent);
+  }
+  /* The spotlight slides and resizes between steps; the page beneath is
+     scrolled instantly, so this transition carries all of the motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    .tour-spotlight {
+      transition:
+        top 0.22s cubic-bezier(0.2, 0.7, 0.3, 1),
+        left 0.22s cubic-bezier(0.2, 0.7, 0.3, 1),
+        width 0.22s cubic-bezier(0.2, 0.7, 0.3, 1),
+        height 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+    }
+  }
+
   /* Dark hand-patches — these utilities embed a literal color that does NOT
      track the --color-* tokens, so they must be re-stated for .dark.
 
@@ -335,6 +362,16 @@
   .dark .glass-card {
     background: color-mix(in oklab, #0e1a17 72%, transparent);
     border: 1px solid color-mix(in oklab, var(--color-outline-variant) 60%, transparent);
+  }
+  /* `on-surface` flips to a near-white in dark mode, so reusing it for the tour
+     scrim would wash the screen out instead of dimming it. Pin to black. */
+  .dark .tour-spotlight {
+    box-shadow:
+      0 0 0 3px var(--color-primary),
+      0 0 0 200vmax color-mix(in oklab, #000 74%, transparent);
+  }
+  .dark .tour-scrim {
+    background: color-mix(in oklab, #000 74%, transparent);
   }
 }
 

@@ -459,7 +459,7 @@ export function BookingForm({
             selectedDay?.status === "available"
               ? `บริการครั้งละ ${selectedService?.durationMinutes} นาที`
               : selectedDay?.status === "full"
-                ? "วันนี้คิวเต็ม — รับการแจ้งเตือนเมื่อมีคิวว่างได้"
+                ? "วันนี้คิวเต็ม — ฝากรอคิวว่างไว้ได้"
                 : "กรุณาเลือกวันที่เปิดบริการก่อน"
           }
         >

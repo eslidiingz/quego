@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import type { CustomerSort } from "@/lib/services/customer-crm";
 
 /**
@@ -50,6 +51,7 @@ export function CustomerListControls({
         }}
         className="flex gap-2"
         noValidate
+        data-tour={TOUR_ANCHORS.customersSearch}
       >
         <div className="relative flex-1">
           <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
@@ -69,7 +71,10 @@ export function CustomerListControls({
         </Button>
       </form>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div
+        data-tour={TOUR_ANCHORS.customersSort}
+        className="flex flex-wrap items-center gap-2"
+      >
         {SORTS.map((s) => (
           <button
             key={s.key}

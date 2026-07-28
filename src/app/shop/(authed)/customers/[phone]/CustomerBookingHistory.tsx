@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { formatBaht } from "@/lib/baht";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import type { ShopCustomerBooking } from "@/lib/services/customer-crm";
 import type { BookingStatus, CancelledBy } from "@/lib/services/bookings";
 
@@ -41,7 +42,7 @@ export function CustomerBookingHistory({
   const hiddenCount = past.length - visiblePast.length;
 
   return (
-    <div className="space-y-8">
+    <div data-tour={TOUR_ANCHORS.customerHistory} className="space-y-8">
       {upcomingSorted.length > 0 ? (
         <section className="space-y-4">
           <h2 className="flex items-center gap-2 font-display text-headline-md text-on-surface">

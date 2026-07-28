@@ -1,6 +1,7 @@
 "use client";
 
 import { CopyField } from "@/components/ui/CopyField";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 
@@ -60,7 +61,7 @@ export function ShareTools({
     <div className="space-y-stack-md">
       {/* Shop link + its QR — primary share target, bundled in one card like
           the in-shop check-in section below. */}
-      <section className={CARD}>
+      <section data-tour={TOUR_ANCHORS.shareShopQr} className={CARD}>
         <h2 className="text-label-lg font-bold text-on-surface mb-1 flex items-center gap-2">
           <Icon name="qr_code_2" size={20} className="text-primary" />
           QR และลิงก์ร้านของคุณ
@@ -93,14 +94,14 @@ export function ShareTools({
             ดาวน์โหลด QR
           </Button>
         </div>
-        <div className="mt-4">
+        <div data-tour={TOUR_ANCHORS.shareShopUrl} className="mt-4">
           <CopyField value={shopUrl} id="share-shop-url" />
         </div>
       </section>
 
       {/* OPP-08: in-shop walk-in QR — print and post at the counter so customers
           self-join today's queue (phone + service, no login). */}
-      <section className={CARD}>
+      <section data-tour={TOUR_ANCHORS.shareWalkIn} className={CARD}>
         <h2 className="text-label-lg font-bold text-on-surface mb-1 flex items-center gap-2">
           <Icon name="storefront" size={20} className="text-primary" />
           QR เช็คอินหน้าร้าน
@@ -142,7 +143,7 @@ export function ShareTools({
       </section>
 
       {/* Direct booking link — secondary, for a "จองคิว" rich-menu button */}
-      <section className={CARD}>
+      <section data-tour={TOUR_ANCHORS.shareBookingUrl} className={CARD}>
         <h2 className="text-label-lg font-bold text-on-surface mb-1 flex items-center gap-2">
           <Icon name="event_available" size={20} className="text-primary" />
           ลิงก์จองคิวโดยตรง

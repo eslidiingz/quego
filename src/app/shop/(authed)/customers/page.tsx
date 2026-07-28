@@ -8,6 +8,8 @@ import {
 import { getBangkokToday } from "@/lib/time/bangkok";
 import { formatBaht } from "@/lib/baht";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { TourHelpButton } from "@/components/tour/TourHelpButton";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import { Icon } from "@/components/ui/Icon";
 import { CustomerListControls } from "./CustomerListControls";
 
@@ -66,6 +68,7 @@ export default async function ShopCustomersPage({
             ? `ผลการค้นหา “${q}” · พบ ${result.total.toLocaleString("th-TH")} คน`
             : `ลูกค้าทั้งหมด ${result.total.toLocaleString("th-TH")} คน · ค้นหา ติดตาม และจองให้ลูกค้าได้จากที่นี่`
         }
+        help={<TourHelpButton tourId="shop-customers" />}
       />
 
       <CustomerListControls q={q} sort={sort} />
@@ -97,7 +100,7 @@ function CustomerCard({
 }) {
   const name = customer.displayName?.trim() || formatPhone(customer.phone);
   return (
-    <li>
+    <li data-tour={TOUR_ANCHORS.customersCard}>
       <Link
         href={`/shop/customers/${customer.phone}`}
         className="flex items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 transition-colors hover:border-primary hover:bg-surface-container-low focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { INSIGHTS_RANGES, type InsightsRange } from "@/lib/insights/aggregate";
 import { cn } from "@/lib/cn";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 
 /**
  * Segmented control for the report lookback window. Server-rendered links that
@@ -39,6 +40,7 @@ export function RangeSelector({
 
   return (
     <div
+      data-tour={TOUR_ANCHORS.insightsRange}
       role="group"
       aria-label="เลือกช่วงเวลา"
       className="flex w-full gap-1.5 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

@@ -58,7 +58,7 @@ function mapNotice(
     case "line-connected-customer":
       return {
         kind: "success",
-        message: "เชื่อมต่อ LINE สำเร็จ คุณจะได้รับแจ้งเตือนสถานะคิวผ่าน LINE",
+        message: "เชื่อมต่อ LINE สำเร็จ คุณจะได้รับข้อความยืนยันการจองผ่าน LINE",
       };
     case "line-already-linked-customer":
       return {

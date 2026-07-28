@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { LocationSearchPicker } from "@/components/ui/LocationSearchPicker";
 import { ShopLocationPicker } from "@/components/shop/ShopLocationPicker";
 import { resolveMapsLink } from "@/lib/location/resolve-maps-link";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import { CategoryPicker } from "@/app/shops/register/CategoryPicker";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Toast } from "@/components/ui/Toast";
@@ -76,6 +77,7 @@ export function EditProfileForm({
           />
           <Input
             name="handle"
+            data-tour={TOUR_ANCHORS.profileHandle}
             label="ลิงก์ร้าน"
             required
             placeholder="เช่น tukta-salon"
@@ -192,6 +194,7 @@ export function EditProfileForm({
         >
           <Input
             name="rescheduleCancelCutoffHours"
+            data-tour={TOUR_ANCHORS.profileCutoff}
             label="ต้องเลื่อน/ยกเลิกล่วงหน้าอย่างน้อย (ชั่วโมง)"
             required
             type="number"

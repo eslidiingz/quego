@@ -4,6 +4,7 @@ import { requireShopSession } from "@/lib/auth/shop-session-server";
 import { getShopById } from "@/lib/services/shops";
 import { absoluteUrl } from "@/lib/url";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { TourHelpButton } from "@/components/tour/TourHelpButton";
 import { Chip } from "@/components/ui/Chip";
 import { ShareTools } from "./ShareTools";
 
@@ -54,6 +55,7 @@ export default async function ShopSharePage() {
           </Chip>
         }
         description="คัดลอกลิงก์หรือดาวน์โหลด QR เพื่อให้ลูกค้าจองคิว และนำไปติดในเมนู LINE ของร้าน"
+        help={<TourHelpButton tourId="shop-share" />}
       />
 
       <ShareTools

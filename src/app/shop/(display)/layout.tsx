@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { requireShopSession } from "@/lib/auth/shop-session-server";
 import { Icon } from "@/components/ui/Icon";
+import { ShopTourProvider } from "@/components/tour/ShopTourProvider";
+import { TourHelpButton } from "@/components/tour/TourHelpButton";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 
 /**
  * Chrome-free layout for the shop waiting-room DISPLAY (`/shop/display`, OPP-07).
@@ -24,16 +27,24 @@ export default async function ShopDisplayLayout({
   await requireShopSession();
 
   return (
-    <div className="relative min-h-screen bg-background">
-      <Link
-        href="/shop"
-        aria-label="ออกจากโหมดจอแสดงผล"
-        title="ออกจากโหมดจอแสดงผล"
-        className="absolute right-4 top-4 z-10 inline-flex items-center justify-center rounded-full border border-outline-variant bg-surface/80 p-2 text-on-surface-variant backdrop-blur transition-colors hover:bg-surface-container-high"
-      >
-        <Icon name="close" size={18} />
-      </Link>
-      {children}
-    </div>
+    // This route group is a sibling of `(authed)`, so it is outside that
+    // layout's provider and needs its own for the `?` button to work here.
+    <ShopTourProvider>
+      <div className="relative min-h-screen bg-background">
+        <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+          <TourHelpButton tourId="shop-display" />
+          <Link
+            href="/shop"
+            data-tour={TOUR_ANCHORS.displayExit}
+            aria-label="ออกจากโหมดจอแสดงผล"
+            title="ออกจากโหมดจอแสดงผล"
+            className="inline-flex items-center justify-center rounded-full border border-outline-variant bg-surface/80 p-2 text-on-surface-variant backdrop-blur transition-colors hover:bg-surface-container-high"
+          >
+            <Icon name="close" size={18} />
+          </Link>
+        </div>
+        {children}
+      </div>
+    </ShopTourProvider>
   );
 }

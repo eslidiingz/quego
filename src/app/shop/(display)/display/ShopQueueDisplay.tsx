@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/cn";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import type { ShopDisplaySnapshot } from "@/lib/services/shop-display";
 import type { DisplayQueueRow } from "@/lib/booking/queue-display";
 import { pollShopDisplayQueue, callNextQueueAction } from "./queue-actions";
@@ -118,7 +119,10 @@ export function ShopQueueDisplay({
 
       {nowServing ? (
         <div className="mt-8 flex flex-1 flex-col">
-          <section className="relative overflow-hidden rounded-3xl border border-primary/20 bg-primary-container/15 px-6 py-10 text-center md:px-10 md:py-14">
+          <section
+            data-tour={TOUR_ANCHORS.displayHero}
+            className="relative overflow-hidden rounded-3xl border border-primary/20 bg-primary-container/15 px-6 py-10 text-center md:px-10 md:py-14"
+          >
             <HeroEyebrow
               hasStarted={nowServingStarted}
               slotTime={nowServing.slotTime}
@@ -151,7 +155,7 @@ export function ShopQueueDisplay({
             </div>
           </section>
 
-          <section className="mt-8">
+          <section data-tour={TOUR_ANCHORS.displayUpcoming} className="mt-8">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-label-md uppercase tracking-widest text-on-surface-variant">
                 คิวถัดไป
@@ -173,7 +177,7 @@ export function ShopQueueDisplay({
             )}
           </section>
 
-          <div className="mt-auto pt-10">
+          <div data-tour={TOUR_ANCHORS.displayCallNext} className="mt-auto pt-10">
             <ConfirmDialog
               trigger={
                 <Button

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Icon } from "@/components/ui/Icon";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import {
   parseLatLngFromGoogleMapsUrl,
   buildLatLngPreviewUrl,
@@ -131,7 +132,7 @@ export function ShopLocationPicker({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div data-tour={TOUR_ANCHORS.profileLocation} className="flex flex-col gap-3">
       {/* The only values the form submits — a pair, or both blank. */}
       <input type="hidden" name="latitude" value={coords ? String(coords.lat) : ""} />
       <input type="hidden" name="longitude" value={coords ? String(coords.lng) : ""} />

@@ -22,7 +22,7 @@ export function CancelWaitlistButton({ entryId }: { entryId: string }) {
         </button>
       }
       title="ออกจากรายการรอหรือไม่?"
-      description="เราจะหยุดแจ้งเตือนเมื่อมีคิวว่างสำหรับรายการนี้"
+      description="รายการนี้จะถูกนำออก และจะไม่ได้รับการเสนอคิวเมื่อมีที่ว่าง"
       confirmLabel="ออกจากรายการรอ"
       cancelLabel="ไม่"
       destructive
