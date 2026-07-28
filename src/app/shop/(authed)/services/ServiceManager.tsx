@@ -10,6 +10,8 @@ import { Chip } from "@/components/ui/Chip";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { TourHelpButton } from "@/components/tour/TourHelpButton";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import {
   parseServiceFormData,
   validateServiceForm,
@@ -79,8 +81,14 @@ export function ServiceManager({
         eyebrow="จัดการบริการ"
         title="บริการ"
         description="เพิ่มและจัดการบริการของร้าน เช่น ตัดผม ทำสี ดัดวอลลุ่ม ระยะเวลาของแต่ละบริการกำหนดรอบเวลาที่ลูกค้าจองได้"
+        help={<TourHelpButton tourId="shop-services" />}
         action={
-          <Button size="sm" iconLeft={<Icon name="add" size={18} />} onClick={openAdd}>
+          <Button
+            size="sm"
+            iconLeft={<Icon name="add" size={18} />}
+            onClick={openAdd}
+            data-tour={TOUR_ANCHORS.servicesAdd}
+          >
             เพิ่มบริการ
           </Button>
         }
@@ -176,6 +184,7 @@ function ServiceRow({
 
   return (
     <li
+      data-tour={TOUR_ANCHORS.servicesRow}
       className={`bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:p-5 flex items-start gap-3 ${
         service.isActive ? "" : "opacity-70"
       }`}
@@ -201,7 +210,10 @@ function ServiceRow({
         ) : null}
       </div>
 
-      <div className="flex flex-col items-end gap-2 shrink-0">
+      <div
+        data-tour={TOUR_ANCHORS.servicesRowControls}
+        className="flex flex-col items-end gap-2 shrink-0"
+      >
         <Switch
           checked={service.isActive}
           disabled={pending}
@@ -393,7 +405,10 @@ function PresetImportBar({
   onOpen: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary-container/10 p-4">
+    <div
+      data-tour={TOUR_ANCHORS.servicesPresets}
+      className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary-container/10 p-4"
+    >
       <div className="min-w-0 flex-1">
         <p className="text-label-md font-bold text-on-surface">
           ชุดบริการสำเร็จรูป{categoryName ? ` · ${categoryName}` : ""}

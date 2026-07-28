@@ -10,6 +10,8 @@ import { Chip } from "@/components/ui/Chip";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { TourHelpButton } from "@/components/tour/TourHelpButton";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import {
   parseStaffFormData,
   validateStaffForm,
@@ -61,8 +63,14 @@ export function StaffManager({
         eyebrow="จัดการทีมงาน"
         title="พนักงาน"
         description="เพิ่มและจัดการพนักงานของร้าน จำนวนพนักงานที่เปิดใช้งานกำหนดว่ารับได้กี่คิวพร้อมกันในแต่ละช่วงเวลา"
+        help={<TourHelpButton tourId="shop-staff" />}
         action={
-          <Button size="sm" iconLeft={<Icon name="person_add" size={18} />} onClick={openAdd}>
+          <Button
+            size="sm"
+            iconLeft={<Icon name="person_add" size={18} />}
+            onClick={openAdd}
+            data-tour={TOUR_ANCHORS.staffAdd}
+          >
             เพิ่มพนักงาน
           </Button>
         }
@@ -117,6 +125,7 @@ function StaffRow({
 
   return (
     <li
+      data-tour={TOUR_ANCHORS.staffRow}
       className={`bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:p-5 flex items-start gap-3 ${
         member.isActive ? "" : "opacity-60"
       }`}
@@ -162,7 +171,10 @@ function StaffRow({
       </div>
 
       {/* right column: switch + actions */}
-      <div className="flex flex-col items-end gap-2 shrink-0">
+      <div
+        data-tour={TOUR_ANCHORS.staffRowControls}
+        className="flex flex-col items-end gap-2 shrink-0"
+      >
         <Switch
           checked={member.isActive}
           disabled={pending}

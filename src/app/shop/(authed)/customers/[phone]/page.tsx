@@ -12,6 +12,8 @@ import { getBookingContext } from "@/lib/services/bookings";
 import { getBangkokToday } from "@/lib/time/bangkok";
 import { formatBaht } from "@/lib/baht";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { TourHelpButton } from "@/components/tour/TourHelpButton";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import { Icon } from "@/components/ui/Icon";
 import { NewBookingDialog } from "../../bookings/NewBookingDialog";
 import { CustomerNoteForm } from "./CustomerNoteForm";
@@ -60,6 +62,7 @@ export default async function ShopCustomerPage({
       <PageHeader
         eyebrow="ลูกค้า"
         title={title}
+        help={<TourHelpButton tourId="shop-customer-detail" />}
         action={
           context ? (
             <NewBookingDialog
@@ -95,7 +98,10 @@ export default async function ShopCustomerPage({
       />
 
       {/* ── Summary tiles ─────────────────────────────────────────── */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <section
+        data-tour={TOUR_ANCHORS.customerStats}
+        className="grid grid-cols-2 gap-3 lg:grid-cols-3"
+      >
         <StatTile
           icon="task_alt"
           label="ใช้บริการแล้ว"
@@ -137,7 +143,10 @@ export default async function ShopCustomerPage({
       </section>
 
       {/* ── Private note editor ───────────────────────────────────── */}
-      <section className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-6 md:p-8 space-y-4">
+      <section
+        data-tour={TOUR_ANCHORS.customerNote}
+        className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-6 md:p-8 space-y-4"
+      >
         <header className="flex items-start gap-3 pb-4 border-b border-outline-variant/40">
           <span className="w-10 h-10 rounded-lg bg-primary-container/10 text-primary flex items-center justify-center shrink-0">
             <Icon name="sticky_note_2" />

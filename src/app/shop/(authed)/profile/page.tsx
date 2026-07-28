@@ -6,6 +6,9 @@ import { Chip } from "@/components/ui/Chip";
 import { ChangePinForm } from "@/components/ui/ChangePinForm";
 import { FlashToast } from "@/components/ui/FlashToast";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { TourHelpButton } from "@/components/tour/TourHelpButton";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
+import { profileTourId } from "@/lib/tour/shop-tours";
 import { ProfileTabs, type ProfileTab } from "./ProfileTabs";
 import { EditProfileForm } from "./EditProfileForm";
 import { ShopImagesForm } from "./ShopImagesForm";
@@ -58,21 +61,31 @@ export default async function ShopProfilePage({
         title="ข้อมูลร้าน"
         badge={<Chip variant="premium" size="sm">เปิดให้บริการ</Chip>}
         description={TAB_DESCRIPTIONS[tab]}
+        help={<TourHelpButton tourId={profileTourId(tab)} />}
       />
 
       <ProfileTabs active={tab} />
 
+      {/* The three tab bodies are anchored from here rather than inside each
+          form: they all return fragments, so there is no single root element of
+          theirs for the tour to point at. */}
       {tab === "info" && (
         <div className="space-y-stack-md">
-          <ShopImagesForm shop={shop} />
+          <div data-tour={TOUR_ANCHORS.profileImages}>
+            <ShopImagesForm shop={shop} />
+          </div>
           <EditProfileForm shop={shop} categories={categories} />
         </div>
       )}
       {tab === "hours" && (
-        <BusinessHoursForm hours={hours} shopId={session.shopId} />
+        <div data-tour={TOUR_ANCHORS.profileHours}>
+          <BusinessHoursForm hours={hours} shopId={session.shopId} />
+        </div>
       )}
       {tab === "security" && (
-        <ChangePinForm action={changeShopPinAction} />
+        <div data-tour={TOUR_ANCHORS.profilePin}>
+          <ChangePinForm action={changeShopPinAction} />
+        </div>
       )}
     </div>
   );

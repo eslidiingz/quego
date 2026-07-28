@@ -1397,3 +1397,77 @@ export async function setShopCover(
   return setShopImage(shopId, "cover", file);
 }
 
+/* ── Onboarding: guided tour + activation checklist ─────────────────────── */
+
+export type ShopOnboardingFlags = {
+  hasLogo: boolean;
+  hasCover: boolean;
+  hasLocationPin: boolean;
+  /** ISO timestamp of the owner's first tour, or null if they've never seen it. */
+  tourSeenAt: string | null;
+};
+
+/**
+ * The handful of `shops` columns the onboarding checklist needs.
+ *
+ * Deliberately not `getShopById` — that joins categories and returns ~25
+ * columns, and this runs on every shop page render (the `(authed)` layout).
+ * `latitude` alone is enough for the pin: a CHECK constraint keeps lat/lng
+ * all-or-nothing.
+ */
+export async function getShopOnboardingFlags(
+  shopId: string,
+): Promise<ShopOnboardingFlags | null> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("shops")
+    .select("logo_key, cover_key, latitude, tour_seen_at")
+    .eq("id", shopId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("getShopOnboardingFlags error:", error);
+    return null;
+  }
+  if (!data) return null;
+
+  return {
+    hasLogo: data.logo_key != null,
+    hasCover: data.cover_key != null,
+    hasLocationPin: data.latitude != null,
+    tourSeenAt: data.tour_seen_at,
+  };
+}
+
+export type ShopOnboardingUpdateResult =
+  | { ok: true }
+  | { ok: false; code: "unknown"; message: string };
+
+/**
+ * Record that the owner has been through the guided tour.
+ *
+ * Filtered on `.is("tour_seen_at", null)` so replaying the tour from the `?`
+ * button never moves the stamp — the column keeps meaning "first seen", which
+ * is what makes it usable as an activation metric later.
+ */
+export async function markShopTourSeen(
+  shopId: string,
+): Promise<ShopOnboardingUpdateResult> {
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("shops")
+    .update({ tour_seen_at: new Date().toISOString() })
+    .eq("id", shopId)
+    .is("tour_seen_at", null);
+
+  if (error) {
+    console.error("markShopTourSeen error:", error);
+    return {
+      ok: false,
+      code: "unknown",
+      message: "บันทึกสถานะไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    };
+  }
+  return { ok: true };
+}
+

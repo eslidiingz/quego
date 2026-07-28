@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import type { BookingsCounts, BookingsFilter } from "@/lib/services/bookings";
 
 const tabs: { key: BookingsFilter; label: string }[] = [
@@ -18,6 +19,7 @@ export function BookingsTabs({
 }) {
   return (
     <nav
+      data-tour={TOUR_ANCHORS.bookingsTabs}
       className="flex gap-1 p-1 bg-surface-container-low rounded-full border border-outline-variant overflow-x-auto no-scrollbar"
       aria-label="กรองรายการจอง"
     >

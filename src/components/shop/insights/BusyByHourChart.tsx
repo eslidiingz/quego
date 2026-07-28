@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import type { BusyHourBucket } from "@/lib/insights/aggregate";
 
 /**
@@ -13,7 +14,7 @@ export function BusyByHourChart({ buckets }: { buckets: BusyHourBucket[] }) {
   const max = Math.max(1, ...buckets.map((b) => b.count));
 
   return (
-    <div>
+    <div data-tour={TOUR_ANCHORS.insightsBusy}>
       <div className="flex items-end gap-1 h-40" aria-hidden="true">
         {buckets.map((b) => {
           const pct = b.count === 0 ? 0 : Math.max(6, Math.round((b.count / max) * 100));

@@ -4,6 +4,8 @@ import { getShopReport } from "@/lib/services/insights";
 import { parseReportRange, serializeReportRange } from "@/lib/insights/aggregate";
 import { formatBaht } from "@/lib/baht";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { TourHelpButton } from "@/components/tour/TourHelpButton";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import { Icon } from "@/components/ui/Icon";
 import { buttonClassName } from "@/components/ui/Button";
 import { RangeSelector } from "@/components/shop/insights/RangeSelector";
@@ -72,6 +74,7 @@ export default async function ShopReportPage({
         eyebrow="ผลการดำเนินงาน"
         title="รายงานร้าน"
         description="สรุปรายได้ พนักงาน บริการ และช่วงเวลาคนเยอะ เพื่อช่วยวางแผนร้าน"
+        help={<TourHelpButton tourId="shop-insights" />}
       />
 
       {/* Sticky filter bar: sticks BELOW the 64px ShopShell header (which is
@@ -140,7 +143,10 @@ export default async function ShopReportPage({
               active — never pairing a full expense total with filtered revenue. */}
           {!insights.hasFilter ? (
             <>
-              <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <section
+                data-tour={TOUR_ANCHORS.insightsProfit}
+                className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+              >
                 <NetProfitCard
                   netProfit={insights.netProfit}
                   profitMargin={insights.profitMargin}

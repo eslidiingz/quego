@@ -9,6 +9,8 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { TourHelpButton } from "@/components/tour/TourHelpButton";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import { formatBaht } from "@/lib/baht";
 import { getBangkokToday } from "@/lib/time/bangkok";
 import {
@@ -97,8 +99,14 @@ export function ExpenseManager({
         eyebrow="จัดการการเงิน"
         title="ค่าใช้จ่าย"
         description="บันทึกค่าใช้จ่ายของร้าน เช่น ค่าเช่า ค่าอุปกรณ์ ค่าพนักงาน เพื่อดูกำไรสุทธิในรายงานร้าน"
+        help={<TourHelpButton tourId="shop-expenses" />}
         action={
-          <Button size="sm" iconLeft={<Icon name="add" size={18} />} onClick={openAdd}>
+          <Button
+            size="sm"
+            iconLeft={<Icon name="add" size={18} />}
+            onClick={openAdd}
+            data-tour={TOUR_ANCHORS.expensesAdd}
+          >
             เพิ่มค่าใช้จ่าย
           </Button>
         }
@@ -131,7 +139,10 @@ export function ExpenseManager({
               onYearChange={setFilterYear}
               onMonthChange={setFilterMonth}
             />
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-3">
+            <div
+              data-tour={TOUR_ANCHORS.expensesTotal}
+              className="flex items-center justify-between gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-3"
+            >
               <span className="text-label-md text-on-surface-variant">
                 {filterMonth === "all" ? "รวมทั้งปี" : "รวมเดือนนี้"}{" "}
                 {filtered.length} รายการ
@@ -471,7 +482,10 @@ function PeriodFilter({
   onMonthChange: (value: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+    <div
+      data-tour={TOUR_ANCHORS.expensesPeriod}
+      className="grid grid-cols-2 gap-3 sm:max-w-md"
+    >
       <Select
         label="ปี"
         value={year}

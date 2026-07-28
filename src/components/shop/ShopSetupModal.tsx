@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Modal } from "@/components/ui/Modal";
 import { Icon } from "@/components/ui/Icon";
 import { buttonClassName } from "@/components/ui/Button";
+import { useTour } from "@/components/tour/TourProvider";
 import type { ShopSetupStep } from "@/lib/services/shop-setup";
 
 // Where each step is completed — the modal stays out of the way while the owner
@@ -28,6 +29,13 @@ const STEP_DESTINATION: Record<ShopSetupStep["key"], string> = {
  */
 export function ShopSetupModal({ step }: { step: ShopSetupStep }) {
   const pathname = usePathname();
+  const { isActive } = useTour();
+
+  // Stay out of the way while a guided tour is running — the tour overlay sits
+  // above this (z-70 vs z-50), so stacking both would bury the modal behind the
+  // scrim with no way to reach it. The layout already withholds this modal
+  // during the *first-run* tour; this covers replays from the ? button.
+  if (isActive) return null;
 
   // Don't block the very page where the owner completes this step.
   if (pathname.startsWith(STEP_DESTINATION[step.key])) return null;

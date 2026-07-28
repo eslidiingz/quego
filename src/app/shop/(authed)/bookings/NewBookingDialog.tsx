@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button, buttonClassName } from "@/components/ui/Button";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import { Input } from "@/components/ui/Input";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Icon } from "@/components/ui/Icon";
@@ -225,6 +226,7 @@ export function NewBookingDialog({
     return (
       <Link
         href="/shop/services"
+        data-tour={TOUR_ANCHORS.newBooking}
         className={buttonClassName({
           size: triggerSize,
           className: triggerClassName,
@@ -245,6 +247,7 @@ export function NewBookingDialog({
         onClick={() => setOpen(true)}
         iconLeft={<Icon name={triggerIcon} />}
         className={triggerClassName}
+        data-tour={TOUR_ANCHORS.newBooking}
       >
         {triggerLabel}
       </Button>

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Select } from "@/components/ui/Select";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 
 /**
  * Month/year period picker for the shop report (กรองรายเดือน / รายปี), mirroring
@@ -58,7 +59,10 @@ export function ReportPeriodPicker({
   };
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+    <div
+      data-tour={TOUR_ANCHORS.insightsPeriod}
+      className="grid grid-cols-2 gap-3 sm:max-w-md"
+    >
       <Select
         label="ปี"
         value={String(year)}

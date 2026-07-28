@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 import { formatBaht } from "@/lib/baht";
 import { hhmmToMinutes } from "@/lib/booking/slot-math";
 import type { BookingListItem } from "@/lib/services/bookings";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 import { CancelBookingByShopButton } from "./CancelBookingByShopButton";
 import { CompleteBookingByShopButton } from "./CompleteBookingByShopButton";
 import {
@@ -57,6 +58,8 @@ export function BookingRow({
 
   return (
     <article
+      // Every row carries the anchor; the tour spotlights the first in DOM order.
+      data-tour={TOUR_ANCHORS.bookingsRow}
       className={cn(
         "bg-surface-container-lowest border border-outline-variant border-l-4 rounded-xl p-4 md:p-5 hover:shadow-tinted transition-shadow flex flex-col gap-3.5",
         STATUS_ACCENT[booking.status],
@@ -184,7 +187,10 @@ export function BookingRow({
           </span>
         </div>
         {isConfirmed ? (
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2 sm:shrink-0">
+          <div
+            data-tour={TOUR_ANCHORS.bookingsRowActions}
+            className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2 sm:shrink-0"
+          >
             <CompleteBookingByShopButton
               bookingId={booking.id}
               customerName={booking.customerName}

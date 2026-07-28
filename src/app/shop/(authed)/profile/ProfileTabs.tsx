@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
+import { TOUR_ANCHORS } from "@/lib/tour/anchors";
 
 export type ProfileTab = "info" | "hours" | "security";
 
@@ -15,6 +16,7 @@ const TABS: { key: ProfileTab; label: string; icon: string }[] = [
 export function ProfileTabs({ active }: { active: ProfileTab }) {
   return (
     <nav
+      data-tour={TOUR_ANCHORS.profileTabs}
       className="flex gap-1 p-1 bg-surface-container-low rounded-full border border-outline-variant overflow-x-auto no-scrollbar"
       aria-label="หมวดหมู่ข้อมูลร้าน"
     >
