@@ -96,38 +96,43 @@ pnpm test -t "rejects overlapping slot"
 src/
 ├── proxy.ts            # Next.js 16 middleware (renamed!) — route-guards every persona area
 ├── app/                # App Router routes, grouped by persona (see "Routing" below)
-│   ├── page.tsx        # Customer home / shop discovery
-│   ├── shops/          # Public: shop detail, booking + walk-in forms, registration
-│   ├── me/             # Customer-authed area (bookings, profile, credit, waitlist)
+│   ├── page.tsx        # Customer landing / shop discovery
+│   ├── business/       # Public shop-owner landing (sells the product to shops)
+│   ├── shops/          # Public: shop detail (/shops/{handle}), booking + walk-in, registration
+│   ├── me/             # Customer-authed area (bookings, profile, waitlist)
 │   ├── login/          # Unified customer/shop step-1 login (+ /login/pin)
 │   ├── shop/           # Shop-owner area — (authed)/ subtree, (display)/ kiosk, /shop/login
 │   ├── admin/          # Admin area — (authed)/ subtree (shops, categories, presets, audit) + /admin/login
 │   ├── bookings/[id]/  # Public booking confirmation + reschedule (UUID-gated)
 │   ├── api/            # Route handlers: LINE webhook + shop/customer LINE OAuth callbacks
 │   ├── design-system/  # Live token/component gallery (dev reference)
-│   ├── globals.css     # ALL design tokens live here (Tailwind v4 @theme)
-│   └── layout.tsx      # IBM Plex Sans Thai + Material Symbols, lang="th"
-├── components/         # ui/ · booking/ · layout/ · admin/ · shop/ · auth/ · landing/ · reviews/
+│   ├── globals.css     # ALL design tokens live here (Tailwind v4 @theme) + `.dark` overrides
+│   └── layout.tsx      # Sora + Anuphan + Material Symbols, lang="th", no-FOUC theme script
+├── components/         # ui/ · booking/ · layout/ · admin/ · shop/ · auth/ · landing/ · reviews/ · tour/
 ├── lib/
 │   ├── cn.ts           # cn() — clsx + extended tailwind-merge (see gotcha below)
+│   ├── baht.ts, slug.ts, url.ts  # ฿ formatting · shop handles · absolute-link building
 │   ├── auth/           # session.ts (JWT core) + *-session-server.ts + password.ts + lockout.ts
-│   ├── services/       # Server-only data layer (shops, bookings, staff, loyalty, reviews, line-*, …)
+│   ├── services/       # Server-only data layer (shops, bookings, staff, expenses, reviews, line-*, …)
 │   ├── supabase/       # admin.ts — cached service-role client
 │   ├── booking/        # slot-math.ts — pure, browser-safe slot generation (+ period/cutoff/queue)
 │   ├── time/           # bangkok.ts — "what time is it in ICT?" helpers
-│   ├── validation/     # shared input validators (shop, phone, uuid)
+│   ├── validation/     # shared input validators (shop, phone, uuid, media)
 │   ├── line/           # LINE Messaging/Login: signature, client, flex builders, commands, oauth
 │   ├── firebase/       # Firebase phone-OTP ID-token verification (jose, no Admin SDK)
 │   ├── r2/             # Cloudflare R2 (S3 SDK) image upload + magic-byte validation
-│   ├── loyalty/        # Loyalty credit + referral math
+│   ├── shop/           # setup-checklist.ts — pure activation-checklist derivation
+│   ├── tour/           # Guided-tour registries + spotlight geometry (pure data — see below)
+│   ├── expenses/       # Shop expense categories
 │   ├── waitlist/       # Waitlist eligibility
 │   ├── insights/       # Shop analytics aggregation (pure)
-│   ├── location/       # Thailand province/district/subdistrict data
+│   ├── location/       # Thailand province/district/subdistrict data + maps links
 │   ├── security/       # Rate-limiting
 │   └── customer/       # Customer-side helpers
-├── supabase/migrations/ # In-repo schema baseline (see "Database schema")
-design/                 # Source HTML mockups + screenshots + DESIGN.md
-docs/                   # product/ (PRDs, backlog) + marketing/ strategy
+
+supabase/migrations/    # In-repo schema — baseline + dated migrations (see "Database schema")
+design/                 # Source HTML mockups + screenshots + DESIGN.md + DARK_MODE.md
+docs/                   # product/ (backlog, competitive analyses) + marketing/ strategy
 ```
 
 Folders under `app/<persona>/(authed)/` are **route groups** — the `(authed)`
@@ -143,6 +148,29 @@ Tailwind v4 reads tokens from `@theme { … }` in [globals.css](src/app/globals.
 That means **adding a new color/typography token requires only editing
 globals.css** — the utility (`bg-foo`, `text-foo`) becomes available
 immediately. There is no `tailwind.config.{ts,js}` to update.
+
+### Dark mode is class-based, and every token has to be re-stated
+
+Tailwind v4 binds `dark:` to `prefers-color-scheme` by default. [globals.css](src/app/globals.css)
+**rewires it** — `@custom-variant dark (&:where(.dark, .dark *))` — so the theme
+follows a `.dark` class on `<html>`, which the user's toggle controls. Consequences
+you must respect:
+
+- Light values live in `@theme { … }`; **every** dark value is re-declared in the
+  `.dark { … }` block further down the same file. Adding a `--color-*` token means
+  adding it in *both* places or dark mode silently keeps the light value.
+- Custom utilities and shadows that hard-code colors instead of reading `--color-*`
+  (`.bg-quego-hero`, `.glass-card`, `.tour-spotlight`, …) don't track tokens, so each
+  has its own `.dark .x` override. Prefer tokens; if you must hard-code, add the
+  override.
+- The class is applied by an **inline, blocking `<script>` in
+  [layout.tsx](src/app/layout.tsx)** before first paint (reads `localStorage`
+  key `quego-theme`, falls back to the OS preference). That's why `<html>` carries
+  `suppressHydrationWarning` — don't remove it, and don't move the script to
+  `next/script` or the page will flash the wrong theme.
+- [ThemeToggle](src/components/ui/ThemeToggle.tsx) owns the same storage key. The
+  full dark palette + contrast report is spec'd in
+  [design/aura_queue/DARK_MODE.md](design/aura_queue/DARK_MODE.md).
 
 ### `cn()` knows about our custom typography tokens
 
@@ -166,6 +194,10 @@ this, `tailwind-merge` would conflate them with color utilities like
   `font-variation-settings`. The font is rendered as a `<link>` in [app/layout.tsx](src/app/layout.tsx)'s
   `<head>` (the `@next/next/no-page-custom-font` lint there is a Pages-Router
   false positive and is intentionally disabled).
+- **Typography is Sora + Anuphan**, both via `next/font/google`. Sora carries
+  Latin display text and numerals; **Anuphan carries all Thai** — Sora has no Thai
+  glyphs, so where `--font-display` leads with Sora, Thai falls through to Anuphan
+  per glyph. Never set a Latin-only family as the sole face on Thai copy.
 
 
 ### Routing & route protection
@@ -252,12 +284,34 @@ projects "now" into ICT (`getBangkokToday`, `getBangkokNow`, `getBangkokDateWind
 pure and shared client+server via [src/lib/booking/slot-math.ts](src/lib/booking/slot-math.ts)
 so the picker and the validator can never disagree about which times exist.
 
+### Shop onboarding: activation checklist + guided tour
+
+Two separate systems, both deliberately **pure data + pure derivation** so they
+stay in the `node` test env:
+
+- **Activation checklist** — [lib/shop/setup-checklist.ts](src/lib/shop/setup-checklist.ts)
+  turns five booleans (service, open day, location pin, logo, active staff) into an
+  ordered task list. Two tiers: `blocking` tasks (services, hours) mean the shop
+  literally cannot take a booking and drive the focus modal; the rest are surfaced,
+  never nagged. The service layer ([services/shop-setup.ts](src/lib/services/shop-setup.ts))
+  does the reading; the module itself performs no I/O.
+- **Guided tour** — [lib/tour/](src/lib/tour) is a registry of coachmark steps as
+  **pure data, no JSX and no functions**, keyed to `data-tour="<id>"` anchors
+  ([anchors.ts](src/lib/tour/anchors.ts)). Every anchored step must supply
+  `fallbackBody`, because a missing anchor is the *normal* case (empty-state pages,
+  the off-canvas nav below `lg`) — `shop-tours.test.ts` enforces this. Progress is
+  persisted as `shops.tour_seen_at`.
+
+The tour copy is held to a hard rule worth preserving: **describe only what the app
+actually does.** There is no shop-side reschedule, no VIP marking, and no
+`/shop/waitlist` page — if you add a step, verify the control exists first.
+
 ### Testing
 
 [vitest.config.ts](vitest.config.ts) runs `src/**/*.test.ts` in a **`node`**
 environment. The suite is **pure-logic only** — slot math, Bangkok time, insights
-aggregation, validators, loyalty/waitlist rules, auth hashing/lockout, and the
-LINE signature/format/command helpers. There is **no DOM, no React-render, and no
+aggregation, validators, waitlist rules, the setup-checklist and guided-tour
+registries, auth hashing/lockout, and the LINE signature/format/command helpers. There is **no DOM, no React-render, and no
 DB** in tests; don't reach for jsdom or a live Supabase.
 
 Two aliases make this work (mirroring how the app imports): `@/…` → `src/…`, and
@@ -270,33 +324,62 @@ request-dependent out of them.
 ### Database schema
 
 The schema now lives **in-repo** under
-[supabase/migrations/](supabase/migrations) — the 60 incremental migrations were
-consolidated into a single baseline,
-`20260620000000_baseline_schema.sql`, which is the source of truth. Apply it to a
-fresh Supabase project (it `CREATE EXTENSION`s `btree_gist`, required by the
-booking overlap constraints and **not** present by default on new projects).
-Inspect/alter the live DB via the Supabase MCP tools (`list_tables`,
-`apply_migration`); add new changes as **new dated migration files**, don't edit
+[supabase/migrations/](supabase/migrations). 60 incremental migrations were once
+consolidated into `20260620000000_baseline_schema.sql`; **that baseline is a
+starting point, not the current schema** — dated migrations have landed on top of
+it since, so read the whole directory in filename order (or query the live DB)
+before assuming a column exists. Apply the baseline first to a fresh Supabase
+project (it `CREATE EXTENSION`s `btree_gist`, required by the booking overlap
+constraints and **not** present by default on new projects), then the rest in
+order. Inspect/alter the live DB via the Supabase MCP tools (`list_tables`,
+`apply_migration`); add new changes as **new dated migration files**, never edit
 the baseline. A super-admin is seeded directly in Supabase (phone `08XXXXXXXX`).
 
-The table set (~19) groups by domain:
+The live table set groups by domain:
 
 - **Core** — `admins`, `customers`, `shops`, `shop_categories`,
   `shop_business_hours`, `bookings`.
 - **Catalog & staff** — `shop_services`, `shop_staff`, `shop_staff_services`,
   `category_service_presets` (admin-curated service templates per category).
-- **Engagement** — `reviews`, `loyalty_ledger` + `referrals` (idempotent credit
-  entries; unique indexes keep one entry per booking/kind and per referral),
-  `waitlist_entries`, `shop_customer_notes`.
+- **Engagement** — `reviews`, `waitlist_entries`, `shop_customer_notes`.
+- **Money** — `shop_expenses` (owner-entered running costs, behind `/shop/expenses`).
 - **LINE** — `line_link_codes`, `line_message_log` (dedups inbound by
   `line_message_id`).
 - **Ops** — `admin_audit_logs`, `rate_limits`.
 
 `bookings` carries a `time_range` and optional `staff_id`; identity is still the
 denormalized `customer_phone` (no FK) — see the Data-access note above.
+`shops` also carries `latitude`/`longitude` (the map pin that powers distance on
+discovery) and `tour_seen_at` (guided-tour state).
+
+**Loyalty is gone, permanently.** `20260701000000_drop_loyalty_promotions_referrals.sql`
+dropped `loyalty_ledger`, `referrals`, `shop_promotions`, `promotion_stamps` and
+`customers.referral_code`. They still appear in the baseline file — that file is
+history, not truth. Don't reintroduce points/stamps/referrals without an explicit
+product decision; it was removed on purpose.
+
+The one **view**: `shop_customer_summary` (one row per shop × customer_phone —
+visits, lifetime spend, last visit) backs the CRM list at `/shop/customers`. It is
+`security_invoker = true`, so it inherits `bookings`' deny-all RLS; the app reads
+it through the service-role client and scopes by `.eq("shop_id", …)` like every
+other read.
 
 ## Gotchas
 
+- **`serverActions.bodySizeLimit` is `5mb` and it is GLOBAL.** Set in
+  [next.config.ts](next.config.ts) so cropped shop logo/cover uploads (which stream
+  through a server action) aren't rejected by the default 1 MB cap. It applies to
+  *every* server action, so the real per-slot limits are enforced in
+  [lib/validation/media.ts](src/lib/validation/media.ts) (2 MB logo / 4 MB cover) —
+  keep validating payload size in the action, not just at the envelope.
+- **`/shops/[id]` takes a handle, not only a UUID.** The segment resolves either;
+  a UUID hit with a handle on record `redirect()`s once to `/shops/{handle}` so
+  shares and SEO settle on the pretty URL. Build links with
+  `shop.handle ?? shop.id`. Handle rules are pure in [lib/slug.ts](src/lib/slug.ts).
+- **Baseline HTTP security headers are set in [next.config.ts](next.config.ts)**
+  (`nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, HSTS) on `/:path*`. If a
+  route ever needs framing (an embed, a LINE LIFF view), it has to be exempted
+  there — it will otherwise fail silently in the browser.
 - **Floating UI (modal, toast, dropdown) must portal to `document.body`.**
   The admin sidebar uses `translate-x-*` for slide-in animation, and CSS spec
   says any `transform` on an ancestor turns it into the containing block for
