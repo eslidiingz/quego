@@ -50,3 +50,34 @@ export async function recordLineMessage(
     console.error("recordLineMessage unexpected error:", err);
   }
 }
+
+/**
+ * Claim a webhook event for processing (insert-first dedupe, audit L3). Returns
+ * false when the key was already logged — a LINE redelivery or a replayed body —
+ * so the caller skips it. Fails OPEN on unexpected DB errors: dropping genuine
+ * events because logging is down would be worse than a rare double-handle, and
+ * the timestamp window still bounds replays.
+ */
+export async function claimLineWebhookEvent(
+  key: string,
+  meta: Record<string, unknown> | null = null,
+): Promise<boolean> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase.from("line_message_log").insert({
+      recipient: "webhook",
+      direction: "inbound",
+      kind: "webhook_event",
+      status: "received",
+      line_message_id: key,
+      meta,
+    });
+    if (!error) return true;
+    if (error.code === "23505") return false;
+    console.error("claimLineWebhookEvent insert error:", error);
+    return true;
+  } catch (err) {
+    console.error("claimLineWebhookEvent unexpected error:", err);
+    return true;
+  }
+}

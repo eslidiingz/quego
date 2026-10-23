@@ -1,4 +1,5 @@
 import "server-only";
+import { allowedFromStatuses } from "@/lib/booking/status-transitions";
 import { after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isValidThaiPhone } from "@/lib/validation/phone";
@@ -1195,17 +1196,27 @@ export type UpdateBookingStatusResult =
  * `id` and `shop_id`; if either fails to match, Supabase returns zero rows
  * and we surface `not_found`.
  */
+const STATUS_CHANGE_DENIED =
+  "ไม่พบรายการจองนี้ หรือสถานะปัจจุบันไม่อนุญาตให้เปลี่ยน";
+
 export async function updateBookingStatus(
   bookingId: string,
   shopId: string,
   newStatus: BookingStatus,
 ): Promise<UpdateBookingStatusResult> {
+  // Compare-and-set on the current status (audit M5): only a live booking may
+  // change, so a cancelled row can't be flipped to completed.
+  const from = allowedFromStatuses(newStatus);
+  if (from.length === 0) {
+    return { ok: false, code: "not_found", message: STATUS_CHANGE_DENIED };
+  }
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("bookings")
     .update({ status: newStatus })
     .eq("id", bookingId)
     .eq("shop_id", shopId)
+    .in("status", [...from])
     .select("id")
     .maybeSingle<{ id: string }>();
 
@@ -1214,7 +1225,7 @@ export async function updateBookingStatus(
     return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
   }
   if (!data) {
-    return { ok: false, code: "not_found", message: "ไม่พบรายการจองนี้" };
+    return { ok: false, code: "not_found", message: STATUS_CHANGE_DENIED };
   }
 
   return { ok: true };

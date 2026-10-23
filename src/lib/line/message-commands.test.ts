@@ -16,10 +16,19 @@ describe("classifyLineTextCommand — in a group/room (inGroup=true)", () => {
     expect(classifyLineTextCommand("/BIND", true)).toBe("group_bind");
   });
 
-  it("matches the bind command embedded in a longer sentence", () => {
-    expect(classifyLineTextCommand("ช่วยเชื่อมร้านให้หน่อย", true)).toBe(
-      "group_bind",
-    );
+  it("ignores surrounding whitespace around the exact command", () => {
+    expect(classifyLineTextCommand("  เชื่อมร้าน\n", true)).toBe("group_bind");
+  });
+
+  it("does NOT bind when the command is embedded in a longer sentence", () => {
+    expect(classifyLineTextCommand("ช่วยเชื่อมร้านให้หน่อย", true)).toBe("none");
+    expect(classifyLineTextCommand("เชื่อมร้าน ตอนนี้เลย", true)).toBe("none");
+  });
+
+  it('routes the exact unbind commands to group_unbind', () => {
+    expect(classifyLineTextCommand("ยกเลิกเชื่อมร้าน", true)).toBe("group_unbind");
+    expect(classifyLineTextCommand(" /UNBIND ", true)).toBe("group_unbind");
+    expect(classifyLineTextCommand("จะยกเลิกเชื่อมร้านไหม", true)).toBe("none");
   });
 
   it('routes "/id" to the group-id echo', () => {
@@ -32,8 +41,9 @@ describe("classifyLineTextCommand — in a group/room (inGroup=true)", () => {
     expect(classifyLineTextCommand("group id", true)).toBe("group_id_echo");
   });
 
-  it("prefers bind over the id echo when a message matches both", () => {
-    expect(classifyLineTextCommand("/bind /id", true)).toBe("group_bind");
+  it("an exact bind command wins; a mixed sentence falls to the id echo", () => {
+    expect(classifyLineTextCommand("/bind", true)).toBe("group_bind");
+    expect(classifyLineTextCommand("/bind /id", true)).toBe("group_id_echo");
   });
 
   it("stays SILENT on normal chatter (the critical group guarantee)", () => {

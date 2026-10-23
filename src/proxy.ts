@@ -2,8 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   ADMIN_SESSION_COOKIE,
   CUSTOMER_SESSION_COOKIE,
+  SHOP_DISPLAY_COOKIE,
   SHOP_SESSION_COOKIE,
   verifyCustomerSessionToken,
+  verifyShopDisplayToken,
   verifySessionToken,
   verifyShopSessionToken,
 } from "@/lib/auth/session";
@@ -74,6 +76,17 @@ async function handleShopRoute(
 
   const token = request.cookies.get(SHOP_SESSION_COOKIE)?.value;
   const session = token ? await verifyShopSessionToken(token) : null;
+
+  // The kiosk (audit M4) runs on its own narrow display token, accepted ONLY
+  // here. An owner session may also open it (to start display mode).
+  const isDisplayRoute =
+    pathname === "/shop/display" || pathname.startsWith("/shop/display/");
+  if (isDisplayRoute && !session) {
+    const displayToken = request.cookies.get(SHOP_DISPLAY_COOKIE)?.value;
+    if (displayToken && (await verifyShopDisplayToken(displayToken))) {
+      return NextResponse.next();
+    }
+  }
 
   if (session && isLoginRoute) {
     return NextResponse.redirect(new URL("/shop", request.url));

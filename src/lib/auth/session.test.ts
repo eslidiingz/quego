@@ -6,6 +6,8 @@ import {
   verifyShopSessionToken,
   signCustomerSessionToken,
   verifyCustomerSessionToken,
+  signShopDisplayToken,
+  verifyShopDisplayToken,
   SESSION_TTL_SECONDS,
   IMPERSONATION_TTL_SECONDS,
   isSessionVersionCurrent,
@@ -168,5 +170,28 @@ describe("session versioning — audit M7", () => {
     const { iat, exp } = decodeJwt(token);
     expect(IMPERSONATION_TTL_SECONDS).toBe(2 * 60 * 60);
     expect((exp ?? 0) - (iat ?? 0)).toBe(IMPERSONATION_TTL_SECONDS);
+  });
+});
+
+describe("shop display (kiosk) token — audit M4", () => {
+  const display = { shopId: "s1", shopName: "ร้านทดสอบ" };
+
+  it("round-trips shopId + shopName only", async () => {
+    const token = await signShopDisplayToken(display);
+    expect(await verifyShopDisplayToken(token)).toEqual(display);
+  });
+
+  it("is never accepted as an owner shop session", async () => {
+    const token = await signShopDisplayToken(display);
+    expect(await verifyShopSessionToken(token)).toBeNull();
+  });
+
+  it("an owner shop session is not accepted as a display token", async () => {
+    const token = await signShopSessionToken({
+      shopId: "s1",
+      phone: "0800000000",
+      shopName: "ร้านทดสอบ",
+    });
+    expect(await verifyShopDisplayToken(token)).toBeNull();
   });
 });
