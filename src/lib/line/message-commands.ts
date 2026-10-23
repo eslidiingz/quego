@@ -21,12 +21,19 @@
 /** The action `handleMessage` should take for an inbound text message. */
 export type LineTextCommand =
   | "group_bind" // bind THIS group to the sender's shop ("เชื่อมร้าน")
+  | "group_unbind" // release THIS group from the sender's shop ("ยกเลิกเชื่อมร้าน")
   | "group_id_echo" // echo the groupId back ("/id") — a join-missed recovery path
   | "link_hint" // 1:1 nudge: linking happens in-app ("เชื่อม" / "link")
   | "none"; // stay silent
 
-/** Owner asks to bind the current group to the shop they own. */
-const GROUP_BIND_RE = /เชื่อมร้าน|เชื่อมต่อร้าน|\/bind/i;
+/**
+ * Owner asks to bind the current group to the shop they own. Anchored: the WHOLE
+ * (trimmed) message must be the command, so a sentence that merely contains the
+ * words — which an attacker can coax an owner into typing — never binds.
+ */
+const GROUP_BIND_RE = /^(?:เชื่อมร้าน|เชื่อมต่อร้าน|\/bind)$/i;
+/** Owner releases the current group. Anchored like the bind command. */
+const GROUP_UNBIND_RE = /^(?:ยกเลิกเชื่อมร้าน|ยกเลิกการเชื่อมร้าน|\/unbind)$/i;
 /** Recovery path: echo the groupId when the join event was missed. */
 const GROUP_ID_ECHO_RE = /groupid|group id|\/id/i;
 /** 1:1 only: the message looks like a link attempt, so nudge to the app flow. */
@@ -44,7 +51,9 @@ export function classifyLineTextCommand(
 ): LineTextCommand {
   if (inGroup) {
     // Bind first — it wins over the id echo when a message matches both.
-    if (GROUP_BIND_RE.test(text)) return "group_bind";
+    const trimmed = text.trim();
+    if (GROUP_BIND_RE.test(trimmed)) return "group_bind";
+    if (GROUP_UNBIND_RE.test(trimmed)) return "group_unbind";
     if (GROUP_ID_ECHO_RE.test(text)) return "group_id_echo";
     // Everything else in a group is chatter: stay silent.
     return "none";

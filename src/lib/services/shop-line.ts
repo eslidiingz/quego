@@ -98,12 +98,15 @@ export async function getShopLineStatus(
 // ----- Group binding (sender-match) ---------------------------------------
 
 export type BindShopLineGroupResult =
-  | { ok: true; shopName: string }
+  | { ok: true; shopName: string; replacedGroup: boolean; unchanged: boolean }
+  | { ok: false; code: "needs_confirm"; shopName: string; message: string }
   | {
       ok: false;
       code: "not_linked" | "group_taken" | "unknown";
       message: string;
     };
+
+const GENERIC_ERROR = "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
 
 /**
  * Bind a LINE group to the shop OWNED by the message sender (sender-match). The
@@ -114,20 +117,26 @@ export type BindShopLineGroupResult =
  * — mirroring the compound-filter ownership rule the other writes use. The
  * partial-unique index on line_group_id is the 23505 backstop (one group, one
  * shop).
+ *
+ * A shop that already has a DIFFERENT group is never silently re-pointed: the
+ * first call returns `needs_confirm`, and only a call with `confirmed: true`
+ * (from the owner's postback tap) overwrites. The update is compare-and-set on
+ * the group we saw, so two racing binds can't both win.
  */
 export async function bindShopLineGroupBySender(
   senderUserId: string,
   groupId: string,
+  opts: { confirmed?: boolean } = {},
 ): Promise<BindShopLineGroupResult> {
   const supabase = getSupabaseAdmin();
   const { data: shop, error } = await supabase
     .from("shops")
-    .select("id, name")
+    .select("id, name, line_group_id")
     .eq("line_user_id", senderUserId)
     .maybeSingle();
   if (error) {
     console.error("bindShopLineGroupBySender lookup error:", error);
-    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
+    return { ok: false, code: "unknown", message: GENERIC_ERROR };
   }
   if (!shop) {
     return {
@@ -138,18 +147,121 @@ export async function bindShopLineGroupBySender(
         "โปรไฟล์ › การแจ้งเตือน แล้วกด “เชื่อมต่อ LINE” ก่อน แล้วลองใหม่",
     };
   }
-  const { error: upErr } = await supabase
+  const shopName = (shop.name as string) ?? "ร้านของคุณ";
+  const current = (shop.line_group_id as string | null) ?? null;
+  if (current === groupId) {
+    return { ok: true, shopName, replacedGroup: false, unchanged: true };
+  }
+  if (current && !opts.confirmed) {
+    return {
+      ok: false,
+      code: "needs_confirm",
+      shopName,
+      message: "ร้านนี้เชื่อมกับกลุ่มอื่นอยู่แล้ว",
+    };
+  }
+  let q = supabase
     .from("shops")
     .update({ line_group_id: groupId })
     .eq("id", shop.id);
+  q = current ? q.eq("line_group_id", current) : q.is("line_group_id", null);
+  const { data: updated, error: upErr } = await q.select("id");
   if (upErr) {
     if (upErr.code === "23505") {
       return { ok: false, code: "group_taken", message: "กลุ่มนี้ถูกผูกกับร้านอื่นแล้ว" };
     }
     console.error("bindShopLineGroupBySender update error:", upErr);
-    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
+    return { ok: false, code: "unknown", message: GENERIC_ERROR };
   }
-  return { ok: true, shopName: (shop.name as string) ?? "ร้านของคุณ" };
+  if (!updated || updated.length === 0) {
+    // Lost the compare-and-set race: the binding changed under us.
+    return { ok: false, code: "unknown", message: GENERIC_ERROR };
+  }
+  return { ok: true, shopName, replacedGroup: Boolean(current), unchanged: false };
+}
+
+export type UnbindShopLineGroupResult =
+  | { ok: true; hadGroup: boolean; shopName: string }
+  | { ok: false; code: "not_linked" | "unknown"; message: string };
+
+/** Clear a shop's bound group. shopId MUST come from the verified session. */
+export async function unbindShopLineGroup(
+  shopId: string,
+): Promise<UnbindShopLineGroupResult> {
+  const supabase = getSupabaseAdmin();
+  const { data: before } = await supabase
+    .from("shops")
+    .select("name, line_group_id")
+    .eq("id", shopId)
+    .maybeSingle();
+  const { error } = await supabase
+    .from("shops")
+    .update({ line_group_id: null })
+    .eq("id", shopId);
+  if (error) {
+    console.error("unbindShopLineGroup error:", error);
+    return { ok: false, code: "unknown", message: GENERIC_ERROR };
+  }
+  return {
+    ok: true,
+    hadGroup: Boolean(before?.line_group_id),
+    shopName: (before?.name as string | undefined) ?? "ร้านของคุณ",
+  };
+}
+
+/**
+ * Unbind by LINE sender (the in-group "ยกเลิกเชื่อมร้าน" command). Same
+ * sender-match proof as binding, and only clears the group the command was typed
+ * in — typing it in some other group can't detach the real one.
+ */
+export async function unbindShopLineGroupBySender(
+  senderUserId: string,
+  groupId: string,
+): Promise<UnbindShopLineGroupResult> {
+  const supabase = getSupabaseAdmin();
+  const { data: shop, error } = await supabase
+    .from("shops")
+    .select("id, name, line_group_id")
+    .eq("line_user_id", senderUserId)
+    .maybeSingle();
+  if (error) {
+    console.error("unbindShopLineGroupBySender lookup error:", error);
+    return { ok: false, code: "unknown", message: GENERIC_ERROR };
+  }
+  if (!shop) {
+    return {
+      ok: false,
+      code: "not_linked",
+      message: "บัญชี LINE ของคุณยังไม่ได้เชื่อมกับร้านใน Quego",
+    };
+  }
+  const shopName = (shop.name as string) ?? "ร้านของคุณ";
+  if (shop.line_group_id !== groupId) {
+    return { ok: true, hadGroup: false, shopName };
+  }
+  const { error: upErr } = await supabase
+    .from("shops")
+    .update({ line_group_id: null })
+    .eq("id", shop.id)
+    .eq("line_group_id", groupId);
+  if (upErr) {
+    console.error("unbindShopLineGroupBySender update error:", upErr);
+    return { ok: false, code: "unknown", message: GENERIC_ERROR };
+  }
+  return { ok: true, hadGroup: true, shopName };
+}
+
+/**
+ * Tell the owner (1:1, so it can't be missed in a noisy group) that a group was
+ * bound or released. Best-effort: pushLineMessage already fail-silents.
+ */
+export async function notifyOwnerGroupChange(
+  ownerLineUserId: string,
+  text: string,
+): Promise<void> {
+  await pushLineMessage(ownerLineUserId, [{ type: "text", text }], {
+    kind: "group_bind_notice",
+  });
 }
 
 // ----- Outbound: notification recipient -----------------------------------
