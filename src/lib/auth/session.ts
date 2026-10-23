@@ -7,11 +7,35 @@ export const SHOP_DISPLAY_COOKIE = "lq_shop_display";
 /** Kiosk token lifetime: one long business day, so the tablet lasts open→close. */
 export const SHOP_DISPLAY_TTL_SECONDS = 60 * 60 * 12;
 export const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8 hours
+/** Admin acting as a shop gets a shorter token than a real login (audit M7). */
+export const IMPERSONATION_TTL_SECONDS = 60 * 60 * 2; // 2 hours
+
+/**
+ * Audit M7: every session token carries the identity row's `session_version`
+ * (claim "sv"). Changing a PIN/password bumps the row (DB trigger), and the
+ * server-side session readers reject tokens whose version is behind. Tokens
+ * minted before this claim existed read as version 1, the column default.
+ */
+export function readSessionVersionClaim(value: unknown): number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0
+    ? value
+    : 1;
+}
+
+/** True when a token's version still matches the identity row. */
+export function isSessionVersionCurrent(
+  tokenVersion: number,
+  dbVersion: number | null,
+): boolean {
+  return dbVersion !== null && tokenVersion === dbVersion;
+}
 
 export type AdminSession = {
   adminId: string;
   phone: string;
   name: string;
+  /** `admins.session_version` at mint time (audit M7). */
+  sessionVersion?: number;
 };
 
 export type ShopSession = {
@@ -24,11 +48,15 @@ export type ShopSession = {
    * to render the impersonation banner and route sign-out back to /admin.
    */
   impersonatedBy?: string;
+  /** `shops.session_version` at mint time (audit M7). */
+  sessionVersion?: number;
 };
 
 export type CustomerSession = {
   customerId: string;
   phone: string;
+  /** `customers.session_version` at mint time (audit M7). */
+  sessionVersion?: number;
 };
 
 function getSecret(): Uint8Array {
@@ -44,7 +72,8 @@ function getSecret(): Uint8Array {
 // ----- Admin session ------------------------------------------------------
 
 export async function signSessionToken(session: AdminSession): Promise<string> {
-  return new SignJWT({ ...session, aud: "admin" })
+  const { sessionVersion, ...claims } = session;
+  return new SignJWT({ ...claims, sv: sessionVersion ?? 1, aud: "admin" })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
@@ -65,6 +94,7 @@ export async function verifySessionToken(
         adminId: payload.adminId,
         phone: payload.phone,
         name: payload.name,
+        sessionVersion: readSessionVersionClaim(payload.sv),
       };
     }
     return null;
@@ -75,11 +105,15 @@ export async function verifySessionToken(
 
 // ----- Shop session -------------------------------------------------------
 
-export async function signShopSessionToken(session: ShopSession): Promise<string> {
-  return new SignJWT({ ...session, aud: "shop" })
+export async function signShopSessionToken(
+  session: ShopSession,
+  ttlSeconds: number = SESSION_TTL_SECONDS,
+): Promise<string> {
+  const { sessionVersion, ...claims } = session;
+  return new SignJWT({ ...claims, sv: sessionVersion ?? 1, aud: "shop" })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
+    .setExpirationTime(`${ttlSeconds}s`)
     .sign(getSecret());
 }
 
@@ -101,6 +135,7 @@ export async function verifyShopSessionToken(
           typeof payload.impersonatedBy === "string"
             ? payload.impersonatedBy
             : undefined,
+        sessionVersion: readSessionVersionClaim(payload.sv),
       };
     }
     return null;
@@ -152,7 +187,8 @@ export async function verifyShopDisplayToken(
 export async function signCustomerSessionToken(
   session: CustomerSession,
 ): Promise<string> {
-  return new SignJWT({ ...session, aud: "customer" })
+  const { sessionVersion, ...claims } = session;
+  return new SignJWT({ ...claims, sv: sessionVersion ?? 1, aud: "customer" })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
@@ -171,7 +207,11 @@ export async function verifyCustomerSessionToken(
       typeof payload.customerId === "string" &&
       typeof payload.phone === "string"
     ) {
-      return { customerId: payload.customerId, phone: payload.phone };
+      return {
+        customerId: payload.customerId,
+        phone: payload.phone,
+        sessionVersion: readSessionVersionClaim(payload.sv),
+      };
     }
     return null;
   } catch {
