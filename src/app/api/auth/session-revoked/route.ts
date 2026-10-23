@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   ADMIN_SESSION_COOKIE,
   CUSTOMER_SESSION_COOKIE,
+  SHOP_DISPLAY_COOKIE,
   SHOP_SESSION_COOKIE,
 } from "@/lib/auth/session";
 
@@ -17,9 +18,11 @@ import {
  * persona — never taken from the query string — so it can't be an open redirect.
  */
 const PERSONAS = {
-  admin: { cookie: ADMIN_SESSION_COOKIE, login: "/admin/login" },
-  shop: { cookie: SHOP_SESSION_COOKIE, login: "/login?tab=shop&notice=session-expired" },
-  customer: { cookie: CUSTOMER_SESSION_COOKIE, login: "/login?notice=session-expired" },
+  admin: { cookie: ADMIN_SESSION_COOKIE, login: "/admin/login", path: "/" },
+  shop: { cookie: SHOP_SESSION_COOKIE, login: "/login?tab=shop&notice=session-expired", path: "/" },
+  // Kiosk token (M4) is scoped to /shop/display, so delete it on that path.
+  display: { cookie: SHOP_DISPLAY_COOKIE, login: "/login?tab=shop&notice=session-expired", path: "/shop/display" },
+  customer: { cookie: CUSTOMER_SESSION_COOKIE, login: "/login?notice=session-expired", path: "/" },
 } as const;
 
 export const dynamic = "force-dynamic";
@@ -27,9 +30,11 @@ export const dynamic = "force-dynamic";
 export function GET(request: NextRequest): NextResponse {
   const raw = request.nextUrl.searchParams.get("p");
   const persona =
-    raw === "admin" || raw === "shop" || raw === "customer" ? raw : "customer";
-  const { cookie, login } = PERSONAS[persona];
+    raw === "admin" || raw === "shop" || raw === "display" || raw === "customer"
+      ? raw
+      : "customer";
+  const { cookie, login, path } = PERSONAS[persona];
   const res = NextResponse.redirect(new URL(login, request.url));
-  res.cookies.delete(cookie);
+  res.cookies.delete({ name: cookie, path });
   return res;
 }

@@ -125,9 +125,10 @@ export async function requireShopSession(): Promise<ShopSession> {
 export const SHOP_DISPLAY_PATH = "/shop/display";
 
 export async function createShopDisplaySession(
-  session: ShopDisplaySession,
+  session: Omit<ShopDisplaySession, "sessionVersion">,
 ): Promise<void> {
-  const token = await signShopDisplayToken(session);
+  const sessionVersion = (await fetchSessionVersion("shops", session.shopId)) ?? 1;
+  const token = await signShopDisplayToken({ ...session, sessionVersion });
   const cookieStore = await cookies();
   cookieStore.set(SHOP_DISPLAY_COOKIE, token, {
     httpOnly: true,
@@ -142,14 +143,28 @@ export async function getShopDisplaySession(): Promise<ShopDisplaySession | null
   const cookieStore = await cookies();
   const token = cookieStore.get(SHOP_DISPLAY_COOKIE)?.value;
   if (!token) return null;
-  return verifyShopDisplayToken(token);
+  const session = await verifyShopDisplayToken(token);
+  if (!session) return null;
+  const dbVersion = await readSessionVersion("shops", session.shopId);
+  return isSessionVersionCurrent(session.sessionVersion ?? 1, dbVersion)
+    ? session
+    : null;
+}
+
+export async function hasShopDisplayCookie(): Promise<boolean> {
+  return Boolean((await cookies()).get(SHOP_DISPLAY_COOKIE)?.value);
 }
 
 /** For kiosk server actions: the display token is the only accepted proof. */
 export async function requireShopDisplaySession(): Promise<ShopDisplaySession> {
   const session = await getShopDisplaySession();
   if (!session) {
-    redirect("/login?tab=shop");
+    // Revoked by a PIN change (M7): clear the path-scoped cookie first.
+    redirect(
+      (await hasShopDisplayCookie())
+        ? "/api/auth/session-revoked?p=display"
+        : "/login?tab=shop",
+    );
   }
   return session;
 }

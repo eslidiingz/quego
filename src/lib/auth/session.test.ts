@@ -176,9 +176,15 @@ describe("session versioning — audit M7", () => {
 describe("shop display (kiosk) token — audit M4", () => {
   const display = { shopId: "s1", shopName: "ร้านทดสอบ" };
 
-  it("round-trips shopId + shopName only", async () => {
+  it("round-trips shopId + shopName, sv defaulting to 1", async () => {
     const token = await signShopDisplayToken(display);
-    expect(await verifyShopDisplayToken(token)).toEqual(display);
+    expect(await verifyShopDisplayToken(token)).toEqual({ ...display, sessionVersion: 1 });
+  });
+
+  it("embeds the shop's session version so a PIN change revokes the kiosk", async () => {
+    const token = await signShopDisplayToken({ ...display, sessionVersion: 3 });
+    expect(decodeJwt(token).sv).toBe(3);
+    expect((await verifyShopDisplayToken(token))?.sessionVersion).toBe(3);
   });
 
   it("is never accepted as an owner shop session", async () => {

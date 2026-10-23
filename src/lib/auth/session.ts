@@ -153,12 +153,19 @@ export async function verifyShopSessionToken(
 export type ShopDisplaySession = {
   shopId: string;
   shopName: string;
+  /** Shop's `session_version` at mint time — a PIN change revokes the kiosk too. */
+  sessionVersion?: number;
 };
 
 export async function signShopDisplayToken(
   session: ShopDisplaySession,
 ): Promise<string> {
-  return new SignJWT({ shopId: session.shopId, shopName: session.shopName, aud: "shop-display" })
+  return new SignJWT({
+    shopId: session.shopId,
+    shopName: session.shopName,
+    sv: session.sessionVersion ?? 1,
+    aud: "shop-display",
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SHOP_DISPLAY_TTL_SECONDS}s`)
@@ -174,7 +181,11 @@ export async function verifyShopDisplayToken(
       audience: "shop-display",
     });
     if (typeof payload.shopId === "string" && typeof payload.shopName === "string") {
-      return { shopId: payload.shopId, shopName: payload.shopName };
+      return {
+        shopId: payload.shopId,
+        shopName: payload.shopName,
+        sessionVersion: readSessionVersionClaim(payload.sv),
+      };
     }
     return null;
   } catch {

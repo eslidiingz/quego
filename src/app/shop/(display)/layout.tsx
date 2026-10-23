@@ -1,5 +1,7 @@
+import { redirect } from "next/navigation";
 import {
   getShopDisplaySession,
+  hasShopDisplayCookie,
   requireShopSession,
 } from "@/lib/auth/shop-session-server";
 import { Icon } from "@/components/ui/Icon";
@@ -34,6 +36,8 @@ export default async function ShopDisplayLayout({
 }) {
   const display = await getShopDisplaySession();
   if (!display) {
+    // A display cookie that no longer verifies was revoked (PIN changed).
+    if (await hasShopDisplayCookie()) redirect("/api/auth/session-revoked?p=display");
     const owner = await requireShopSession();
     return <StartDisplayMode shopName={owner.shopName} />;
   }
