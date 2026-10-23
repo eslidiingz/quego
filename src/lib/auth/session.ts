@@ -3,6 +3,9 @@ import { SignJWT, jwtVerify } from "jose";
 export const ADMIN_SESSION_COOKIE = "lq_admin_session";
 export const SHOP_SESSION_COOKIE = "lq_shop_session";
 export const CUSTOMER_SESSION_COOKIE = "lq_customer_session";
+export const SHOP_DISPLAY_COOKIE = "lq_shop_display";
+/** Kiosk token lifetime: one long business day, so the tablet lasts open→close. */
+export const SHOP_DISPLAY_TTL_SECONDS = 60 * 60 * 12;
 export const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8 hours
 
 export type AdminSession = {
@@ -99,6 +102,44 @@ export async function verifyShopSessionToken(
             ? payload.impersonatedBy
             : undefined,
       };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// ----- Shop display (kiosk) session ---------------------------------------
+// A narrow token for the waiting-room tablet (audit M4): it carries only the
+// shopId + name and is accepted ONLY by /shop/display — never as an owner
+// session — so a customer tapping the kiosk can't reach customers, expenses or
+// booking management.
+
+export type ShopDisplaySession = {
+  shopId: string;
+  shopName: string;
+};
+
+export async function signShopDisplayToken(
+  session: ShopDisplaySession,
+): Promise<string> {
+  return new SignJWT({ shopId: session.shopId, shopName: session.shopName, aud: "shop-display" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(`${SHOP_DISPLAY_TTL_SECONDS}s`)
+    .sign(getSecret());
+}
+
+export async function verifyShopDisplayToken(
+  token: string,
+): Promise<ShopDisplaySession | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecret(), {
+      algorithms: ["HS256"],
+      audience: "shop-display",
+    });
+    if (typeof payload.shopId === "string" && typeof payload.shopName === "string") {
+      return { shopId: payload.shopId, shopName: payload.shopName };
     }
     return null;
   } catch {
