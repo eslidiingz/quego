@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validate } from "./business-hours";
-import type { BusinessHour } from "@/lib/booking/slot-math";
+import type { BusinessHour, DayOfWeek } from "@/lib/booking/slot-math";
 
 /**
  * Build a valid 7-day array (days 0..6). When `open` is true, every day is
@@ -9,7 +9,7 @@ import type { BusinessHour } from "@/lib/booking/slot-math";
  */
 function buildWeek(open: boolean): BusinessHour[] {
   return Array.from({ length: 7 }, (_, day) => ({
-    dayOfWeek: day,
+    dayOfWeek: day as DayOfWeek,
     isOpen: open,
     openTime: open ? "09:00" : null,
     closeTime: open ? "18:00" : null,
