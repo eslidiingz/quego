@@ -3,8 +3,13 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import {
+  SHOP_DISPLAY_COOKIE,
+  SHOP_DISPLAY_TTL_SECONDS,
   SHOP_SESSION_COOKIE,
   SESSION_TTL_SECONDS,
+  signShopDisplayToken,
+  verifyShopDisplayToken,
+  type ShopDisplaySession,
   signShopSessionToken,
   verifyShopSessionToken,
   type ShopSession,
@@ -76,6 +81,47 @@ export async function requireShopSession(): Promise<ShopSession> {
     redirect("/login?tab=shop");
   }
   return session;
+}
+
+// ----- Kiosk display session ---------------------------------------------
+// Scoped to the /shop/display path so the browser never even sends it to the
+// owner area; the owner session itself is removed when display mode starts.
+
+export const SHOP_DISPLAY_PATH = "/shop/display";
+
+export async function createShopDisplaySession(
+  session: ShopDisplaySession,
+): Promise<void> {
+  const token = await signShopDisplayToken(session);
+  const cookieStore = await cookies();
+  cookieStore.set(SHOP_DISPLAY_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: SHOP_DISPLAY_PATH,
+    maxAge: SHOP_DISPLAY_TTL_SECONDS,
+  });
+}
+
+export async function getShopDisplaySession(): Promise<ShopDisplaySession | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SHOP_DISPLAY_COOKIE)?.value;
+  if (!token) return null;
+  return verifyShopDisplayToken(token);
+}
+
+/** For kiosk server actions: the display token is the only accepted proof. */
+export async function requireShopDisplaySession(): Promise<ShopDisplaySession> {
+  const session = await getShopDisplaySession();
+  if (!session) {
+    redirect("/login?tab=shop");
+  }
+  return session;
+}
+
+export async function destroyShopDisplaySession(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete({ name: SHOP_DISPLAY_COOKIE, path: SHOP_DISPLAY_PATH });
 }
 
 // ----- Step-1 → step-2 login intent ---------------------------------------

@@ -1,4 +1,4 @@
-import { requireShopSession } from "@/lib/auth/shop-session-server";
+import { getShopDisplaySession } from "@/lib/auth/shop-session-server";
 import { getShopDisplayQueue } from "@/lib/services/shop-display";
 import { ShopQueueDisplay } from "./ShopQueueDisplay";
 
@@ -11,11 +11,13 @@ export const metadata = {
 /**
  * The shop's full-screen waiting-room display (OPP-07). Renders today's
  * now-serving + upcoming confirmed queue and a big "เรียกคิวถัดไป" button. The
- * shopId comes from the verified session (never request input); the island then
- * polls the same source the customer position view uses.
+ * shopId comes from the verified display token (never request input); the
+ * island then polls the same source the customer position view uses. Without a
+ * display token the layout renders the "start display mode" panel instead.
  */
 export default async function ShopDisplayPage() {
-  const session = await requireShopSession();
+  const session = await getShopDisplaySession();
+  if (!session) return null;
   const initial = await getShopDisplayQueue(session.shopId);
 
   return <ShopQueueDisplay initial={initial} shopName={session.shopName} />;
