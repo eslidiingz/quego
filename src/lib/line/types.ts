@@ -20,25 +20,32 @@ export type LineTextMessageContent = {
   text: string;
 };
 
-export type LineMessageEvent = {
+/** Fields LINE puts on every webhook event — used for the replay guard. */
+export type LineEventMeta = {
+  timestamp?: number;
+  webhookEventId?: string;
+  deliveryContext?: { isRedelivery?: boolean };
+};
+
+export type LineMessageEvent = LineEventMeta & {
   type: "message";
   replyToken: string;
   source: LineSource;
   message: LineTextMessageContent | { type: string; id: string };
 };
 
-export type LineFollowEvent = {
+export type LineFollowEvent = LineEventMeta & {
   type: "follow";
   replyToken: string;
   source: LineSource;
 };
 
-export type LineUnfollowEvent = {
+export type LineUnfollowEvent = LineEventMeta & {
   type: "unfollow";
   source: LineSource;
 };
 
-export type LinePostbackEvent = {
+export type LinePostbackEvent = LineEventMeta & {
   type: "postback";
   replyToken: string;
   source: LineSource;
@@ -47,7 +54,7 @@ export type LinePostbackEvent = {
 
 /** Fired when the OA is added to a group/multi-person chat — carries the
  * groupId/roomId we need to push shop notifications there. */
-export type LineJoinEvent = {
+export type LineJoinEvent = LineEventMeta & {
   type: "join";
   replyToken: string;
   source: LineSource;
