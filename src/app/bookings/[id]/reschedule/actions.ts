@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { rescheduleBooking } from "@/lib/services/bookings";
-import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { checkRateLimits, getClientIp } from "@/lib/security/rate-limit";
 import { isValidThaiPhone } from "@/lib/validation/phone";
 
 export type RescheduleState = { ok: false; message: string } | null;
@@ -30,8 +30,15 @@ export async function rescheduleBookingAction(
     return { ok: false, message: "กรุณายืนยันเบอร์โทรที่ใช้จอง" };
   }
 
+  // Per-booking cap (not per booking + IP) so rotating IPs buys no extra phone
+  // guesses; per-IP bucket is coarse flood control. See cancelBookingByLinkAction.
   const ip = await getClientIp();
-  if (!(await checkRateLimit(`booking-reschedule:${bookingId}:${ip}`, 10, 600))) {
+  if (
+    !(await checkRateLimits([
+      { bucket: `booking-reschedule:${bookingId}`, limit: 10, windowSeconds: 3600 },
+      { bucket: `booking-reschedule:ip:${ip}`, limit: 30, windowSeconds: 600 },
+    ]))
+  ) {
     return { ok: false, message: "ทำรายการบ่อยเกินไป กรุณาลองใหม่ภายหลัง" };
   }
 

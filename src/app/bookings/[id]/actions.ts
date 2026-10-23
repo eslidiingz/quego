@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { cancelBookingByLink } from "@/lib/services/bookings";
-import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { checkRateLimits, getClientIp } from "@/lib/security/rate-limit";
 
 /**
  * OPP-04 — cancel a booking from its UUID-gated link (the booking page). The
@@ -16,10 +16,16 @@ export async function cancelBookingByLinkAction(
   customerPhone: string,
 ): Promise<void> {
   const ip = await getClientIp();
-  // Keyed by booking UUID + IP so a known-UUID attacker can't bypass the cap by
-  // rotating IPs, while a shared office IP still gets its own per-booking budget.
-  // The phone factor inside cancelBookingByLink is the real authorization.
-  if (!(await checkRateLimit(`booking-cancel:${bookingId}:${ip}`, 10, 600))) {
+  // The phone re-entry inside cancelBookingByLink is the real authorization, so
+  // the cap must bound phone GUESSES per booking. Keying on the booking UUID
+  // alone (not UUID + IP) means rotating IPs buys no extra guesses. The per-IP
+  // bucket is a coarse flood control across many bookings.
+  if (
+    !(await checkRateLimits([
+      { bucket: `booking-cancel:${bookingId}`, limit: 10, windowSeconds: 3600 },
+      { bucket: `booking-cancel:ip:${ip}`, limit: 30, windowSeconds: 600 },
+    ]))
+  ) {
     throw new Error("ทำรายการบ่อยเกินไป กรุณาลองใหม่อีกครั้งในภายหลัง");
   }
   const result = await cancelBookingByLink(bookingId, customerPhone);

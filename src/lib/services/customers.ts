@@ -297,7 +297,7 @@ export type ChangePinResult =
   | { ok: true }
   | {
       ok: false;
-      code: "bad_current" | "bad_new" | "not_found" | "unknown";
+      code: "bad_current" | "bad_new" | "not_found" | "locked" | "unknown";
       message: string;
     };
 
@@ -322,28 +322,64 @@ export async function changeCustomerPin(
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("customers")
-    .select("pin_hash")
+    .select("pin_hash, failed_pin_attempts, locked_until")
     .eq("id", id)
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) {
+    console.error("changeCustomerPin read error:", error);
+    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
+  }
   if (!data || !data.pin_hash) {
     return { ok: false, code: "not_found", message: "ไม่พบบัญชีนี้" };
   }
 
+  // Share the login lockout: a wrong current PIN here counts toward the same
+  // 5-strike lock as the login form, so a stolen session cookie can't be used
+  // as an unthrottled PIN oracle.
+  const lockTarget = {
+    table: "customers",
+    counter: "failed_pin_attempts",
+  } as const;
+  let knownAttempts = (data.failed_pin_attempts as number | null) ?? 0;
+  if (data.locked_until) {
+    const lockedUntil = new Date(data.locked_until as string);
+    if (lockedUntil.getTime() > Date.now()) {
+      return { ok: false, code: "locked", message: lockedMessage(lockedUntil) };
+    }
+    await clearFailedAttempts(lockTarget, id);
+    knownAttempts = 0;
+  }
+
   const ok = await verifyPassword(currentPin, data.pin_hash as string);
   if (!ok) {
-    return { ok: false, code: "bad_current", message: "รหัส PIN เดิมไม่ถูกต้อง" };
+    const { lockedUntil, newAttempts } = await registerFailedAttempt(
+      lockTarget,
+      id,
+      knownAttempts,
+    );
+    if (lockedUntil) {
+      return { ok: false, code: "locked", message: lockedMessage(lockedUntil) };
+    }
+    const warning = remainingAttemptsMessage(newAttempts);
+    return {
+      ok: false,
+      code: "bad_current",
+      message: warning
+        ? `รหัส PIN เดิมไม่ถูกต้อง — ${warning}`
+        : "รหัส PIN เดิมไม่ถูกต้อง",
+    };
   }
 
   const hash = await hashPassword(newPin);
   const { error: updateError } = await supabase
     .from("customers")
-    .update({ pin_hash: hash })
+    .update({ pin_hash: hash, failed_pin_attempts: 0, locked_until: null })
     .eq("id", id);
 
   if (updateError) {
-    return { ok: false, code: "unknown", message: updateError.message };
+    console.error("changeCustomerPin update error:", updateError);
+    return { ok: false, code: "unknown", message: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
   }
   return { ok: true };
 }
