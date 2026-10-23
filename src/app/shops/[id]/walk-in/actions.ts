@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createWalkInBooking } from "@/lib/services/bookings";
 import { isValidThaiPhone } from "@/lib/validation/phone";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { getCustomerSession } from "@/lib/auth/customer-session-server";
 
 export type WalkInState = {
   ok: false;
@@ -34,7 +35,11 @@ export async function joinWalkInAction(
 ): Promise<WalkInState> {
   const serviceId = String(formData.get("serviceId") ?? "");
   const customerName = String(formData.get("customerName") ?? "").trim();
-  const customerPhone = String(formData.get("customerPhone") ?? "").trim();
+  // Signed in → session phone only (H1), same as the booking form.
+  const session = await getCustomerSession();
+  const customerPhone = (
+    session?.phone ?? String(formData.get("customerPhone") ?? "")
+  ).trim();
 
   // Rate limit per shop + client IP: an in-store kiosk shares one IP, so key on
   // the shop too — one busy shop's device can't starve another behind the same

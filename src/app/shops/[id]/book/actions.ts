@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createBooking } from "@/lib/services/bookings";
 import { joinWaitlist } from "@/lib/services/waitlist";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { getCustomerSession } from "@/lib/auth/customer-session-server";
 
 export type CreateBookingState =
   | {
@@ -36,7 +37,11 @@ export async function createBookingAction(
   const date = String(formData.get("date") ?? "");
   const slotTime = String(formData.get("slotTime") ?? "");
   const customerName = String(formData.get("customerName") ?? "");
-  const customerPhone = String(formData.get("customerPhone") ?? "");
+  // Signed in → the session phone is the only one we accept (H1): a logged-in
+  // customer can't book under someone else's number.
+  const session = await getCustomerSession();
+  const customerPhone =
+    session?.phone ?? String(formData.get("customerPhone") ?? "");
 
   // Rate limit per client IP: anonymous/public endpoint, so cap booking spam.
   const ip = await getClientIp();
@@ -95,7 +100,9 @@ export async function joinWaitlistAction(
   const preferredStaffId = String(formData.get("preferredStaffId") ?? "");
   const requestedDate = String(formData.get("date") ?? "");
   const customerName = String(formData.get("customerName") ?? "");
-  const customerPhone = String(formData.get("customerPhone") ?? "");
+  const session = await getCustomerSession();
+  const customerPhone =
+    session?.phone ?? String(formData.get("customerPhone") ?? "");
 
   // Rate limit per client IP: public endpoint, so cap waitlist spam.
   const ip = await getClientIp();
