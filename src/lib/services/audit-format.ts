@@ -28,6 +28,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   "preset.update": "แก้ไขบริการ preset",
   "preset.toggle_active": "เปิด/ปิดบริการ preset",
   "preset.delete": "ลบบริการ preset",
+  "admin.change_password": "เปลี่ยนรหัสผ่านผู้ดูแล",
 };
 
 /** Thai label for each entity type, for the table's "ประเภท" column. */
@@ -35,6 +36,7 @@ const ENTITY_LABELS: Record<AuditEntityType, string> = {
   shop: "ร้าน",
   category: "หมวดหมู่",
   preset: "บริการ preset",
+  admin: "ผู้ดูแล",
 };
 
 const UNKNOWN_ACTION_LABEL = "การกระทำอื่น";

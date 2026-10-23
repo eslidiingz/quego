@@ -39,6 +39,8 @@ function mapNotice(
   notice: string | undefined,
 ): { kind: ToastKind; message: string } | null {
   switch (notice) {
+    case "password-changed":
+      return { kind: "success", message: "เปลี่ยนรหัสผ่านเรียบร้อยแล้ว" };
     case "signed-out":
       return { kind: "success", message: "ออกจากระบบเรียบร้อยแล้ว" };
     case "session-expired":

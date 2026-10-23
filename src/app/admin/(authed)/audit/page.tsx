@@ -24,12 +24,14 @@ const KNOWN_ACTIONS: readonly AuditAction[] = [
   "preset.update",
   "preset.toggle_active",
   "preset.delete",
+  "admin.change_password",
 ];
 
 const KNOWN_ENTITY_TYPES: readonly AuditEntityType[] = [
   "shop",
   "category",
   "preset",
+  "admin",
 ];
 
 function asAction(value: string | undefined): AuditAction | undefined {

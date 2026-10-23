@@ -28,12 +28,14 @@ const ACTION_FILTERS: { value: AuditAction; label: string }[] = [
   { value: "preset.update", label: "แก้ไข preset" },
   { value: "preset.toggle_active", label: "เปิด/ปิด preset" },
   { value: "preset.delete", label: "ลบ preset" },
+  { value: "admin.change_password", label: "เปลี่ยนรหัสผ่าน" },
 ];
 
 const ENTITY_FILTERS: { value: AuditEntityType; label: string }[] = [
   { value: "shop", label: "ร้าน" },
   { value: "category", label: "หมวดหมู่" },
   { value: "preset", label: "บริการ preset" },
+  { value: "admin", label: "ผู้ดูแล" },
 ];
 
 /** Format an ISO timestamp as a Bangkok-local "DD/MM/YYYY HH:MM" string. */
