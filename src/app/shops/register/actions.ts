@@ -2,10 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createShop } from "@/lib/services/shops";
-import {
-  isPhoneVerified,
-  clearPhoneVerified,
-} from "@/lib/auth/phone-verification-server";
+import { isPhoneVerified } from "@/lib/auth/phone-verification-server";
 import { setShopLoginIntent } from "@/lib/auth/shop-session-server";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import {
@@ -115,11 +112,11 @@ export async function registerShop(
   }
 
   // Self-serve onboarding: the shop is created already-approved (no admin gate),
-  // so send the owner straight into PIN setup. Consume the one-time OTP proof,
-  // then drop a shop login-intent (the same cookie step-1 login sets) so
-  // /shop/login/pin shows the "set PIN" form for this shop and, on success,
-  // mints the session and lands them in /shop.
-  await clearPhoneVerified();
+  // so send the owner straight into PIN setup. Drop a shop login-intent (the
+  // same cookie step-1 login sets) so /shop/login/pin shows the "set PIN" form
+  // for this shop. The OTP proof is deliberately NOT consumed here: setupShopPin
+  // requires it (same phone) and consumes it once the PIN is set, so the owner
+  // isn't asked for a second OTP right after registering.
   await setShopLoginIntent({ shopId: result.id, phone: parsed.ownerPhone });
 
   redirect("/shop/login/pin");
