@@ -1,5 +1,6 @@
 import "server-only";
 import type {
+  LineEventMeta,
   LineFollowEvent,
   LineJoinEvent,
   LineMessageEvent,
@@ -9,12 +10,18 @@ import type {
 } from "./types";
 import { replyLineMessage } from "./client";
 import { classifyLineTextCommand } from "./message-commands";
-import { recordLineMessage } from "@/lib/services/line-log";
+import { claimLineWebhookEvent, recordLineMessage } from "@/lib/services/line-log";
+import { isStaleLineEvent, webhookEventKey } from "./webhook-guard";
+import { buildGroupBindConfirmFlex, parseGroupBindPostback } from "./group-bind";
 import {
   parseBookingPostback,
   handleBookingPostback,
 } from "@/lib/services/line-booking-actions";
-import { bindShopLineGroupBySender } from "@/lib/services/shop-line";
+import {
+  bindShopLineGroupBySender,
+  notifyOwnerGroupChange,
+  unbindShopLineGroupBySender,
+} from "@/lib/services/shop-line";
 
 /**
  * Inbound webhook event dispatch. SRP: route a LINE event to the right action
@@ -41,11 +48,34 @@ export async function dispatchLineEvents(
 ): Promise<void> {
   for (const event of events) {
     try {
+      if (!(await shouldProcess(event))) continue;
       await handleEvent(event);
     } catch (err) {
       console.error("LINE event handler error:", err);
     }
   }
+}
+
+/**
+ * Replay guard (audit L3). The signature only proves LINE sent the body once; a
+ * captured body could otherwise be re-POSTed to re-run "เชื่อมร้าน" forever.
+ * Drop events older than 5 minutes, then claim the webhookEventId insert-first
+ * so a redelivery/replay of the same event is handled at most once.
+ */
+async function shouldProcess(event: LineWebhookEvent): Promise<boolean> {
+  const meta = event as LineEventMeta;
+  if (isStaleLineEvent(meta.timestamp)) {
+    console.warn("[LINE webhook] dropped stale event", event.type, meta.timestamp);
+    return false;
+  }
+  const key = webhookEventKey(meta.webhookEventId);
+  if (!key) return true; // tolerate payloads without an id (timestamp still bounds them)
+  const claimed = await claimLineWebhookEvent(key, {
+    type: event.type,
+    isRedelivery: meta.deliveryContext?.isRedelivery ?? false,
+  });
+  if (!claimed) console.info("[LINE webhook] skipped duplicate event", key);
+  return claimed;
 }
 
 async function handleEvent(event: LineWebhookEvent): Promise<void> {
@@ -120,6 +150,17 @@ async function handlePostback(event: LinePostbackEvent): Promise<void> {
     meta: { data: event.postback.data },
   });
   if (!userId) return;
+  const groupAct = parseGroupBindPostback(event.postback.data);
+  if (groupAct) {
+    const groupId = event.source?.groupId ?? event.source?.roomId;
+    if (!groupId) return;
+    if (groupAct === "keep") {
+      await replyText(event.replyToken, "ไม่เปลี่ยน — แจ้งเตือนยังส่งไปกลุ่มเดิม", groupId);
+      return;
+    }
+    await bindGroupAndReply(userId, groupId, event.replyToken, true);
+    return;
+  }
   const parsed = parseBookingPostback(event.postback.data);
   if (!parsed) return;
   await handleBookingPostback(parsed, userId, event.replyToken);
@@ -167,35 +208,22 @@ async function handleMessage(event: LineMessageEvent): Promise<void> {
   // link-hint here (it would fire on staff conversation). Only echo the groupId
   // on an explicit request, as a recovery path when the join event was missed.
   if (groupId) {
-    // "เชื่อมร้าน" — bind THIS group to the shop the sender owns (sender-match).
-    if (command === "group_bind") {
+    // "เชื่อมร้าน" / "ยกเลิกเชื่อมร้าน" — sender-match against the shop owner.
+    if (command === "group_bind" || command === "group_unbind") {
       const senderUserId = event.source?.userId;
       if (!senderUserId) {
-        await replyLineMessage(
+        await replyText(
           event.replyToken,
-          [
-            {
-              type: "text",
-              text: "ไม่พบบัญชีผู้ส่ง — โปรดเพิ่ม Quego เป็นเพื่อนใน LINE ก่อน แล้วลองพิมพ์ “เชื่อมร้าน” อีกครั้ง",
-            },
-          ],
-          { kind: "group_bind", recipient: groupId },
+          "ไม่พบบัญชีผู้ส่ง — โปรดเพิ่ม Quego เป็นเพื่อนใน LINE ก่อน แล้วลองอีกครั้ง",
+          groupId,
         );
         return;
       }
-      const result = await bindShopLineGroupBySender(senderUserId, groupId);
-      await replyLineMessage(
-        event.replyToken,
-        [
-          {
-            type: "text",
-            text: result.ok
-              ? `✅ เชื่อมต่อร้าน “${result.shopName}” กับกลุ่มนี้แล้ว — แจ้งเตือนการจองจะส่งเข้ากลุ่มนี้`
-              : result.message,
-          },
-        ],
-        { kind: "group_bind", recipient: groupId },
-      );
+      if (command === "group_bind") {
+        await bindGroupAndReply(senderUserId, groupId, event.replyToken, false);
+      } else {
+        await unbindGroupAndReply(senderUserId, groupId, event.replyToken);
+      }
       return;
     }
     if (command === "group_id_echo") {
@@ -218,4 +246,88 @@ async function handleMessage(event: LineMessageEvent): Promise<void> {
       { kind: "link_hint", recipient: userId },
     );
   }
+}
+
+async function replyText(
+  replyToken: string,
+  text: string,
+  groupId: string,
+): Promise<void> {
+  await replyLineMessage(replyToken, [{ type: "text", text }], {
+    kind: "group_bind",
+    recipient: groupId,
+  });
+}
+
+/**
+ * Bind (or, when the shop already has another group and `confirmed` is false,
+ * ask first via a postback bubble). Every successful change is also pushed 1:1
+ * to the owner so a bind they were tricked into is visible outside the group.
+ */
+async function bindGroupAndReply(
+  senderUserId: string,
+  groupId: string,
+  replyToken: string,
+  confirmed: boolean,
+): Promise<void> {
+  const result = await bindShopLineGroupBySender(senderUserId, groupId, {
+    confirmed,
+  });
+  if (!result.ok) {
+    if (result.code === "needs_confirm") {
+      await replyLineMessage(replyToken, [buildGroupBindConfirmFlex(result.shopName)], {
+        kind: "group_bind_confirm",
+        recipient: groupId,
+      });
+      return;
+    }
+    await replyText(replyToken, result.message, groupId);
+    return;
+  }
+  if (result.unchanged) {
+    await replyText(
+      replyToken,
+      `กลุ่มนี้เชื่อมกับร้าน “${result.shopName}” อยู่แล้ว`,
+      groupId,
+    );
+    return;
+  }
+  await replyText(
+    replyToken,
+    `✅ เชื่อมต่อร้าน “${result.shopName}” กับกลุ่มนี้แล้ว — แจ้งเตือนการจองจะส่งเข้ากลุ่มนี้\n` +
+      "พิมพ์ “ยกเลิกเชื่อมร้าน” ในกลุ่มนี้เมื่อต้องการหยุด",
+    groupId,
+  );
+  await notifyOwnerGroupChange(
+    senderUserId,
+    `🔔 ร้าน “${result.shopName}” ` +
+      (result.replacedGroup ? "ย้ายการแจ้งเตือนไปยังกลุ่ม LINE ใหม่แล้ว" : "เชื่อมกับกลุ่ม LINE แล้ว") +
+      " — ข้อมูลการจอง (ชื่อลูกค้า บริการ เวลา) จะส่งเข้ากลุ่มนั้น " +
+      "หากคุณไม่ได้ทำรายการนี้ ให้พิมพ์ “ยกเลิกเชื่อมร้าน” ในกลุ่มนั้น หรือนำ Quego ออกจากกลุ่ม",
+  );
+}
+
+async function unbindGroupAndReply(
+  senderUserId: string,
+  groupId: string,
+  replyToken: string,
+): Promise<void> {
+  const result = await unbindShopLineGroupBySender(senderUserId, groupId);
+  if (!result.ok) {
+    await replyText(replyToken, result.message, groupId);
+    return;
+  }
+  if (!result.hadGroup) {
+    await replyText(replyToken, "กลุ่มนี้ไม่ได้เชื่อมกับร้านของคุณ", groupId);
+    return;
+  }
+  await replyText(
+    replyToken,
+    `ยกเลิกการเชื่อมร้าน “${result.shopName}” กับกลุ่มนี้แล้ว — แจ้งเตือนจะกลับไปส่งที่ LINE ส่วนตัวของเจ้าของร้าน`,
+    groupId,
+  );
+  await notifyOwnerGroupChange(
+    senderUserId,
+    `🔕 ร้าน “${result.shopName}” ยกเลิกการเชื่อมกลุ่ม LINE แล้ว — แจ้งเตือนจะส่งมาที่แชทนี้แทน`,
+  );
 }
