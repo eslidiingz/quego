@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireShopSession } from "@/lib/auth/shop-session-server";
+import {
+  createImpersonationSession,
+  createShopSession,
+  requireShopSession,
+} from "@/lib/auth/shop-session-server";
 import { checkRateLimits, getClientIp } from "@/lib/security/rate-limit";
 import {
   changeShopPin,
@@ -280,6 +284,20 @@ export async function changeShopPinAction(
       };
     }
     return { ok: false, message: result.message };
+  }
+
+  // The new PIN bumped shops.session_version, revoking every session — keep
+  // THIS device signed in by re-minting its token at the new version (M7).
+  const identity = {
+    shopId: session.shopId,
+    phone: session.phone,
+    shopName: session.shopName,
+  };
+  const { impersonatedBy } = session;
+  if (impersonatedBy) {
+    await createImpersonationSession(identity, impersonatedBy);
+  } else {
+    await createShopSession(identity);
   }
 
   revalidatePath("/shop/profile");

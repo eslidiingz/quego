@@ -2,7 +2,10 @@
 
 import { after } from "next/server";
 import { redirect } from "next/navigation";
-import { requireAdminSession } from "@/lib/auth/session-server";
+import {
+  createAdminSession,
+  requireAdminSession,
+} from "@/lib/auth/session-server";
 import { changeAdminPassword } from "@/lib/services/admins";
 import { writeAuditLog } from "@/lib/services/audit-log";
 import { checkRateLimits, getClientIp } from "@/lib/security/rate-limit";
@@ -82,6 +85,14 @@ export async function changeAdminPasswordAction(
       summary: session.name,
     }),
   );
+
+  // New password bumped admins.session_version — re-mint so THIS device stays
+  // signed in while every other session is revoked (audit M7).
+  await createAdminSession({
+    adminId: session.adminId,
+    phone: session.phone,
+    name: session.name,
+  });
 
   redirect("/admin/account?notice=password-changed");
 }

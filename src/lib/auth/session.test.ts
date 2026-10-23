@@ -7,7 +7,11 @@ import {
   signCustomerSessionToken,
   verifyCustomerSessionToken,
   SESSION_TTL_SECONDS,
+  IMPERSONATION_TTL_SECONDS,
+  isSessionVersionCurrent,
+  readSessionVersionClaim,
 } from "@/lib/auth/session";
+import { decodeJwt } from "jose";
 
 beforeEach(() => {
   vi.stubEnv("ADMIN_SESSION_SECRET", "x".repeat(40));
@@ -21,7 +25,7 @@ describe("admin session round-trip", () => {
   it("signs then verifies an admin payload back to the same object", async () => {
     const session = { adminId: "a1", phone: "0800000000", name: "แอดมิน" };
     const token = await signSessionToken(session);
-    expect(await verifySessionToken(token)).toEqual(session);
+    expect(await verifySessionToken(token)).toEqual({ ...session, sessionVersion: 1 });
   });
 });
 
@@ -35,7 +39,7 @@ describe("shop session round-trip", () => {
     };
     const token = await signShopSessionToken(session);
     const verified = await verifyShopSessionToken(token);
-    expect(verified).toEqual(session);
+    expect(verified).toEqual({ ...session, sessionVersion: 1 });
     expect(verified?.impersonatedBy).toBe("admin1");
   });
 
@@ -47,7 +51,7 @@ describe("shop session round-trip", () => {
     };
     const token = await signShopSessionToken(session);
     const verified = await verifyShopSessionToken(token);
-    expect(verified).toEqual({ ...session, impersonatedBy: undefined });
+    expect(verified).toEqual({ ...session, impersonatedBy: undefined, sessionVersion: 1 });
     expect(verified?.impersonatedBy).toBeUndefined();
   });
 });
@@ -56,7 +60,7 @@ describe("customer session round-trip", () => {
   it("signs then verifies a customer payload back to the same object", async () => {
     const session = { customerId: "c1", phone: "0899999999" };
     const token = await signCustomerSessionToken(session);
-    expect(await verifyCustomerSessionToken(token)).toEqual(session);
+    expect(await verifyCustomerSessionToken(token)).toEqual({ ...session, sessionVersion: 1 });
   });
 });
 
@@ -128,5 +132,41 @@ describe("secret requirement", () => {
 describe("session ttl constant", () => {
   it("is eight hours expressed in seconds", () => {
     expect(SESSION_TTL_SECONDS).toBe(60 * 60 * 8);
+  });
+});
+
+describe("session versioning — audit M7", () => {
+  it("embeds the session version as the sv claim and reads it back", async () => {
+    const token = await signShopSessionToken({
+      shopId: "s1",
+      phone: "0811111111",
+      shopName: "ร้าน",
+      sessionVersion: 4,
+    });
+    expect(decodeJwt(token).sv).toBe(4);
+    expect((await verifyShopSessionToken(token))?.sessionVersion).toBe(4);
+  });
+
+  it("reads a missing or malformed sv claim as version 1 (pre-M7 tokens)", () => {
+    expect(readSessionVersionClaim(undefined)).toBe(1);
+    expect(readSessionVersionClaim("3")).toBe(1);
+    expect(readSessionVersionClaim(0)).toBe(1);
+    expect(readSessionVersionClaim(2)).toBe(2);
+  });
+
+  it("a token is current only when its version equals the DB row's", () => {
+    expect(isSessionVersionCurrent(2, 2)).toBe(true);
+    expect(isSessionVersionCurrent(1, 2)).toBe(false);
+    expect(isSessionVersionCurrent(1, null)).toBe(false);
+  });
+
+  it("impersonation tokens expire after 2 hours", async () => {
+    const token = await signShopSessionToken(
+      { shopId: "s1", phone: "0811111111", shopName: "ร้าน", impersonatedBy: "a1" },
+      IMPERSONATION_TTL_SECONDS,
+    );
+    const { iat, exp } = decodeJwt(token);
+    expect(IMPERSONATION_TTL_SECONDS).toBe(2 * 60 * 60);
+    expect((exp ?? 0) - (iat ?? 0)).toBe(IMPERSONATION_TTL_SECONDS);
   });
 });

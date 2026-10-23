@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireCustomerSession } from "@/lib/auth/customer-session-server";
+import {
+  createCustomerSession,
+  requireCustomerSession,
+} from "@/lib/auth/customer-session-server";
 import { checkRateLimits, getClientIp } from "@/lib/security/rate-limit";
 import {
   changeCustomerPin,
@@ -111,6 +114,13 @@ export async function changeCustomerPinAction(
     }
     return { ok: false, message: result.message };
   }
+
+  // New PIN bumped customers.session_version — re-mint so THIS device stays
+  // signed in while every other session is revoked (audit M7).
+  await createCustomerSession({
+    customerId: session.customerId,
+    phone: session.phone,
+  });
 
   revalidatePath("/me/profile");
   return { ok: true };

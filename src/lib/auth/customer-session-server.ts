@@ -2,7 +2,9 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
+import { fetchSessionVersion, readSessionVersion } from "./session-version";
 import {
+  isSessionVersionCurrent,
   CUSTOMER_SESSION_COOKIE,
   SESSION_TTL_SECONDS,
   signCustomerSessionToken,
@@ -32,7 +34,10 @@ function getSecret(): Uint8Array {
 export async function createCustomerSession(
   session: CustomerSession,
 ): Promise<void> {
-  const token = await signCustomerSessionToken(session);
+  // Stamp the current session_version (audit M7); callers never pass it.
+  const sessionVersion =
+    (await fetchSessionVersion("customers", session.customerId)) ?? 1;
+  const token = await signCustomerSessionToken({ ...session, sessionVersion });
   const cookieStore = await cookies();
   cookieStore.set(CUSTOMER_SESSION_COOKIE, token, {
     httpOnly: true,
@@ -52,13 +57,28 @@ export async function getCustomerSession(): Promise<CustomerSession | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(CUSTOMER_SESSION_COOKIE)?.value;
   if (!token) return null;
-  return verifyCustomerSessionToken(token);
+  const session = await verifyCustomerSessionToken(token);
+  if (!session) return null;
+  const dbVersion = await readSessionVersion("customers", session.customerId);
+  return isSessionVersionCurrent(session.sessionVersion ?? 1, dbVersion)
+    ? session
+    : null;
+}
+
+async function hasSessionCookie(): Promise<boolean> {
+  return Boolean((await cookies()).get(CUSTOMER_SESSION_COOKIE)?.value);
 }
 
 export async function requireCustomerSession(): Promise<CustomerSession> {
   const session = await getCustomerSession();
   if (!session) {
-    redirect("/login");
+    // A cookie that still parses but no longer matches the DB version was
+    // revoked; clear it via the route handler (Server Components can't).
+    redirect(
+      (await hasSessionCookie())
+        ? "/api/auth/session-revoked?p=customer"
+        : "/login",
+    );
   }
   return session;
 }
