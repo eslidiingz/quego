@@ -14,7 +14,12 @@ const LOGIN_INTENT_COOKIE = "lq_shop_login_intent";
 const LOGIN_INTENT_TTL_SECONDS = 60 * 10; // 10 minutes
 
 export type ShopLoginIntent = {
-  shopId: string;
+  /**
+   * null when the typed phone has no approved shop. Step 1 still issues an
+   * intent and sends the visitor to the PIN page (audit M8), so the response
+   * never reveals whether the number is a shop owner; that PIN can never pass.
+   */
+  shopId: string | null;
   phone: string;
 };
 
@@ -109,7 +114,10 @@ export async function getShopLoginIntent(): Promise<ShopLoginIntent | null> {
       algorithms: ["HS256"],
       audience: "shop-login-intent",
     });
-    if (typeof payload.shopId === "string" && typeof payload.phone === "string") {
+    if (
+      (typeof payload.shopId === "string" || payload.shopId === null) &&
+      typeof payload.phone === "string"
+    ) {
       return { shopId: payload.shopId, phone: payload.phone };
     }
     return null;

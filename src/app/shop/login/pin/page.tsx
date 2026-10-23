@@ -16,6 +16,11 @@ export const dynamic = "force-dynamic";
 /**
  * Step 2 of shop login. Reads the login intent cookie set by step 1, then
  * picks setup (no PIN yet) vs verify (PIN exists) based on the live shop row.
+ *
+ * Audit M8: a phone with no shop also lands here (shopId null) and gets the
+ * verify form, which can never succeed. The page shows the TYPED phone in full,
+ * never the shop name, so it reveals nothing the visitor didn't enter — and the
+ * owner can spot a mistyped number and use "เปลี่ยนเบอร์".
  * SRP: the page only orchestrates which form to show — neither form knows
  * about the other.
  */
@@ -25,12 +30,9 @@ export default async function ShopPinPage() {
     redirect("/login?tab=shop&notice=session-expired");
   }
 
-  const shop = await findShopByOwnerPhone(intent.phone);
-  if (!shop) {
-    redirect("/login?tab=shop&notice=session-expired");
-  }
-
-  const mode: "setup" | "verify" = shop.hasPin ? "verify" : "setup";
+  const shop = intent.shopId ? await findShopByOwnerPhone(intent.phone) : null;
+  // No shop (or it went away) → the verify form; it fails like a wrong PIN.
+  const mode: "setup" | "verify" = shop && !shop.hasPin ? "setup" : "verify";
   // Fresh from registration the OTP proof is still valid — skip a second OTP.
   const alreadyVerified =
     mode === "setup" ? await isPhoneVerified(intent.phone) : false;
@@ -45,17 +47,17 @@ export default async function ShopPinPage() {
       }
       subtitle={
         mode === "setup"
-          ? `ตั้งรหัส PIN 6 หลักเพื่อใช้เข้าสู่ระบบของร้าน "${shop.name}" ในครั้งต่อไป`
-          : `ใช้รหัส PIN ของร้าน "${shop.name}" เพื่อเข้าสู่ระบบ`
+          ? `ตั้งรหัส PIN 6 หลักสำหรับเบอร์ ${intent.phone} เพื่อใช้เข้าสู่ระบบร้านในครั้งต่อไป`
+          : `กรอกรหัส PIN ของเบอร์ ${intent.phone} เพื่อเข้าสู่ระบบร้าน`
       }
       footer={
         <>
-          ไม่ใช่ร้านนี้?{" "}
+          เบอร์ไม่ถูกต้อง?{" "}
           <Link
             href="/login?tab=shop"
             className="text-on-primary font-semibold underline underline-offset-2 hover:opacity-80 transition-opacity rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-primary focus-visible:ring-offset-2 focus-visible:ring-offset-primary-container"
           >
-            กลับไปกรอกเบอร์ใหม่
+            เปลี่ยนเบอร์
           </Link>
         </>
       }

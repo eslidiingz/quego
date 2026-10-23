@@ -16,12 +16,31 @@ import {
   isPhoneVerified,
 } from "@/lib/auth/phone-verification-server";
 import { checkRateLimits, getClientIp } from "@/lib/security/rate-limit";
+import { hashPassword, verifyPassword } from "@/lib/auth/password";
 
 export type PinFormState =
   | { ok: false; message: string; fieldErrors?: { pin?: string; confirmPin?: string } }
   | null;
 
 const PIN_RE = /^\d{6}$/u;
+
+/**
+ * Audit M8: every failed verify looks the same whether or not the phone is a
+ * shop owner — one wrong-credentials message, one lock message (no remaining-
+ * attempt count, no exact unlock time that only real accounts could produce).
+ */
+const BAD_CREDENTIALS = "เบอร์โทรหรือ PIN ไม่ถูกต้อง";
+const LOCKED = "ลองผิดหลายครั้งเกินไป ระบบล็อกไว้ชั่วคราว กรุณาลองใหม่ในอีก 10 นาที";
+/** Mirrors the real lockout (5 wrong → 10 min) for phones with no shop. */
+const UNKNOWN_PHONE_ATTEMPTS = 5;
+const UNKNOWN_PHONE_WINDOW_SECONDS = 600;
+
+let dummyHash: Promise<string> | null = null;
+/** Burn the same scrypt cost as a real check so timing doesn't leak existence. */
+async function burnPinCheck(pin: string): Promise<void> {
+  dummyHash ??= hashPassword("000000-dummy");
+  await verifyPassword(pin, await dummyHash);
+}
 
 /**
  * Step 2 (setup variant): first-time PIN setup.
@@ -35,6 +54,12 @@ export async function setupShopPin(
   if (!intent) {
     redirect("/login?tab=shop&notice=session-expired");
   }
+
+  // No shop behind this phone (M8 keeps step 1 silent about it) — nothing to set.
+  if (!intent.shopId) {
+    redirect("/login?tab=shop&notice=session-expired");
+  }
+  const shopId = intent.shopId;
 
   const pin = String(formData.get("pin") ?? "").trim();
   const confirmPin = String(formData.get("confirmPin") ?? "").trim();
@@ -55,7 +80,7 @@ export async function setupShopPin(
   const setupIp = await getClientIp();
   if (
     !(await checkRateLimits([
-      { bucket: `shoppinsetup:shop:${intent.shopId}`, limit: 5, windowSeconds: 3600 },
+      { bucket: `shoppinsetup:shop:${shopId}`, limit: 5, windowSeconds: 3600 },
       { bucket: `shoppinsetup:ip:${setupIp}`, limit: 15, windowSeconds: 3600 },
     ]))
   ) {
@@ -78,7 +103,7 @@ export async function setupShopPin(
     };
   }
 
-  const result = await setShopPin(intent.shopId, pin);
+  const result = await setShopPin(shopId, pin);
   if (!result.ok) {
     // pin_already_set is recoverable: route to verify instead.
     if (result.code === "pin_already_set") {
@@ -139,7 +164,7 @@ export async function verifyShopPinAction(
   const verifyIp = await getClientIp();
   if (
     !(await checkRateLimits([
-      { bucket: `shoppin:shop:${intent.shopId}`, limit: 20, windowSeconds: 600 },
+      { bucket: `shoppin:shop:${intent.shopId ?? intent.phone}`, limit: 20, windowSeconds: 600 },
       { bucket: `shoppin:ip:${verifyIp}`, limit: 30, windowSeconds: 600 },
     ]))
   ) {
@@ -149,13 +174,25 @@ export async function verifyShopPinAction(
     };
   }
 
+  if (!intent.shopId) {
+    // Unknown phone: same cost, same messages, same 5-try lock as a real shop.
+    await burnPinCheck(pin);
+    const underLimit = await checkRateLimits([
+      {
+        bucket: `shoppin:unknown:${intent.phone}`,
+        // The real lockout trips ON the 5th wrong PIN, so allow 4 then lock.
+        limit: UNKNOWN_PHONE_ATTEMPTS - 1,
+        windowSeconds: UNKNOWN_PHONE_WINDOW_SECONDS,
+      },
+    ]);
+    const message = underLimit ? BAD_CREDENTIALS : LOCKED;
+    return { ok: false, message, fieldErrors: { pin: message } };
+  }
+
   const result = await verifyShopPin(intent.shopId, pin);
   if (!result.ok) {
-    return {
-      ok: false,
-      message: result.message,
-      fieldErrors: { pin: result.message },
-    };
+    const message = result.code === "locked" ? LOCKED : BAD_CREDENTIALS;
+    return { ok: false, message, fieldErrors: { pin: message } };
   }
 
   const shop = await findShopByOwnerPhone(intent.phone);

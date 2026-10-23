@@ -11,9 +11,12 @@ export type StartLoginState =
   | null;
 
 /**
- * Step 1 of shop login: verify the phone matches an APPROVED shop, then
- * stamp a short-lived "login intent" cookie that the PIN page reads.
- * Pure SRP: phone validation + intent setup. PIN handling lives in step 2.
+ * Step 1 of shop login: look up the APPROVED shop for the phone, then stamp a
+ * short-lived "login intent" cookie that the PIN page reads. Pure SRP: phone
+ * validation + intent setup. PIN handling lives in step 2.
+ *
+ * Audit M8: an unknown phone gets the same redirect (with shopId null) instead
+ * of "no shop uses this number", so step 1 can't be used to enumerate owners.
  */
 export async function startShopLogin(
   _prev: StartLoginState,
@@ -44,14 +47,7 @@ export async function startShopLogin(
   }
 
   const shop = await findShopByOwnerPhone(phone);
-  if (!shop) {
-    return {
-      ok: false,
-      message: "ไม่พบร้านที่ใช้เบอร์นี้ในระบบ",
-    };
-  }
-
-  await setShopLoginIntent({ shopId: shop.id, phone: shop.phone });
+  await setShopLoginIntent({ shopId: shop?.id ?? null, phone });
 
   redirect("/shop/login/pin");
 }
