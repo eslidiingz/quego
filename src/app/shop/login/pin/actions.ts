@@ -11,6 +11,10 @@ import {
   createShopSession,
   getShopLoginIntent,
 } from "@/lib/auth/shop-session-server";
+import {
+  clearPhoneVerified,
+  isPhoneVerified,
+} from "@/lib/auth/phone-verification-server";
 import { checkRateLimits, getClientIp } from "@/lib/security/rate-limit";
 
 export type PinFormState =
@@ -61,6 +65,19 @@ export async function setupShopPin(
     };
   }
 
+  // Hard gate: first PIN setup requires proven ownership of the owner phone.
+  // The login intent alone only proves someone TYPED the number at step 1, so
+  // without this anyone who knows an owner's phone could claim a shop that has
+  // no PIN yet (abandoned signup, legacy rows). Registration leaves its OTP
+  // proof in place for exactly this step; the login path shows the OTP gate.
+  if (!(await isPhoneVerified(intent.phone))) {
+    return {
+      ok: false,
+      message: "กรุณายืนยันเบอร์โทรด้วย OTP ก่อนตั้ง PIN",
+      fieldErrors: { pin: "กรุณายืนยันเบอร์โทรด้วย OTP ก่อนตั้ง PIN" },
+    };
+  }
+
   const result = await setShopPin(intent.shopId, pin);
   if (!result.ok) {
     // pin_already_set is recoverable: route to verify instead.
@@ -84,6 +101,8 @@ export async function setupShopPin(
     phone: shop.phone,
     shopName: shop.name,
   });
+  // PIN set — consume the OTP proof so it can't be replayed, then drop intent.
+  await clearPhoneVerified();
   await clearShopLoginIntent();
   redirect("/shop");
 }

@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { AuthHeroShell } from "@/components/auth/AuthHeroShell";
 import { findShopByOwnerPhone } from "@/lib/services/shops";
 import { getShopLoginIntent } from "@/lib/auth/shop-session-server";
-import { SetupPinForm } from "./SetupPinForm";
+import { isPhoneVerified } from "@/lib/auth/phone-verification-server";
+import { ShopSetupGate } from "./ShopSetupGate";
 import { VerifyPinForm } from "./VerifyPinForm";
 
 export const metadata = {
@@ -30,6 +31,9 @@ export default async function ShopPinPage() {
   }
 
   const mode: "setup" | "verify" = shop.hasPin ? "verify" : "setup";
+  // Fresh from registration the OTP proof is still valid — skip a second OTP.
+  const alreadyVerified =
+    mode === "setup" ? await isPhoneVerified(intent.phone) : false;
 
   return (
     <AuthHeroShell
@@ -56,7 +60,14 @@ export default async function ShopPinPage() {
         </>
       }
     >
-      {mode === "setup" ? <SetupPinForm /> : <VerifyPinForm />}
+      {mode === "setup" ? (
+        <ShopSetupGate
+          phone={intent.phone}
+          alreadyVerified={alreadyVerified}
+        />
+      ) : (
+        <VerifyPinForm />
+      )}
     </AuthHeroShell>
   );
 }
