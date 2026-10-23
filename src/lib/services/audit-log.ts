@@ -33,10 +33,11 @@ export type AuditAction =
   | "preset.create"
   | "preset.update"
   | "preset.toggle_active"
-  | "preset.delete";
+  | "preset.delete"
+  | "admin.change_password";
 
 /** The kind of entity an action targets — drives the "ประเภท" column. */
-export type AuditEntityType = "shop" | "category" | "preset";
+export type AuditEntityType = "shop" | "category" | "preset" | "admin";
 
 export type WriteAuditLogInput = {
   /** Acting admin's id — MUST come from the verified session. */

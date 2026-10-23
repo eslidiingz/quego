@@ -17,6 +17,7 @@ const navItems = [
   { href: "/admin/categories", label: "หมวดหมู่ร้าน", icon: "category" },
   { href: "/admin/presets", label: "บริการ preset", icon: "stacks" },
   { href: "/admin/audit", label: "บันทึกการกระทำ", icon: "history" },
+  { href: "/admin/account", label: "บัญชีของฉัน", icon: "manage_accounts" },
 ];
 
 export function AdminShell({
