@@ -80,6 +80,7 @@ export async function createManualBookingAction(
     slotTime,
     customerName,
     customerPhone,
+    createdBy: "shop",
   });
 
   if (!result.ok) {

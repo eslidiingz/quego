@@ -5,6 +5,7 @@ import { getBookingContext } from "@/lib/services/bookings";
 import { hasOpenSlotForService, isReofferable } from "@/lib/waitlist/eligibility";
 import { pushWaitlistSlotOpenToCustomer } from "@/lib/services/line-linking";
 import { isValidThaiPhone } from "@/lib/validation/phone";
+import { PHONE_CAPS, WAITLIST_CAP_MESSAGE } from "@/lib/booking/phone-caps";
 
 /**
  * Waitlist service (OPP-05). When a (shop, service, date) is fully booked a
@@ -55,6 +56,7 @@ export type JoinWaitlistResult =
         | "service_unavailable"
         | "date_invalid"
         | "slots_available"
+        | "phone_limit"
         | "unknown";
       message: string;
     };
@@ -144,6 +146,34 @@ export async function joinWaitlist(
   }
 
   const supabase = getSupabaseAdmin();
+
+  // H1: cap active entries per phone across all shops. A re-join of the same
+  // (shop, service, date) is still the benign `alreadyWaiting` no-op. Fails
+  // closed on a lookup error.
+  const { data: active, error: activeError } = await supabase
+    .from("waitlist_entries")
+    .select("shop_id, service_id, requested_date")
+    .eq("customer_phone", phone)
+    .in("status", ["waiting", "notified"]);
+  if (activeError) {
+    console.error("[waitlist] phone cap lookup failed:", activeError.message);
+    return { ok: false, code: "unknown", message: "ระบบขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง" };
+  }
+  const rows = active ?? [];
+  if (
+    rows.some(
+      (r) =>
+        r.shop_id === input.shopId &&
+        r.service_id === serviceId &&
+        r.requested_date === input.requestedDate,
+    )
+  ) {
+    return { ok: true, alreadyWaiting: true };
+  }
+  if (rows.length >= PHONE_CAPS.waitlistActiveAllShops) {
+    return { ok: false, code: "phone_limit", message: WAITLIST_CAP_MESSAGE };
+  }
+
   const { error } = await supabase.from("waitlist_entries").insert({
     shop_id: input.shopId,
     service_id: serviceId,

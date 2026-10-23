@@ -43,6 +43,14 @@ import {
   pushBookingCancellationToCustomer,
 } from "@/lib/services/line-linking";
 import { isPastChangeCutoff } from "@/lib/booking/cutoff";
+import {
+  PHONE_CAP_MESSAGES,
+  SHOP_MANUAL_BOOKINGS_PER_HOUR,
+  SHOP_MANUAL_CAP_MESSAGE,
+  evaluatePhoneCaps,
+  type BookingOrigin,
+  type PhoneBookingRow,
+} from "@/lib/booking/phone-caps";
 import { toCoord } from "@/lib/location/maps";
 
 // Re-export so server callers can import {BookingContext} from this module
@@ -92,6 +100,13 @@ export type CreateBookingInput = {
    * choose a different slot or staff.
    */
   preferredStaffId?: string | null;
+  /**
+   * Who is creating the row (persisted as bookings.created_by). Defaults to
+   * "customer". Customer and walk-in bookings require a phone and are subject
+   * to the per-phone caps; "shop" is exempt from those but capped per shop per
+   * hour (see lib/booking/phone-caps).
+   */
+  createdBy?: BookingOrigin;
 };
 
 export type CreateBookingResult =
@@ -105,6 +120,8 @@ export type CreateBookingResult =
         | "slot_invalid"
         | "slot_past"
         | "slot_taken"
+        | "phone_limit"
+        | "rate_limited"
         | "invalid"
         | "unknown";
       message: string;
@@ -383,6 +400,82 @@ const TIME_RE = /^([01]\d|2[0-3]):[0-5]0$/u;
  *   5. The slot isn't already taken (unique-index protection is the final
  *      backstop for race conditions between two simultaneous clicks)
  */
+type CapFailure = Extract<CreateBookingResult, { ok: false }>;
+
+const CAP_CHECK_FAILED: CapFailure = {
+  ok: false,
+  code: "unknown",
+  message: "ระบบขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง",
+};
+
+/**
+ * Per-phone caps for customer and walk-in bookings (audit H1). Reads this
+ * phone's customer-originated rows that are upcoming or created in the last
+ * 24h, then defers the decision to the pure `evaluatePhoneCaps`. Shop-made and
+ * legacy (NULL created_by) rows are not counted.
+ */
+async function checkPhoneBookingCaps(args: {
+  phone: string;
+  origin: "customer" | "walk_in";
+  shopId: string;
+  date: string;
+}): Promise<CapFailure | null> {
+  const today = getBangkokToday();
+  const nowMs = Date.now();
+  const since = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await getSupabaseAdmin()
+    .from("bookings")
+    .select("shop_id, booking_date, status, created_by, created_at")
+    .eq("customer_phone", args.phone)
+    .in("created_by", ["customer", "walk_in"])
+    .or(`booking_date.gte.${today},created_at.gte."${since}"`)
+    .limit(200);
+  if (error) {
+    console.error("[bookings] phone cap lookup failed:", error.message);
+    return CAP_CHECK_FAILED;
+  }
+  const rows: PhoneBookingRow[] = (data ?? []).map((r) => ({
+    shopId: r.shop_id as string,
+    bookingDate: r.booking_date as string,
+    status: r.status as PhoneBookingRow["status"],
+    createdBy: r.created_by as PhoneBookingRow["createdBy"],
+    createdAt: r.created_at as string,
+  }));
+  const violation = evaluatePhoneCaps({
+    rows,
+    origin: args.origin,
+    shopId: args.shopId,
+    date: args.date,
+    today,
+    nowMs,
+  });
+  return violation
+    ? { ok: false, code: "phone_limit", message: PHONE_CAP_MESSAGES[violation] }
+    : null;
+}
+
+/**
+ * Rolling-hour cap on shop-made bookings (audit M6). Shops are exempt from the
+ * phone caps, so this is what stops the manual-booking dialog being used to
+ * push LINE messages at arbitrary numbers.
+ */
+async function checkShopManualBookingCap(shopId: string): Promise<CapFailure | null> {
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count, error } = await getSupabaseAdmin()
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("shop_id", shopId)
+    .eq("created_by", "shop")
+    .gte("created_at", since);
+  if (error) {
+    console.error("[bookings] shop manual cap lookup failed:", error.message);
+    return CAP_CHECK_FAILED;
+  }
+  return (count ?? 0) >= SHOP_MANUAL_BOOKINGS_PER_HOUR
+    ? { ok: false, code: "rate_limited", message: SHOP_MANUAL_CAP_MESSAGE }
+    : null;
+}
+
 export async function createBooking(
   input: CreateBookingInput,
 ): Promise<CreateBookingResult> {
@@ -390,7 +483,11 @@ export async function createBooking(
   const name = input.customerName.trim();
   const phone = (input.customerPhone ?? "").trim();
   const phoneProvided = phone.length > 0;
+  const origin: BookingOrigin = input.createdBy ?? "customer";
   if (
+    // Only the shop may omit the phone: otherwise skipping it would dodge the
+    // per-phone caps below.
+    (origin !== "shop" && !phoneProvided) ||
     !DATE_RE.test(input.date) ||
     !TIME_RE.test(input.slotTime) ||
     (phoneProvided && !isValidThaiPhone(phone)) ||
@@ -419,6 +516,19 @@ export async function createBooking(
       message: "ร้านนี้ยังไม่พร้อมรับการจอง",
     };
   }
+
+  // H1 / M6 abuse caps, before any slot work. Both fail closed: a DB error
+  // here rejects the booking rather than waving it through.
+  const capFailure =
+    origin === "shop"
+      ? await checkShopManualBookingCap(input.shopId)
+      : await checkPhoneBookingCaps({
+          phone,
+          origin,
+          shopId: input.shopId,
+          date: input.date,
+        });
+  if (capFailure) return capFailure;
 
   // Resolve the chosen service. A provided serviceId must be an active service
   // of THIS shop (ownership + active checked in getBookableService). Its
@@ -515,6 +625,7 @@ export async function createBooking(
     service_id: serviceId,
     service_name: serviceName,
     service_price: servicePrice,
+    created_by: origin,
   };
 
   const slotTaken: CreateBookingResult = {
@@ -704,6 +815,7 @@ export type WalkInResult =
         | "service_unavailable"
         | "no_slot_today"
         | "slot_taken"
+        | "phone_limit"
         | "invalid"
         | "unknown";
       message: string;
@@ -811,6 +923,7 @@ export async function createWalkInBooking(input: {
     slotTime: soonest.time,
     customerName: name,
     customerPhone: input.customerPhone,
+    createdBy: "walk_in",
   });
 
   if (result.ok) return { ok: true, bookingId: result.bookingId };
@@ -840,7 +953,9 @@ export async function createWalkInBooking(input: {
   // Map any remaining createBooking failure onto a walk-in code, preserving its
   // Thai message.
   const code =
-    result.code === "service_unavailable"
+    result.code === "phone_limit"
+      ? "phone_limit"
+      : result.code === "service_unavailable"
       ? "service_unavailable"
       : result.code === "shop_unavailable"
         ? "shop_unavailable"
