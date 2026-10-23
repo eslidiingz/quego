@@ -1247,7 +1247,7 @@ export async function changeShopPin(
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("shops")
-    .select("pin_hash, status")
+    .select("pin_hash, status, failed_pin_attempts, locked_until")
     .eq("id", shopId)
     .maybeSingle();
 
@@ -1263,15 +1263,42 @@ export async function changeShopPin(
     return { ok: false, code: "not_found", message: "ไม่พบร้านในระบบ" };
   }
 
+  // Share the login lockout so a stolen session can't brute-force the PIN here.
+  const lockTarget = { table: "shops", counter: "failed_pin_attempts" } as const;
+  let knownAttempts = (data.failed_pin_attempts as number | null) ?? 0;
+  if (data.locked_until) {
+    const lockedUntil = new Date(data.locked_until as string);
+    if (lockedUntil.getTime() > Date.now()) {
+      return { ok: false, code: "locked", message: lockedMessage(lockedUntil) };
+    }
+    await clearFailedAttempts(lockTarget, shopId);
+    knownAttempts = 0;
+  }
+
   const ok = await verifyPassword(currentPin, data.pin_hash);
   if (!ok) {
-    return { ok: false, code: "bad_pin", message: "รหัส PIN เดิมไม่ถูกต้อง" };
+    const { lockedUntil, newAttempts } = await registerFailedAttempt(
+      lockTarget,
+      shopId,
+      knownAttempts,
+    );
+    if (lockedUntil) {
+      return { ok: false, code: "locked", message: lockedMessage(lockedUntil) };
+    }
+    const warning = remainingAttemptsMessage(newAttempts);
+    return {
+      ok: false,
+      code: "bad_pin",
+      message: warning
+        ? `รหัส PIN เดิมไม่ถูกต้อง — ${warning}`
+        : "รหัส PIN เดิมไม่ถูกต้อง",
+    };
   }
 
   const hash = await hashPassword(newPin);
   const { error: updateError } = await supabase
     .from("shops")
-    .update({ pin_hash: hash })
+    .update({ pin_hash: hash, failed_pin_attempts: 0, locked_until: null })
     .eq("id", shopId);
 
   if (updateError) {

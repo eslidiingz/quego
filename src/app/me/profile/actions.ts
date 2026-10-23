@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireCustomerSession } from "@/lib/auth/customer-session-server";
+import { checkRateLimits, getClientIp } from "@/lib/security/rate-limit";
 import {
   changeCustomerPin,
   updateCustomerName,
@@ -74,6 +75,22 @@ export async function changeCustomerPinAction(
   }
   if (Object.keys(fieldErrors).length > 0) {
     return { ok: false, message: "กรอกข้อมูลไม่ถูกต้อง", fieldErrors };
+  }
+
+  // Flood backstop on top of the shared PIN lockout (which is the real
+  // per-account ceiling). Kept above the 5-strike lock so the lockout message,
+  // not a vague throttle, is what the owner sees.
+  const ip = await getClientIp();
+  if (
+    !(await checkRateLimits([
+      { bucket: `custpinchange:id:${session.customerId}`, limit: 20, windowSeconds: 600 },
+      { bucket: `custpinchange:ip:${ip}`, limit: 30, windowSeconds: 600 },
+    ]))
+  ) {
+    return {
+      ok: false,
+      message: "ลองเปลี่ยน PIN ถี่เกินไป กรุณาลองใหม่อีกครั้งในภายหลัง",
+    };
   }
 
   const result = await changeCustomerPin(session.customerId, currentPin, newPin);
