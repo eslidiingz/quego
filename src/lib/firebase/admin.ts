@@ -54,10 +54,19 @@ function firebaseProjectId(): string {
 export type VerifiedPhone = { phone: string; firebaseUid: string };
 
 /**
+ * How recent the SMS proof must be (audit M9). The browser sends the ID token
+ * right after the code is confirmed, so 10 minutes is generous. Without this an
+ * ID token (valid 1 h) could be replayed, and a refreshed token from a sign-in
+ * days ago would still "prove" the phone — hence BOTH `iat` (via
+ * `maxTokenAge`) and `auth_time` (when the SMS code was actually confirmed).
+ */
+const MAX_PROOF_AGE_SECONDS = 10 * 60;
+
+/**
  * Verify a Firebase ID token from the browser Phone Auth flow and extract the
  * PROVEN phone number, normalized to the canonical Thai 10-digit / leading-0
  * form used everywhere else. Returns null on ANY failure (bad/expired/forged
- * token, wrong project, missing phone claim, non-Thai number) — callers treat
+ * token, wrong project, stale proof, missing phone claim, non-Thai number) — callers treat
  * null as "not verified" and must never create an account.
  *
  * `keySet` is injectable so tests can verify against a locally-generated key
@@ -73,7 +82,14 @@ export async function verifyFirebaseIdToken(
       algorithms: ["RS256"],
       issuer: `https://securetoken.google.com/${projectId}`,
       audience: projectId,
+      maxTokenAge: MAX_PROOF_AGE_SECONDS,
     });
+    // `auth_time` = when the user confirmed the SMS code. Google requires it to
+    // be in the past; we also require it to be recent.
+    const now = Math.floor(Date.now() / 1000);
+    const authTime = payload.auth_time;
+    if (typeof authTime !== "number") return null;
+    if (authTime > now + 60 || now - authTime > MAX_PROOF_AGE_SECONDS) return null;
     // `sub` is the Firebase uid and MUST be a non-empty string (Google's spec).
     if (typeof payload.sub !== "string" || payload.sub.length === 0) return null;
     if (typeof payload.phone_number !== "string") return null;

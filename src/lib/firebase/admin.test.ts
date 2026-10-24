@@ -65,6 +65,10 @@ type TokenOpts = {
   expiresIn?: string | number;
   signWith?: typeof privateKey;
   kid?: string;
+  /** Epoch seconds for `iat`; default now. */
+  issuedAt?: number;
+  /** Epoch seconds for `auth_time`; default now. null omits the claim. */
+  authTime?: number | null;
 };
 
 async function makeToken(opts: TokenOpts = {}): Promise<string> {
@@ -76,15 +80,18 @@ async function makeToken(opts: TokenOpts = {}): Promise<string> {
     expiresIn = "1h",
     signWith = privateKey,
     kid = KID,
+    issuedAt = Math.floor(Date.now() / 1000),
+    authTime = Math.floor(Date.now() / 1000),
   } = opts;
   const claims: Record<string, unknown> = {};
   if (phoneNumber !== null) claims.phone_number = phoneNumber;
+  if (authTime !== null) claims.auth_time = authTime;
   return new SignJWT(claims)
     .setProtectedHeader({ alg: "RS256", kid })
     .setSubject(sub)
     .setIssuer(issuer)
     .setAudience(audience)
-    .setIssuedAt()
+    .setIssuedAt(issuedAt)
     .setExpirationTime(expiresIn)
     .sign(signWith);
 }
@@ -133,6 +140,34 @@ describe("verifyFirebaseIdToken", () => {
   it("rejects a token with an empty sub (uid)", async () => {
     const token = await makeToken({ sub: "" });
     expect(await verifyFirebaseIdToken(token, keySet)).toBeNull();
+  });
+
+  it("rejects a token issued more than 10 minutes ago (replay)", async () => {
+    const elevenMinAgo = Math.floor(Date.now() / 1000) - 11 * 60;
+    const token = await makeToken({ issuedAt: elevenMinAgo, authTime: elevenMinAgo });
+    expect(await verifyFirebaseIdToken(token, keySet)).toBeNull();
+  });
+
+  it("rejects a freshly refreshed token whose SMS proof (auth_time) is old", async () => {
+    const yesterday = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
+    const token = await makeToken({ authTime: yesterday });
+    expect(await verifyFirebaseIdToken(token, keySet)).toBeNull();
+  });
+
+  it("rejects a token with auth_time in the future", async () => {
+    const token = await makeToken({ authTime: Math.floor(Date.now() / 1000) + 3600 });
+    expect(await verifyFirebaseIdToken(token, keySet)).toBeNull();
+  });
+
+  it("rejects a token with no auth_time claim", async () => {
+    const token = await makeToken({ authTime: null });
+    expect(await verifyFirebaseIdToken(token, keySet)).toBeNull();
+  });
+
+  it("accepts an SMS proof from 9 minutes ago", async () => {
+    const nineMinAgo = Math.floor(Date.now() / 1000) - 9 * 60;
+    const token = await makeToken({ issuedAt: nineMinAgo, authTime: nineMinAgo });
+    expect(await verifyFirebaseIdToken(token, keySet)).not.toBeNull();
   });
 
   it("fails closed when NEXT_PUBLIC_FIREBASE_PROJECT_ID is unset", async () => {
