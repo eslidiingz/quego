@@ -239,8 +239,9 @@ get/set/destroy and the `require*Session()` redirect helpers.
   Check, +66-only region policy, quotas) is mandatory before go-live — see
   [.env.example](.env.example).
 - **LINE account linking** is orthogonal to auth: shops and customers each link
-  a LINE userId (`/api/{shop,customer}/line/connect` → `…/callback` OAuth, or a
-  short-lived link code) so the Messaging API can push notifications to them.
+  a LINE userId (`/api/{shop,customer}/line/connect` → `…/callback` OAuth) so
+  the Messaging API can push notifications to them. (The old typed link-code
+  flow and its `line_link_codes` table are gone.)
 
 ### Data access — service layer over a service-role client
 
@@ -343,8 +344,9 @@ The live table set groups by domain:
   `category_service_presets` (admin-curated service templates per category).
 - **Engagement** — `reviews`, `waitlist_entries`, `shop_customer_notes`.
 - **Money** — `shop_expenses` (owner-entered running costs, behind `/shop/expenses`).
-- **LINE** — `line_link_codes`, `line_message_log` (dedups inbound by
-  `line_message_id`).
+- **LINE** — `line_message_log`: outbound sends, 1:1 inbound messages, group
+  *commands* only (not group chatter), plus the `webhook_event` rows
+  `claimLineWebhookEvent` uses to dedupe redelivered webhooks.
 - **Ops** — `admin_audit_logs`, `rate_limits`.
 
 `bookings` carries a `time_range` and optional `staff_id`; identity is still the
