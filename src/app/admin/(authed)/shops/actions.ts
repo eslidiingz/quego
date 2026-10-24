@@ -57,6 +57,7 @@ export async function updateShop(
       entityType: "shop",
       entityId: id,
       summary: parsed.name,
+      meta: { changes: result.changes },
     }),
   );
 
