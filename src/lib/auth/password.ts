@@ -28,15 +28,15 @@ export async function verifyPassword(
 ): Promise<boolean> {
   const parts = stored.split("$");
   if (parts.length !== 6 || parts[0] !== "scrypt") return false;
-  const n = Number(parts[1]);
-  const r = Number(parts[2]);
-  const p = Number(parts[3]);
-  if (!Number.isFinite(n) || !Number.isFinite(r) || !Number.isFinite(p)) {
+  // Only our own cost parameters are accepted (audit L7): a stored hash can't
+  // pick a weaker N/r/p, or a huge one that pins the CPU, or a short key.
+  if (parts[1] !== String(N) || parts[2] !== String(R) || parts[3] !== String(P)) {
     return false;
   }
   const salt = Buffer.from(parts[4], "base64");
   const expected = Buffer.from(parts[5], "base64");
-  const actual = await scrypt(password, salt, expected.length, { N: n, r, p });
+  if (expected.length !== KEYLEN) return false;
+  const actual = await scrypt(password, salt, KEYLEN, { N, r: R, p: P });
   if (actual.length !== expected.length) return false;
   return timingSafeEqual(actual, expected);
 }
