@@ -110,6 +110,54 @@ export type InsightsBooking = {
   price: number | null;
 };
 
+/**
+ * Bookings rolled up by every dimension a metric reads — staff, service,
+ * status and slot hour. The report never needs a single booking, only these
+ * sums, so the database returns them pre-grouped (see `shop_insights_rollup`)
+ * instead of shipping every row (which PostgREST silently caps at 1,000).
+ */
+export type InsightsBookingGroup = {
+  staffId: string | null;
+  serviceId: string | null;
+  status: InsightsBooking["status"];
+  /** Hour of the slot start, 0–23. */
+  hour: number;
+  count: number;
+  /** Sum of service durations. */
+  minutes: number;
+  /** Sum of non-null snapshotted prices. */
+  revenue: number;
+};
+
+/**
+ * Roll raw bookings up into `InsightsBookingGroup`s — the JS twin of the SQL
+ * `shop_insights_rollup` grouping, so tests can feed per-booking fixtures.
+ */
+export function groupBookings(bookings: InsightsBooking[]): InsightsBookingGroup[] {
+  const groups = new Map<string, InsightsBookingGroup>();
+  for (const b of bookings) {
+    const hour = Math.floor(hhmmToMinutes(b.slotTime) / 60);
+    const key = `${b.staffId}|${b.serviceId}|${b.status}|${hour}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = {
+        staffId: b.staffId,
+        serviceId: b.serviceId,
+        status: b.status,
+        hour,
+        count: 0,
+        minutes: 0,
+        revenue: 0,
+      };
+      groups.set(key, g);
+    }
+    g.count += 1;
+    g.minutes += b.durationMinutes;
+    if (b.price != null) g.revenue += b.price;
+  }
+  return [...groups.values()];
+}
+
 /** An active, service-providing staff member to break utilization down by. */
 export type InsightsStaff = { id: string; name: string };
 
@@ -122,6 +170,8 @@ export type InsightsExpense = {
   expenseDate: string;
   category: string;
   amount: number;
+  /** Expenses this row stands for when pre-summed per category (default 1). */
+  count?: number;
 };
 
 export type BusyHourBucket = {
@@ -217,7 +267,8 @@ export function computeShopInsights(input: {
   windowDates: { dateYmd: string; dayOfWeek: DayOfWeek }[];
   /** Business hours indexed positionally by day-of-week (length 7). */
   hours: BusinessHour[];
-  bookings: InsightsBooking[];
+  /** Window bookings, pre-grouped (see `InsightsBookingGroup`). */
+  bookings: InsightsBookingGroup[];
   /** Active, service-providing staff. Empty ⇒ single-queue shop. */
   staff: InsightsStaff[];
   /** All shop services (active or not) for revenue-by-service name resolution. */
@@ -292,18 +343,17 @@ export function computeShopInsights(input: {
 
   for (const b of filtered) {
     if (b.status === "cancelled") {
-      cancelled += 1;
+      cancelled += b.count;
       continue;
     }
     // confirmed or completed = an "active" booking that consumed a line.
-    totalBookings += 1;
-    bookedMin += b.durationMinutes;
+    totalBookings += b.count;
+    bookedMin += b.minutes;
 
-    const hour = Math.floor(hhmmToMinutes(b.slotTime) / 60);
-    if (hour >= 0 && hour < 24) hourCounts[hour] += 1;
+    if (b.hour >= 0 && b.hour < 24) hourCounts[b.hour] += b.count;
 
-    staffCount.set(b.staffId, (staffCount.get(b.staffId) ?? 0) + 1);
-    serviceCount.set(b.serviceId, (serviceCount.get(b.serviceId) ?? 0) + 1);
+    staffCount.set(b.staffId, (staffCount.get(b.staffId) ?? 0) + b.count);
+    serviceCount.set(b.serviceId, (serviceCount.get(b.serviceId) ?? 0) + b.count);
 
     // The window is (almost) all past dates, where any non-cancelled booking was
     // served (no-show is folded into cancelled). Count revenue across all active
@@ -311,13 +361,11 @@ export function computeShopInsights(input: {
     // figure tracks `totalBookings`/fill-rate instead of reading ฿0 whenever
     // completion isn't diligently recorded. Today is now included for parity with
     // the overview, so it may carry a few not-yet-served confirmed bookings; they
-    // count as booked revenue, which is acceptable for a rolling total. Skip null
-    // prices for revenue but still count the booking above.
-    if (b.price != null) {
-      revenue += b.price;
-      staffRevenue.set(b.staffId, (staffRevenue.get(b.staffId) ?? 0) + b.price);
-      serviceRevenue.set(b.serviceId, (serviceRevenue.get(b.serviceId) ?? 0) + b.price);
-    }
+    // count as booked revenue, which is acceptable for a rolling total. Null
+    // prices are already left out of `revenue` but still counted above.
+    revenue += b.revenue;
+    staffRevenue.set(b.staffId, (staffRevenue.get(b.staffId) ?? 0) + b.revenue);
+    serviceRevenue.set(b.serviceId, (serviceRevenue.get(b.serviceId) ?? 0) + b.revenue);
   }
 
   const totalAll = totalBookings + cancelled;
@@ -502,7 +550,7 @@ function buildExpensesByCategory(
   for (const e of expenses) {
     const category = e.category.trim() || "ไม่ระบุหมวด";
     amountByCat.set(category, (amountByCat.get(category) ?? 0) + e.amount);
-    countByCat.set(category, (countByCat.get(category) ?? 0) + 1);
+    countByCat.set(category, (countByCat.get(category) ?? 0) + (e.count ?? 1));
   }
 
   const rows: ExpenseByCategory[] = [];

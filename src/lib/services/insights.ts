@@ -15,7 +15,7 @@ import {
 } from "@/lib/booking/slot-math";
 import {
   computeShopInsights,
-  type InsightsBooking,
+  type InsightsBookingGroup,
   type InsightsStaff,
   type InsightsService,
   type InsightsExpense,
@@ -25,7 +25,9 @@ import {
 
 /**
  * Shop report service (รายงานร้าน, OPP-19 Phase 1). Reads the data the aggregate
- * needs over the service-role client (RLS deny-all), then defers ALL metric
+ * needs over the service-role client (RLS deny-all) — bookings and expenses
+ * arrive pre-summed from the `shop_insights_rollup` SQL function, so a busy
+ * shop never hits PostgREST's 1,000-row cap — then defers ALL metric
  * math to the pure `computeShopInsights` helper so this module stays a thin
  * I/O shim. It also runs the aggregate twice — current window + the
  * immediately-preceding equal-length window — to derive period-over-period
@@ -66,6 +68,26 @@ export type { ReportRange } from "@/lib/insights/aggregate";
 
 type WindowDate = { dateYmd: string; dayOfWeek: DayOfWeek };
 
+/** One `shop_insights_rollup` booking group (`cur` = current window). */
+type RollupBooking = {
+  cur: boolean;
+  staff_id: string | null;
+  service_id: string | null;
+  status: string;
+  hour: number;
+  n: number;
+  minutes: number;
+  revenue: number | string;
+};
+
+/** One `shop_insights_rollup` expense group, summed per category. */
+type RollupExpense = {
+  cur: boolean;
+  category: string | null;
+  amount: number | string;
+  n: number;
+};
+
 /** Booking statuses the analytics model understands; others are skipped. */
 const VALID_BOOKING_STATUSES = new Set<string>([
   "confirmed",
@@ -73,7 +95,7 @@ const VALID_BOOKING_STATUSES = new Set<string>([
   "completed",
 ]);
 
-/** Postgres `numeric` arrives over the wire as a string — coerce to number. */
+/** Postgres `numeric` may arrive as a string — coerce to number. */
 function priceFromDb(value: number | string | null): number | null {
   if (value == null) return null;
   const n = typeof value === "string" ? Number(value) : value;
@@ -158,30 +180,29 @@ export async function getShopReport(
   const currentWindow = resolveWindow(range);
   const compareWindow = precedingWindow(currentWindow);
 
-  // Fetch bookings across BOTH windows in one query, then partition in memory.
-  const allDates = [...compareWindow, ...currentWindow];
-  const queryStart = allDates.length > 0 ? allDates[0].dateYmd : "9999-12-31";
-  const queryEnd =
-    allDates.length > 0 ? allDates[allDates.length - 1].dateYmd : "0001-01-01";
+  // Both windows are contiguous date runs; null bounds = empty window.
+  const bounds = (w: WindowDate[]) =>
+    w.length > 0 ? [w[0].dateYmd, w[w.length - 1].dateYmd] : [null, null];
+  const [curStart, curEnd] = bounds(currentWindow);
+  const [cmpStart, cmpEnd] = bounds(compareWindow);
 
   const [
-    { data: bookingsData, error: bookingsError },
+    { data: rollupData, error: rollupError },
     { data: hoursData, error: hoursError },
     { data: staffData, error: staffError },
     { data: servicesData, error: servicesError },
-    { data: expensesData, error: expensesError },
     { data: firstBookingData, error: firstBookingError },
     { data: firstExpenseData, error: firstExpenseError },
   ] = await Promise.all([
-    // ALL statuses — cancelled rows are needed for the cancellation rate.
-    supabase
-      .from("bookings")
-      .select(
-        "booking_date, slot_time, service_duration_minutes, staff_id, service_id, status, service_price",
-      )
-      .eq("shop_id", shopId)
-      .gte("booking_date", queryStart)
-      .lte("booking_date", queryEnd),
+    // Bookings (ALL statuses — cancelled feeds the cancellation rate) and
+    // expenses for both windows, summed in SQL. One jsonb value, not rows.
+    supabase.rpc("shop_insights_rollup", {
+      p_shop_id: shopId,
+      p_cur_start: curStart,
+      p_cur_end: curEnd,
+      p_cmp_start: cmpStart,
+      p_cmp_end: cmpEnd,
+    }),
     supabase
       .from("shop_business_hours")
       .select("day_of_week, is_open, open_time, close_time")
@@ -203,14 +224,6 @@ export async function getShopReport(
       .eq("shop_id", shopId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
-    // Expenses across the same window — aggregated into net profit. Shop-wide,
-    // so no staff/service scoping here.
-    supabase
-      .from("shop_expenses")
-      .select("expense_date, category, amount")
-      .eq("shop_id", shopId)
-      .gte("expense_date", queryStart)
-      .lte("expense_date", queryEnd),
     // Earliest booking / expense dates → the lower bound of the picker's year
     // list, so an owner can scroll back to any year they have data in. Single
     // indexed row each; cheap.
@@ -231,8 +244,8 @@ export async function getShopReport(
   // Surface query failures loudly. Without this, the `?? []` fallbacks below
   // would turn any failed query into an all-zero "no data" dashboard — a silent
   // wrong answer the owner can't distinguish from a genuinely quiet period.
-  if (bookingsError) {
-    throw new Error(`insights: bookings query failed: ${bookingsError.message}`);
+  if (rollupError) {
+    throw new Error(`insights: rollup query failed: ${rollupError.message}`);
   }
   if (hoursError) {
     throw new Error(`insights: business hours query failed: ${hoursError.message}`);
@@ -242,9 +255,6 @@ export async function getShopReport(
   }
   if (servicesError) {
     throw new Error(`insights: services query failed: ${servicesError.message}`);
-  }
-  if (expensesError) {
-    throw new Error(`insights: expenses query failed: ${expensesError.message}`);
   }
   if (firstBookingError) {
     throw new Error(
@@ -257,36 +267,38 @@ export async function getShopReport(
     );
   }
 
-  const allBookings: InsightsBooking[] = (bookingsData ?? []).flatMap((b) => {
-    // Validate the DB status BEFORE narrowing it to the analytics union: an
-    // unrecognised status (e.g. a future one) must not fall through and be
-    // counted as an active booking, which would silently inflate every metric.
-    const status = b.status as string;
-    if (!VALID_BOOKING_STATUSES.has(status)) return [];
-    return [
-      {
-        bookingDate: b.booking_date as string,
-        slotTime: (b.slot_time as string).slice(0, 5),
-        durationMinutes: b.service_duration_minutes as number,
-        staffId: (b.staff_id as string | null) ?? null,
-        serviceId: (b.service_id as string | null) ?? null,
-        status: status as InsightsBooking["status"],
-        price: priceFromDb(b.service_price as number | string | null),
-      },
-    ];
-  });
+  const rollup = (rollupData ?? {}) as { bookings?: RollupBooking[]; expenses?: RollupExpense[] };
 
-  const allExpenses: InsightsExpense[] = (expensesData ?? []).flatMap((e) => {
-    const amount = priceFromDb(e.amount as number | string | null);
-    if (amount == null) return [];
-    return [
-      {
-        expenseDate: e.expense_date as string,
-        category: (e.category as string) ?? "",
-        amount,
-      },
-    ];
-  });
+  const currentBookings: InsightsBookingGroup[] = [];
+  const compareBookings: InsightsBookingGroup[] = [];
+  for (const b of rollup.bookings ?? []) {
+    // The SQL already filters to these statuses; re-check before narrowing so
+    // an unrecognised one can never be counted as an active booking.
+    if (!VALID_BOOKING_STATUSES.has(b.status)) continue;
+    (b.cur ? currentBookings : compareBookings).push({
+      staffId: b.staff_id ?? null,
+      serviceId: b.service_id ?? null,
+      status: b.status as InsightsBookingGroup["status"],
+      hour: b.hour,
+      count: b.n,
+      minutes: b.minutes,
+      revenue: priceFromDb(b.revenue) ?? 0,
+    });
+  }
+
+  const currentExpenses: InsightsExpense[] = [];
+  const compareExpenses: InsightsExpense[] = [];
+  for (const e of rollup.expenses ?? []) {
+    const amount = priceFromDb(e.amount);
+    if (amount == null) continue;
+    (e.cur ? currentExpenses : compareExpenses).push({
+      // Per-category sums carry no date; the window is decided by `cur`.
+      expenseDate: "",
+      category: e.category ?? "",
+      amount,
+      count: e.n,
+    });
+  }
 
   // Index business hours positionally by day-of-week (mirrors getBookingContext).
   const byDay = new Map<DayOfWeek, BusinessHour>();
@@ -318,14 +330,6 @@ export async function getShopReport(
     id: s.id as string,
     name: s.name as string,
   }));
-
-  // Partition bookings into the two windows by date membership.
-  const currentDateSet = new Set(currentWindow.map((d) => d.dateYmd));
-  const compareDateSet = new Set(compareWindow.map((d) => d.dateYmd));
-  const currentBookings = allBookings.filter((b) => currentDateSet.has(b.bookingDate));
-  const compareBookings = allBookings.filter((b) => compareDateSet.has(b.bookingDate));
-  const currentExpenses = allExpenses.filter((e) => currentDateSet.has(e.expenseDate));
-  const compareExpenses = allExpenses.filter((e) => compareDateSet.has(e.expenseDate));
 
   const insights = computeShopInsights({
     rangeDays: currentWindow.length,
