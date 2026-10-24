@@ -1,5 +1,6 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { dbFailure } from "./db-error";
 
 /**
  * Shop-expenses (ค่าใช้จ่ายของร้าน) service. A shop records one-off expenses —
@@ -163,7 +164,7 @@ export async function createExpense(
     .select("id")
     .single();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("expenses", error);
   return { ok: true, id: data.id as string };
 }
 
@@ -196,7 +197,7 @@ export async function updateExpense(
     .select("id")
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("expenses", error);
   if (!data)
     return { ok: false, code: "not_found", message: "ไม่พบรายการค่าใช้จ่ายนี้" };
   return { ok: true, id: data.id as string };
@@ -216,7 +217,7 @@ export async function deleteExpense(
     .select("id")
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("expenses", error);
   if (!data)
     return { ok: false, code: "not_found", message: "ไม่พบรายการค่าใช้จ่ายนี้" };
   return { ok: true, id: data.id as string };

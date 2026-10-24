@@ -1,5 +1,6 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { dbFailure } from "./db-error";
 
 /**
  * Category service-presets service. Admin-curated building blocks: each shop
@@ -280,7 +281,7 @@ export async function createPreset(
     if (error.code === "23503") {
       return { ok: false, code: "not_found", message: "ไม่พบหมวดหมู่นี้" };
     }
-    return { ok: false, code: "unknown", message: error.message };
+    return dbFailure("service-presets", error);
   }
   return { ok: true, id: data.id as string };
 }
@@ -326,7 +327,7 @@ export async function updatePreset(
         message: "มีบริการชื่อนี้ในหมวดนี้อยู่แล้ว",
       };
     }
-    return { ok: false, code: "unknown", message: error.message };
+    return dbFailure("service-presets", error);
   }
   if (!data) return { ok: false, code: "not_found", message: "ไม่พบบริการ preset นี้" };
   return { ok: true, id: data.id as string };
@@ -350,7 +351,7 @@ export async function setPresetActive(
     .select("id")
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("service-presets", error);
   if (!data) return { ok: false, code: "not_found", message: "ไม่พบบริการ preset นี้" };
   return { ok: true, id: data.id as string };
 }
@@ -370,7 +371,7 @@ export async function deletePreset(
     .select("id")
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("service-presets", error);
   if (!data) return { ok: false, code: "not_found", message: "ไม่พบบริการ preset นี้" };
   return { ok: true, id: data.id as string };
 }

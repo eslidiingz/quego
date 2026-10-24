@@ -1,5 +1,6 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { dbFailure } from "./db-error";
 
 /**
  * Shop-staff (พนักงาน) service. One shop has many staff, each acting as a
@@ -184,7 +185,7 @@ export async function createStaff(
     .single();
 
   if (error) {
-    return { ok: false, code: "unknown", message: error.message };
+    return dbFailure("staff", error);
   }
   return { ok: true, id: data.id as string };
 }
@@ -223,7 +224,7 @@ export async function updateStaff(
     .select("id")
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("staff", error);
   if (!data) return { ok: false, code: "not_found", message: "ไม่พบพนักงานนี้" };
   return { ok: true, id: data.id as string };
 }
@@ -246,7 +247,7 @@ export async function setStaffActive(
     .select("id")
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("staff", error);
   if (!data) return { ok: false, code: "not_found", message: "ไม่พบพนักงานนี้" };
   return { ok: true, id: data.id as string };
 }
@@ -278,14 +279,14 @@ export async function setStaffServices(
     .from("shop_staff_services")
     .delete()
     .eq("staff_id", staffId);
-  if (delError) return { ok: false, code: "unknown", message: delError.message };
+  if (delError) return dbFailure("staff", delError);
 
   if (serviceIds.length > 0) {
     const rows = serviceIds.map((sid) => ({ staff_id: staffId, service_id: sid }));
     const { error: insError } = await supabase
       .from("shop_staff_services")
       .insert(rows);
-    if (insError) return { ok: false, code: "unknown", message: insError.message };
+    if (insError) return dbFailure("staff", insError);
   }
 
   return { ok: true, id: staffId };
@@ -308,7 +309,7 @@ export async function deleteStaff(
     .select("id")
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("staff", error);
   if (!data) return { ok: false, code: "not_found", message: "ไม่พบพนักงานนี้" };
   return { ok: true, id: data.id as string };
 }

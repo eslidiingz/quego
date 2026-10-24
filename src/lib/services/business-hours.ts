@@ -5,6 +5,7 @@ import {
   type BusinessHour,
   type DayOfWeek,
 } from "@/lib/booking/slot-math";
+import { dbFailure } from "./db-error";
 
 // Re-export so existing callers (`@/lib/services/business-hours`) keep
 // resolving — the canonical definition now lives in the pure module.
@@ -117,7 +118,7 @@ export async function upsertBusinessHours(
     .upsert(rows, { onConflict: "shop_id,day_of_week" });
 
   if (error) {
-    return { ok: false, code: "unknown", message: error.message };
+    return dbFailure("business-hours", error);
   }
   return { ok: true };
 }
