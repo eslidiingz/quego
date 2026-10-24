@@ -80,7 +80,8 @@ export async function saveStaffAction(
           .map((v) => String(v).trim())
           .filter(Boolean)
       : [];
-  await setStaffServices(session.shopId, result.id, serviceIds);
+  const assigned = await setStaffServices(session.shopId, result.id, serviceIds);
+  if (!assigned.ok) return { ok: false, message: assigned.message };
 
   revalidateStaffSurfaces();
   return { ok: true };
