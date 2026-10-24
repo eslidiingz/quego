@@ -36,6 +36,7 @@ import {
   MAX_COVER_BYTES,
 } from "@/lib/validation/media";
 import { dbFailure } from "./db-error";
+import { diffFields, type FieldChange } from "@/lib/audit/diff";
 
 // ----- Types --------------------------------------------------------------
 
@@ -137,7 +138,11 @@ export type ShopListItem = {
 export type UpdateShopInput = CreateShopInput;
 
 export type UpdateShopResult =
-  | { ok: true }
+  | {
+      ok: true;
+      /** Admin edits only: what changed, for the audit log (L6). */
+      changes?: Partial<Record<AuditedShopField, FieldChange>>;
+    }
   | {
       ok: false;
       code: "not_found" | "category_not_found" | "duplicate" | "unknown";
@@ -802,6 +807,22 @@ export async function listShops(filter?: {
 
 // ----- Admin write: edit shop profile -------------------------------------
 
+/** Columns an admin edit can change; their before → after goes to the audit log (L6). */
+const AUDITED_SHOP_FIELDS = [
+  "name",
+  "category_id",
+  "description",
+  "address",
+  "province",
+  "district",
+  "subdistrict",
+  "contact_phone",
+  "owner_name",
+  "owner_phone",
+  "owner_email",
+] as const;
+type AuditedShopField = (typeof AUDITED_SHOP_FIELDS)[number];
+
 /**
  * Admin-side update of shop fields. Does not touch `status` — registration is
  * self-serve and there is no moderation flow, so `status` is never edited.
@@ -818,9 +839,9 @@ export async function updateShop(
 
   const { data: existing, error: readError } = await supabase
     .from("shops")
-    .select("id")
+    .select(AUDITED_SHOP_FIELDS.join(", "))
     .eq("id", id)
-    .maybeSingle();
+    .maybeSingle<Record<AuditedShopField, string | null>>();
   if (readError) {
     return dbFailure("shops", readError);
   }
@@ -844,22 +865,22 @@ export async function updateShop(
     };
   }
 
+  const next: Record<AuditedShopField, string | null> = {
+    name: input.name,
+    category_id: input.categoryId,
+    description: input.description || null,
+    address: input.address || null,
+    province: input.province,
+    district: input.district,
+    subdistrict: input.subdistrict,
+    contact_phone: input.contactPhone || null,
+    owner_name: input.ownerName,
+    owner_phone: input.ownerPhone,
+    owner_email: input.ownerEmail || null,
+  };
   const { error: updateError } = await supabase
     .from("shops")
-    .update({
-      name: input.name,
-      category_id: input.categoryId,
-      description: input.description || null,
-      address: input.address || null,
-      province: input.province,
-      district: input.district,
-      subdistrict: input.subdistrict,
-      contact_phone: input.contactPhone || null,
-      owner_name: input.ownerName,
-      owner_phone: input.ownerPhone,
-      owner_email: input.ownerEmail || null,
-      reviewed_by: editorAdminId,
-    })
+    .update({ ...next, reviewed_by: editorAdminId })
     .eq("id", id);
 
   if (updateError) {
@@ -873,7 +894,7 @@ export async function updateShop(
     return dbFailure("shops", updateError);
   }
 
-  return { ok: true };
+  return { ok: true, changes: diffFields(existing, next) };
 }
 
 // ----- Shop fetch by id ---------------------------------------------------
