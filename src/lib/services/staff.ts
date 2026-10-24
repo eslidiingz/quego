@@ -275,14 +275,29 @@ export async function setStaffServices(
     .maybeSingle();
   if (!staffRow) return { ok: false, code: "not_found", message: "ไม่พบพนักงานนี้" };
 
+  // Every service must belong to this shop too (audit L2). Reject rather than
+  // drop: a list filtered down to empty would mean "can do all services".
+  const uniqueIds = [...new Set(serviceIds)];
+  if (uniqueIds.length > 0) {
+    const { data: owned, error: ownError } = await supabase
+      .from("shop_services")
+      .select("id")
+      .eq("shop_id", shopId)
+      .in("id", uniqueIds);
+    if (ownError) return dbFailure("staff", ownError);
+    if ((owned ?? []).length !== uniqueIds.length) {
+      return { ok: false, code: "invalid", message: "บริการที่เลือกไม่ถูกต้อง" };
+    }
+  }
+
   const { error: delError } = await supabase
     .from("shop_staff_services")
     .delete()
     .eq("staff_id", staffId);
   if (delError) return dbFailure("staff", delError);
 
-  if (serviceIds.length > 0) {
-    const rows = serviceIds.map((sid) => ({ staff_id: staffId, service_id: sid }));
+  if (uniqueIds.length > 0) {
+    const rows = uniqueIds.map((sid) => ({ staff_id: staffId, service_id: sid }));
     const { error: insError } = await supabase
       .from("shop_staff_services")
       .insert(rows);
