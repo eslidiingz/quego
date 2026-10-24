@@ -6,6 +6,7 @@ import {
   registerFailedAttempt,
   clearFailedAttempts,
 } from "@/lib/auth/lockout-store";
+import { dbFailure } from "./db-error";
 
 /**
  * Customer (end-user) service. Mirrors the shape of `shops.ts`'s PIN flow
@@ -288,7 +289,7 @@ export async function updateCustomerName(
     .select("id")
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("customers", error);
   if (!data) return { ok: false, code: "not_found", message: "ไม่พบบัญชีนี้" };
   return { ok: true };
 }

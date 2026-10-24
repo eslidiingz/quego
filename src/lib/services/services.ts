@@ -1,5 +1,6 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { dbFailure } from "./db-error";
 
 /**
  * Shop-services (บริการ) service. One shop offers many bookable services
@@ -294,7 +295,7 @@ export async function createService(
     .single();
 
   if (error) {
-    return { ok: false, code: "unknown", message: error.message };
+    return dbFailure("services", error);
   }
   return { ok: true, id: data.id as string };
 }
@@ -333,7 +334,7 @@ export async function updateService(
     .select("id")
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("services", error);
   if (!data) return { ok: false, code: "not_found", message: "ไม่พบบริการนี้" };
   return { ok: true, id: data.id as string };
 }
@@ -356,7 +357,7 @@ export async function setServiceActive(
     .select("id")
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("services", error);
   if (!data) return { ok: false, code: "not_found", message: "ไม่พบบริการนี้" };
   return { ok: true, id: data.id as string };
 }
@@ -379,7 +380,7 @@ export async function deleteService(
     .select("id")
     .maybeSingle();
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("services", error);
   if (!data) return { ok: false, code: "not_found", message: "ไม่พบบริการนี้" };
   return { ok: true, id: data.id as string };
 }
@@ -394,7 +395,7 @@ export async function deleteAllServices(
     .eq("shop_id", shopId)
     .select("id");
 
-  if (error) return { ok: false, code: "unknown", message: error.message };
+  if (error) return dbFailure("services", error);
   return { ok: true, deleted: (data ?? []).length };
 }
 
@@ -438,7 +439,7 @@ export async function createServicesFromPresets(
     .from("shop_services")
     .select("name")
     .eq("shop_id", shopId);
-  if (readError) return { ok: false, code: "unknown", message: readError.message };
+  if (readError) return dbFailure("services", readError);
 
   const existingNames = new Set(
     (existing ?? []).map((r) =>
@@ -488,7 +489,7 @@ export async function createServicesFromPresets(
     .from("shop_services")
     .insert(rows);
   if (insertError) {
-    return { ok: false, code: "unknown", message: insertError.message };
+    return dbFailure("services", insertError);
   }
 
   return { ok: true, added: rows.length, skipped };

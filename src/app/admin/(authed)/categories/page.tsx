@@ -17,10 +17,11 @@ export default async function CategoriesPage() {
     .order("name", { ascending: true });
 
   if (error) {
+    console.error("[admin/categories] load failed:", error);
     return (
       <div className="p-4 md:p-12 max-w-[1280px] mx-auto w-full">
         <div className="rounded-lg border border-error/30 bg-error-container/30 text-error px-4 py-3">
-          โหลดข้อมูลหมวดหมู่ไม่สำเร็จ: {error.message}
+          โหลดข้อมูลหมวดหมู่ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง
         </div>
       </div>
     );

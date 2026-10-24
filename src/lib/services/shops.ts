@@ -35,6 +35,7 @@ import {
   MAX_LOGO_BYTES,
   MAX_COVER_BYTES,
 } from "@/lib/validation/media";
+import { dbFailure } from "./db-error";
 
 // ----- Types --------------------------------------------------------------
 
@@ -548,7 +549,7 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
     .maybeSingle();
 
   if (categoryError) {
-    return { ok: false, code: "unknown", message: categoryError.message };
+    return dbFailure("shops", categoryError);
   }
   if (!category || !category.is_active) {
     return {
@@ -619,7 +620,7 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
       .maybeSingle();
 
     if (clashError) {
-      return { ok: false, code: "unknown", message: clashError.message };
+      return dbFailure("shops", clashError);
     }
     if (clash) {
       return {
@@ -709,7 +710,7 @@ export async function createShop(input: CreateShopInput): Promise<CreateShopResu
               : "เบอร์โทรนี้ถูกใช้สมัครร้านในระบบแล้ว";
       return { ok: false, code: "duplicate", field, message };
     }
-    return { ok: false, code: "unknown", message: error.message };
+    return dbFailure("shops", error);
   }
 
   return { ok: true, id: data.id };
@@ -821,7 +822,7 @@ export async function updateShop(
     .eq("id", id)
     .maybeSingle();
   if (readError) {
-    return { ok: false, code: "unknown", message: readError.message };
+    return dbFailure("shops", readError);
   }
   if (!existing) {
     return { ok: false, code: "not_found", message: "ไม่พบร้านในระบบ" };
@@ -833,7 +834,7 @@ export async function updateShop(
     .eq("id", input.categoryId)
     .maybeSingle();
   if (categoryError) {
-    return { ok: false, code: "unknown", message: categoryError.message };
+    return dbFailure("shops", categoryError);
   }
   if (!category) {
     return {
@@ -869,7 +870,7 @@ export async function updateShop(
         message: "ข้อมูลนี้ขัดแย้งกับร้านอื่นในระบบ",
       };
     }
-    return { ok: false, code: "unknown", message: updateError.message };
+    return dbFailure("shops", updateError);
   }
 
   return { ok: true };
@@ -987,7 +988,7 @@ export async function updateOwnShopProfile(
     .eq("id", input.categoryId)
     .maybeSingle();
   if (categoryError) {
-    return { ok: false, code: "unknown", message: categoryError.message };
+    return dbFailure("shops", categoryError);
   }
   if (!category) {
     return {
@@ -1062,7 +1063,7 @@ export async function updateOwnShopProfile(
         message: "ข้อมูลนี้ขัดแย้งกับร้านอื่นในระบบ",
       };
     }
-    return { ok: false, code: "unknown", message: updateError.message };
+    return dbFailure("shops", updateError);
   }
 
   return { ok: true };
@@ -1355,7 +1356,7 @@ async function setShopImage(
     maxBytes: IMAGE_MAX_BYTES[slot],
   });
   if (!validation.ok) {
-    return { ok: false, code: "unknown", message: validation.message };
+    return dbFailure("shops", validation);
   }
 
   const supabase = getSupabaseAdmin();
@@ -1365,7 +1366,7 @@ async function setShopImage(
     .eq("id", shopId)
     .maybeSingle();
   if (readError) {
-    return { ok: false, code: "unknown", message: readError.message };
+    return dbFailure("shops", readError);
   }
   if (!existing) {
     return { ok: false, code: "not_found", message: "ไม่พบร้านในระบบ" };
