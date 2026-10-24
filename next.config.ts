@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { buildCsp, PERMISSIONS_POLICY } from "./src/lib/security/csp";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -27,6 +28,12 @@ const nextConfig: NextConfig = {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains; preload",
           },
+          // L4: CSP + Permissions-Policy — see src/lib/security/csp.ts.
+          {
+            key: "Content-Security-Policy",
+            value: buildCsp({ dev: process.env.NODE_ENV !== "production" }),
+          },
+          { key: "Permissions-Policy", value: PERMISSIONS_POLICY },
         ],
       },
     ];
