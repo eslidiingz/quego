@@ -64,3 +64,20 @@ describe("verifyPassword on malformed stored values returns false (never throws)
     expect(await verifyPassword("whatever", "scrypt$x$8$1$aa$bb")).toBe(false);
   });
 });
+
+describe("verifyPassword only accepts our fixed scrypt parameters — audit L7", () => {
+  it("rejects a valid hash re-labelled with weaker N/r/p", async () => {
+    const h = await hashPassword("123456");
+    const [, , , , salt, key] = h.split("$");
+    expect(await verifyPassword("123456", `scrypt$1024$8$1$${salt}$${key}`)).toBe(false);
+    expect(await verifyPassword("123456", `scrypt$16384$1$1$${salt}$${key}`)).toBe(false);
+    expect(await verifyPassword("123456", `scrypt$16384$8$2$${salt}$${key}`)).toBe(false);
+  });
+
+  it("rejects a truncated key", async () => {
+    const h = await hashPassword("123456");
+    const [, n, r, p, salt, key] = h.split("$");
+    const short = Buffer.from(key, "base64").subarray(0, 16).toString("base64");
+    expect(await verifyPassword("123456", `scrypt$${n}$${r}$${p}$${salt}$${short}`)).toBe(false);
+  });
+});
