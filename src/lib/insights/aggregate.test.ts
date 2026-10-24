@@ -3,7 +3,8 @@ import {
   parseRange,
   parseReportRange,
   serializeReportRange,
-  computeShopInsights,
+  computeShopInsights as computeFromGroups,
+  groupBookings,
   DEFAULT_INSIGHTS_RANGE,
   type InsightsBooking,
   type InsightsStaff,
@@ -13,6 +14,19 @@ import {
 import type { BusinessHour, DayOfWeek } from "@/lib/booking/slot-math";
 
 // --- Fixture helpers ---------------------------------------------------------
+
+/**
+ * Tests write per-booking fixtures; production feeds SQL-grouped rows. Route
+ * fixtures through `groupBookings` (the JS twin of the SQL rollup) so every
+ * metric test also exercises the grouping.
+ */
+function computeShopInsights(
+  input: Omit<Parameters<typeof computeFromGroups>[0], "bookings"> & {
+    bookings: InsightsBooking[];
+  },
+) {
+  return computeFromGroups({ ...input, bookings: groupBookings(input.bookings) });
+}
 
 /** Build one InsightsBooking; overrides win over the active 60-min default. */
 function makeBooking(overrides: Partial<InsightsBooking> = {}): InsightsBooking {
@@ -952,5 +966,75 @@ describe("computeShopInsights — hasData & window bounds", () => {
       hasFilter: false,
       filteredToZero: false,
     });
+  });
+});
+
+describe("groupBookings", () => {
+  it("sums count, minutes and non-null revenue per staff/service/status/hour", () => {
+    const groups = groupBookings([
+      makeBooking({ slotTime: "10:00", staffId: "s1", price: 300 }),
+      makeBooking({ slotTime: "10:45", staffId: "s1", price: null, durationMinutes: 30 }),
+      makeBooking({ slotTime: "11:00", staffId: "s1", price: 200 }),
+      makeBooking({ slotTime: "10:00", staffId: "s1", status: "cancelled", price: 300 }),
+    ]);
+    expect(groups).toHaveLength(3);
+    expect(groups).toContainEqual({
+      staffId: "s1",
+      serviceId: null,
+      status: "confirmed",
+      hour: 10,
+      count: 2,
+      minutes: 90,
+      revenue: 300,
+    });
+    expect(groups).toContainEqual(
+      expect.objectContaining({ status: "cancelled", hour: 10, count: 1 }),
+    );
+  });
+
+  it("gives the same insights as one group per booking", () => {
+    const bookings = Array.from({ length: 1500 }, (_, i) =>
+      makeBooking({
+        slotTime: `${String(9 + (i % 8)).padStart(2, "0")}:00`,
+        staffId: i % 2 ? "a" : "b",
+        status: i % 10 === 0 ? "cancelled" : "confirmed",
+        price: 100,
+      }),
+    );
+    const input = {
+      rangeDays: 1,
+      windowDates: [day("2026-06-01", 1)],
+      hours: makeHours(),
+      staff: [makeStaff("a", "A"), makeStaff("b", "B")],
+    };
+    const grouped = computeShopInsights({ ...input, bookings });
+    const oneEach = computeFromGroups({
+      ...input,
+      bookings: bookings.flatMap((b) => groupBookings([b])),
+    });
+    expect(grouped).toEqual(oneEach);
+    expect(grouped.totalBookings).toBe(1350);
+    expect(grouped.revenue).toBe(135000);
+  });
+});
+
+describe("computeShopInsights — pre-summed expenses", () => {
+  it("uses each row's count for the per-category tally", () => {
+    const result = computeFromGroups({
+      rangeDays: 1,
+      windowDates: [day("2026-06-01", 1)],
+      hours: makeHours(),
+      bookings: [],
+      staff: [],
+      expenses: [
+        makeExpense({ category: "ค่าเช่า", amount: 900, count: 3 }),
+        makeExpense({ category: "ค่าไฟ", amount: 50 }),
+      ],
+    });
+    expect(result.expensesTotal).toBe(950);
+    expect(result.expensesByCategory).toEqual([
+      { category: "ค่าเช่า", amount: 900, count: 3 },
+      { category: "ค่าไฟ", amount: 50, count: 1 },
+    ]);
   });
 });
