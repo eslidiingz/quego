@@ -9,7 +9,7 @@ import type {
   LineWebhookEvent,
 } from "./types";
 import { replyLineMessage } from "./client";
-import { classifyLineTextCommand } from "./message-commands";
+import { classifyLineTextCommand, shouldLogInboundMessage } from "./message-commands";
 import { claimLineWebhookEvent, recordLineMessage } from "@/lib/services/line-log";
 import { isStaleLineEvent, webhookEventKey } from "./webhook-guard";
 import { buildGroupBindConfirmFlex, parseGroupBindPostback } from "./group-bind";
@@ -189,20 +189,23 @@ async function handleMessage(event: LineMessageEvent): Promise<void> {
       ? event.message.text
       : "";
 
-  await recordLineMessage({
-    recipient: groupId ?? userId ?? "unknown",
-    direction: "inbound",
-    kind: "message",
-    status: "received",
-    lineMessageId: messageId ?? null,
-    meta: { messageType: event.message.type, source: event.source.type },
-  });
-
-  if (event.message.type !== "text") return;
-
   // Pure routing decision (tested in message-commands.test.ts) — the dispatcher
   // below only carries out the side effects for whichever command it names.
+  // Non-text messages classify as "none".
   const command = classifyLineTextCommand(text, Boolean(groupId));
+
+  if (shouldLogInboundMessage(command, Boolean(groupId))) {
+    await recordLineMessage({
+      recipient: groupId ?? userId ?? "unknown",
+      direction: "inbound",
+      kind: "message",
+      status: "received",
+      lineMessageId: messageId ?? null,
+      meta: { messageType: event.message.type, source: event.source.type },
+    });
+  }
+
+  if (event.message.type !== "text") return;
 
   // In a group/room the bot must stay quiet on normal chatter — never run the
   // link-hint here (it would fire on staff conversation). Only echo the groupId

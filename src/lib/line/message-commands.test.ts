@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { classifyLineTextCommand } from "./message-commands";
+import { classifyLineTextCommand, shouldLogInboundMessage } from "./message-commands";
 
 describe("classifyLineTextCommand — in a group/room (inGroup=true)", () => {
   it('routes "เชื่อมร้าน" to the bind command', () => {
@@ -88,5 +88,24 @@ describe("classifyLineTextCommand — in a 1:1 chat (inGroup=false)", () => {
     expect(classifyLineTextCommand("สวัสดี", false)).toBe("none");
     expect(classifyLineTextCommand("ขอจองคิว", false)).toBe("none");
     expect(classifyLineTextCommand("", false)).toBe("none");
+  });
+});
+
+describe("shouldLogInboundMessage", () => {
+  it("skips plain group chatter", () => {
+    expect(shouldLogInboundMessage(classifyLineTextCommand("พรุ่งนี้กี่โมง", true), true)).toBe(
+      false,
+    );
+  });
+
+  it("logs group commands", () => {
+    expect(shouldLogInboundMessage("group_bind", true)).toBe(true);
+    expect(shouldLogInboundMessage("group_unbind", true)).toBe(true);
+    expect(shouldLogInboundMessage("group_id_echo", true)).toBe(true);
+  });
+
+  it("always logs 1:1 messages", () => {
+    expect(shouldLogInboundMessage("none", false)).toBe(true);
+    expect(shouldLogInboundMessage("link_hint", false)).toBe(true);
   });
 });

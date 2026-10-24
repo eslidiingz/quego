@@ -60,3 +60,17 @@ export function classifyLineTextCommand(
   }
   return LINK_HINT_RE.test(text) ? "link_hint" : "none";
 }
+
+/**
+ * Whether an inbound message is worth a `line_message_log` row (audit L5).
+ * A group the OA sits in carries the staff's whole day of chatter, so there we
+ * log only messages that are commands; 1:1 chats are low-volume and always
+ * logged. Redelivery dedupe does not depend on this log (see
+ * `claimLineWebhookEvent`).
+ */
+export function shouldLogInboundMessage(
+  command: LineTextCommand,
+  inGroup: boolean,
+): boolean {
+  return !inGroup || command !== "none";
+}
